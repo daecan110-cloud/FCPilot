@@ -24,6 +24,14 @@ env/
 *.swp
 *.swo
 
+# Test/output files
+output_*.xlsx
+test_*.xlsx
+final_*.xlsx
+v[0-9]_*.xlsx
+~$*.xlsx
+*보장분석.pdf
+
 # OS
 .DS_Store
 Thumbs.db

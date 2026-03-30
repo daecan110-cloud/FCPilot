@@ -103,11 +103,7 @@ def _do_signup(email: str, password: str, display_name: str):
             "options": {"data": {"display_name": display_name}},
         })
         if res.user:
-            # 사용자 설정 초기화
-            sb.table("fp_users_settings").insert({
-                "id": res.user.id,
-                "display_name": display_name or email.split("@")[0],
-            }).execute()
+            # fp_users_settings는 DB 트리거가 자동 생성
             st.success("회원가입 완료! 이메일 인증 후 로그인해주세요.")
         else:
             st.warning("회원가입 요청이 전송되었습니다. 이메일을 확인해주세요.")

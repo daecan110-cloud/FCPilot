@@ -13,16 +13,15 @@ def main():
 
     check_session_timeout()
 
-    # 사이드바
     with st.sidebar:
-        st.title("🛡️ FCPilot")
+        st.title("FCPilot")
         user = st.session_state.get("user")
         if user:
-            st.caption(f"📧 {user.email}")
+            st.caption(user.email)
 
         tab = st.radio(
             "메뉴",
-            ["📊 보장분석", "⚙️ 설정"],
+            ["보장분석", "고객관리", "개척지도", "설정"],
             label_visibility="collapsed",
         )
 
@@ -30,11 +29,16 @@ def main():
         if st.button("로그아웃", use_container_width=True):
             logout()
 
-    # 페이지 라우팅
-    if tab == "📊 보장분석":
+    if tab == "보장분석":
         from pages.page_analysis import render
         render()
-    elif tab == "⚙️ 설정":
+    elif tab == "고객관리":
+        from pages.page_clients import render
+        render()
+    elif tab == "개척지도":
+        from pages.page_pioneer_map import render
+        render()
+    elif tab == "설정":
         from pages.page_settings import render
         render()
 

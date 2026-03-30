@@ -5,7 +5,7 @@ from utils.supabase_client import get_supabase_client
 
 
 def render():
-    st.header("⚙️ 설정")
+    st.header("설정")
 
     sb = get_supabase_client()
     user_id = get_current_user_id()
