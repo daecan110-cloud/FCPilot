@@ -1,0 +1,33 @@
+# Secrets
+.streamlit/secrets.toml
+.env
+
+# Data files (고객 개인정보 보호)
+*.csv
+*.xlsx
+*.xls
+!templates/*.xlsx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs (프로젝트 설정 문서 - 코드만 커밋)
+FCPilot_*.md
+CLAUDE 기본설정/
