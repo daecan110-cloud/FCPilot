@@ -18,7 +18,7 @@
 
 ---
 
-# Sprint 2 (Phase 2: CRM + 개척) — 진행 중
+# Sprint 2 (Phase 2: CRM + 개척) — 완료
 
 ## 목표
 - [ ] 1. 구글시트 CSV → Supabase 마이그레이션 (fp_clients, fp_contact_logs)
@@ -72,20 +72,18 @@
 
 ---
 
-# Sprint 3 계획 (Phase 3: 개척 고도화 + 약관)
+# Sprint 3 (Phase 3: 개척 고도화 + 약관) — 완료
 
-## 건드릴 파일
-```
-신규:
-- pages/page_pioneer_route.py
-- pages/page_yakwan.py
-- services/yakwan_engine.py
-- services/followup.py
-- services/reminder.py
-
-수정:
-- app.py (탭 추가)
-```
+- [x] yakwan_engine.py (약관 PDF → 구조화 JSON + K열 요약)
+- [x] page_analysis.py (약관 분석 → I열 반영 → 엑셀 재생성)
+- [x] excel_generator.py (k_column_data 지원)
+- [x] fp_yakwan_records 테이블 SQL
+- [x] map_utils.py (polyline + 번호 마커)
+- [x] page_pioneer_route.py (동선 추적 탭)
+- [x] app.py (동선기록 탭 추가)
+- [x] followup.py (팔로업 상태머신)
+- [x] page_pioneer_map.py (팔로업 탭)
+- [x] reminder.py (리마인드 대상 조회)
 
 ---
 

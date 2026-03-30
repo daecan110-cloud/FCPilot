@@ -2,67 +2,54 @@
 
 ## 현재 상태
 
-**Phase:** Sprint 2 완료 (CRM + 개척 핵심)
-**마지막 세션:** 2026-03-31 (Opus — 전체 문서 검토 + Sprint 3 설계)
+**Phase:** Sprint 3 완료 (개척 고도화 + 약관)
+**마지막 세션:** 2026-03-31
 
 ---
 
 ## Sprint 1 (MVP) — 완료
+## Sprint 2 (CRM + 개척) — 완료
+## Sprint 3 (개척 고도화 + 약관) — 완료
 
-- [x] 프로젝트 초기화 (repo, 파일 구조, requirements.txt)
-- [x] Supabase 테이블 생성 (fp_users_settings, fp_clients, fp_contact_logs, fp_analysis_records)
-- [x] Auth 구현 (로그인/회원가입/세션 타임아웃)
-- [x] 보장분석 엔진 v4 (PDF → pdfplumber → 엑셀)
-- [x] 텔레그램 알림 모듈
-- [x] 약관 분석 AI 대화창
-
-### Sprint 1 미해결 (병행 수정)
-- [ ] 보장분석표 하단 섹션(가족/세액공제) 셀 병합 패턴 정밀 검증
-- [ ] Streamlit Cloud 배포 (fcpilot-kr.streamlit.app)
-
----
-
-## Sprint 2 (CRM + 개척 핵심) — 구현 완료
-
-- [x] 고객 목록/상세/등록/수정 (page_clients.py)
-- [x] 상담 기록 타임라인 (page_clients.py)
-- [x] CSV 마이그레이션 (migration.py)
-- [x] 간판 OCR — Claude Vision (ocr_engine.py)
-- [x] 개척 매장 등록 (page_pioneer_map.py)
-- [x] 개척지도 folium (page_pioneer_map.py + map_utils.py)
-- [x] Naver 지오코딩 (geocoding.py)
-- [x] UI 한국어화 (app.py, page_settings.py)
-
-### Sprint 2 영민 확인 필요
-- [ ] Supabase SQL 실행: sql/003_sprint2_tables.sql (fp_pioneer_shops, fp_pioneer_visits)
-- [ ] 로컬 테스트: streamlit run app.py → 고객관리/개척지도 탭 확인
-- [ ] 실제 간판 사진으로 OCR 테스트
-- [ ] 구글시트 CSV 마이그레이션 테스트
+- [x] yakwan_engine.py (Claude API → 구조화 JSON + K열 요약)
+- [x] page_analysis.py 수정 (약관 분석 → I열 반영 → 엑셀 재생성/재다운로드)
+- [x] excel_generator.py (k_column_data 파라미터 지원)
+- [x] fp_yakwan_records DB 저장 (sql/004_yakwan_records.sql)
+- [x] map_utils.py 확장 (AntPath polyline + 번호 마커)
+- [x] page_pioneer_route.py (동선 추적 탭 — 오늘 기록/이전 기록)
+- [x] app.py (동선기록 탭 추가 — 총 5탭)
+- [x] followup.py (팔로업 상태머신 — 결과별 재방문 기한/우선순위)
+- [x] page_pioneer_map.py (팔로업 탭 추가)
+- [x] reminder.py (리마인드 대상 조회 — 발송 트리거는 Sprint 4)
 
 ---
 
-## 다음 세션 할 일 (Sprint 3: 개척 고도화 + 약관)
+## 영민 확인 필요
 
-- [ ] 동선 추적 탭 (page_pioneer_route.py)
-- [ ] 팔로업 플로우 엔진 (followup.py)
-- [ ] 약관 분석 전용 탭 (page_yakwan.py + yakwan_engine.py)
-- [ ] 리마인드 알림 (reminder.py)
+### Supabase SQL 실행 (2개)
+1. `sql/003_sprint2_tables.sql` — fp_pioneer_shops, fp_pioneer_visits
+2. `sql/004_yakwan_records.sql` — fp_yakwan_records
+
+### 기능 테스트
+- 고객관리 탭: 등록/수정/상담기록
+- 개척지도 탭: 매장 등록 → 팔로업 확인
+- 동선기록 탭: 방문 추가 → 동선 지도
+- 보장분석 탭: 약관 PDF → I열 반영 → 엑셀 재다운로드
+
+---
+
+## 미해결 이슈
+
+- 보장분석표 하단 셀 병합 패턴 정밀 검증 (Sprint 1 잔여)
+- Streamlit Cloud 배포 미완료
+- 텔레그램 양방향 폴링 미구현
+
+---
+
+## 다음 세션 (Sprint 4: 통합 대시보드)
+
+- [ ] page_home.py (대시보드 — 리마인드/팔로업/최근 활동)
+- [ ] page_stats.py (통계 — 계약률, 활동량, 매출)
+- [ ] 텔레그램 양방향 getUpdates 폴링
+- [ ] reminder.py 발송 트리거 (텔레그램 알림)
 - [ ] Streamlit Cloud 배포
-
----
-
-## 알려진 이슈
-
-- Supabase project ID: zrtjojphudopwzjpyzoy (AlphaBot과 공유 — fp_ 접두사 분리)
-- AlphaBot GitHub repo private 전환 아직 미완료
-- Streamlit Cloud 무료 플랜 앱 개수 제한 확인 필요
-- 보장분석표 하단 셀 병합 패턴 검증 미완 (Sprint 1 잔여)
-
----
-
-## 영민에게 물어볼 것
-
-- Supabase SQL 실행 완료 여부
-- 구글시트 CSV 파일 준비 여부 (마이그레이션용)
-- Naver Developers API 키 발급 완료 여부
-- Streamlit Cloud 배포 시점 (Sprint 2 확인 후? Sprint 3 후?)
