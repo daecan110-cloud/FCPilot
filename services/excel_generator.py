@@ -93,7 +93,8 @@ def _fill_primary(slice_data, full_data, include_review):
     if include_review:
         _fill_renewal(ws, slice_data.get("계약", []))
 
-    _fill_review_values(ws, all_contracts)
+    k_column = full_data.get("_k_column", {})
+    _fill_review_values(ws, all_contracts, k_column)
     _fill_family_values(ws, full_data, extra)
     _fill_tax_values(ws, full_data, extra)
 
@@ -330,7 +331,8 @@ def _infer_premium_change(contract):
 # 리뷰 (Row 75~) — 값만 설정, 서식 건드리지 않음
 # ══════════════════════════════════════════════════════════════════
 
-def _fill_review_values(ws, all_contracts):
+def _fill_review_values(ws, all_contracts, k_column=None):
+    k_column = k_column or {}
     for i, c in enumerate(all_contracts):
         r = REVIEW_START + i
         safe_val(ws, r, 1, f"{c.get('보험사', '')}\n{c.get('상품명', '')}")
@@ -340,7 +342,9 @@ def _fill_review_values(ws, all_contracts):
         prem = c.get("월보험료", 0)
         safe_val(ws, r, 4, f"{prem:,}원" if prem > 0 else "0원\n(단체/무료)")
         safe_val(ws, r, 5, _build_review(c))
-        safe_val(ws, r, 9, "약관 제공 시\n분석 가능")
+        # I열: 약관 분석 결과 있으면 반영, 없으면 기본값
+        k_text = k_column.get(i, k_column.get(str(i), ""))
+        safe_val(ws, r, 9, k_text if k_text else "약관 제공 시\n분석 가능")
 
 
 def _build_review(contract):

@@ -11,10 +11,12 @@ from config import ALLOWED_FILE_TYPES, MAX_FILE_SIZE_MB
 def render():
     st.header("개척지도")
 
-    tab_map, tab_register, tab_ocr = st.tabs(["지도", "매장 등록", "간판 OCR"])
+    tab_map, tab_followup, tab_register, tab_ocr = st.tabs(["지도", "팔로업", "매장 등록", "간판 OCR"])
 
     with tab_map:
         _render_map()
+    with tab_followup:
+        _render_followup()
     with tab_register:
         _render_register()
     with tab_ocr:
@@ -163,3 +165,39 @@ def _render_ocr():
                 st.session_state.pop("ocr_result", None)
             except Exception as e:
                 st.error(f"등록 실패: {e}")
+
+
+# ── 팔로업 ──
+
+def _render_followup():
+    from services.followup import get_followup_list
+    from utils.map_utils import VISIT_RESULT_LABELS
+
+    st.subheader("팔로업 현황")
+    fc_id = get_current_user_id()
+    followups = get_followup_list(fc_id)
+
+    if not followups:
+        st.info("팔로업 대상이 없습니다.")
+        return
+
+    priority_icons = {"high": "!!!", "medium": "!!", "low": ""}
+
+    for f in followups:
+        shop = f["shop"]
+        icon = priority_icons.get(f["priority"], "")
+        name = shop.get("shop_name", "")
+
+        if f["overdue"]:
+            st.error(f"{icon} **{name}** — {f['action']}")
+        elif f["priority"] == "medium":
+            st.warning(f"{icon} **{name}** — {f['action']} (D-{f.get('days_left', '?')})")
+        else:
+            st.info(f"**{name}** — {f['action']} (D-{f.get('days_left', '?')})")
+
+        if f.get("last_visit"):
+            lv = f["last_visit"]
+            result_text = VISIT_RESULT_LABELS.get(lv.get("result", ""), "")
+            st.caption(f"최근 방문: {lv.get('visit_date', '')} | {result_text}")
+
+    st.caption(f"총 {len(followups)}건")

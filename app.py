@@ -21,7 +21,7 @@ def main():
 
         tab = st.radio(
             "메뉴",
-            ["보장분석", "고객관리", "개척지도", "설정"],
+            ["보장분석", "고객관리", "개척지도", "동선기록", "설정"],
             label_visibility="collapsed",
         )
 
@@ -37,6 +37,9 @@ def main():
         render()
     elif tab == "개척지도":
         from pages.page_pioneer_map import render
+        render()
+    elif tab == "동선기록":
+        from pages.page_pioneer_route import render
         render()
     elif tab == "설정":
         from pages.page_settings import render
