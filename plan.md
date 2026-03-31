@@ -52,10 +52,19 @@
 
 ---
 
+## Sprint 7 — 완료 (2026-03-31)
+- [x] 텔레그램 봇 v5 (10가지 action, Gemini 100%)
+- [x] handleContact/handleVisit/handleSearch/handleStats
+- [x] contact_logs 방문 예약 컬럼 추가
+- [x] Edge Function npm: import 방식 배포
+- [x] 자동 테스트 10/10 통과
+
+---
+
 ## 다음 Sprint 후보
 
 | 항목 | 우선순위 |
 |------|---------|
 | 200줄 초과 파일 분리 (excel_generator 512줄 등 6개) | 높음 |
-| 텔레그램 봇 분리 (개발 알림용 / FCPilot 사용자용) | 중간 |
 | Streamlit Cloud 배포 후 실사용 테스트 | 높음 |
+| 텔레그램 봇 분리 (개발 알림용 / FCPilot 사용자용) | 중간 |
