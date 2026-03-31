@@ -5,6 +5,7 @@ import streamlit as st
 
 from auth import get_current_user_id
 from services.reminder import get_all_reminders
+from services.remind_trigger import check_and_send_daily_reminder
 from utils.supabase_client import get_supabase_client
 
 
@@ -17,6 +18,7 @@ def render():
         st.warning("로그인이 필요합니다.")
         return
 
+    check_and_send_daily_reminder()
     reminders = get_all_reminders(fc_id)
     _render_summary(reminders)
     st.divider()
