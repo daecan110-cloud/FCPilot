@@ -90,3 +90,17 @@ def cancel_reminder(reminder_id: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def update_reminder(reminder_id: str, reminder_date: str, purpose: str,
+                    product_ids: list | None, memo: str) -> bool:
+    try:
+        get_supabase_client().table("fp_reminders").update({
+            "reminder_date": reminder_date,
+            "purpose": purpose,
+            "product_ids": product_ids or None,
+            "memo": memo or None,
+        }).eq("id", reminder_id).execute()
+        return True
+    except Exception:
+        return False
