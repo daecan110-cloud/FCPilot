@@ -113,7 +113,7 @@ CREATE POLICY "fc_own_photos" ON storage.objects
 # auth.py에 추가
 import time
 
-SESSION_TIMEOUT = 30 * 60  # 30분
+SESSION_TIMEOUT = 60 * 60  # 60분
 
 def check_session_timeout():
     """60분 무활동 시 자동 로그아웃"""

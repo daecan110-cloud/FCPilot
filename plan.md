@@ -87,14 +87,22 @@
 
 ---
 
-# Sprint 4 계획 (Phase 4: 통합 대시보드)
+# Sprint 4 (Phase 4: 통합 대시보드 + 양방향 + 리마인드) — 완료
 
-## 건드릴 파일
-```
-신규:
-- pages/page_home.py
-- pages/page_stats.py
+- [x] 텔레그램 양방향 (getUpdates 폴링 + 명령어 파싱)
+- [x] utils/db_admin.py (SQL 실행 유틸)
+- [x] K열 약관 분석 UI 텍스트 통일
+- [x] pages/page_home.py (홈 대시보드)
+- [x] pages/page_stats.py (통계 대시보드)
+- [x] app.py 탭 추가 (7개)
+- [x] 리마인드 발송 트리거
+- [x] 세액공제 셀 병합 충돌 수정
 
-수정:
-- app.py (홈 탭 추가)
-```
+---
+
+# Sprint 5 계획 (Phase 5: 배포 + QA)
+
+## 목표
+- Streamlit Cloud 배포
+- 전체 QA + 보안 체크리스트
+- 텔레그램 양방향 통합 테스트

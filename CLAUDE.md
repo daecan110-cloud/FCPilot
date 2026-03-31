@@ -36,16 +36,16 @@ templates/          → 엑셀 템플릿 등 정적 파일.
 
 ## 세션 시작 시
 
-1. `plan.md` 읽기 → 오늘 목표 확인
-2. `handoff.md` 읽기 → 이전 세션 상태 확인
-3. 작업 대상 파일 먼저 읽기 → 수정 전 현재 상태 파악
-4. 작업 완료 후 → handoff.md 업데이트 + git commit
+1. `git pull origin main` → 최신 코드 동기화
+2. `plan.md` 읽기 → 오늘 목표 확인
+3. `handoff.md` 읽기 → 이전 세션 상태 확인
+4. 작업 대상 파일 먼저 읽기 → 수정 전 현재 상태 파악
 
 ## 세션 종료 시
 
 1. handoff.md 업데이트 (완료/미완료/이슈)
-2. git add + commit (작업 단위별)
-3. plan.md에 완료 체크
+2. plan.md에 완료 체크
+3. `git add -A` → `git commit` → `git push origin main`
 
 ## DB 테이블 (fp_ 접두사)
 
