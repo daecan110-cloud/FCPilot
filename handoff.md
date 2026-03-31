@@ -23,11 +23,11 @@
 - [x] Streamlit Cloud 배포 준비 완료
 
 ### Streamlit Cloud 배포 (영민 수동)
-- [ ] https://share.streamlit.io → New app
-- [ ] Repo: japanstudy1205-cloud/FCPilot, Branch: main, File: app.py
+- [ ] https://share.streamlit.io → **daecan110@gmail.com-cloud** 계정으로 로그인
+- [ ] New app → Repo: daecan110-cloud/FCPilot, Branch: main, File: app.py
 - [ ] Custom subdomain: fcpilot-kr
-- [ ] Secrets: .streamlit/secrets.toml 내용 붙여넣기
-- [ ] Deploy 클릭
+- [ ] Advanced settings → Secrets: .streamlit/secrets.toml 내용 붙여넣기
+- [ ] Deploy 클릭 → fcpilot-kr.streamlit.app 접속 확인
 
 ### Daily Reminder cron (영민 수동)
 - [ ] Supabase Dashboard → Database → Extensions → pg_cron + pg_net 활성화
