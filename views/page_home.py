@@ -94,8 +94,9 @@ def _render_reminder_card(r: dict, bucket: str):
                 st.caption(memo)
             st.caption(f"예정일: {d}")
         with col_btn:
+            fc_id = r.get("fc_id", "")
             if st.button("완료", key=f"done_{rid}_{bucket}", type="primary", use_container_width=True):
-                complete_reminder(rid)
+                complete_reminder(fc_id, rid)
                 st.rerun()
             if st.button("수정", key=f"edit_{rid}_{bucket}", use_container_width=True):
                 st.session_state[edit_key] = not st.session_state.get(edit_key, False)
@@ -173,7 +174,8 @@ def _render_edit_form(r: dict, edit_key: str):
         c1, c2 = st.columns(2)
         if c1.form_submit_button("저장", type="primary", use_container_width=True):
             pids = [prod_map[n] for n in new_prods if n in prod_map] or None
-            if update_reminder(rid, str(new_date), new_purpose, pids, new_memo):
+            fc_id = r.get("fc_id", "")
+            if update_reminder(fc_id, rid, str(new_date), new_purpose, pids, new_memo):
                 st.session_state.pop(edit_key, None)
                 st.rerun()
             else:

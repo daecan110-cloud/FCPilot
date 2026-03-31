@@ -182,8 +182,8 @@ def _render_list():
             if st.session_state.get(confirm_key):
                 if st.button("확인", key=f"del_confirm_{c['id']}", type="primary"):
                     try:
-                        sb.table("contact_logs").delete().eq("client_id", c["id"]).execute()
-                        sb.table("clients").delete().eq("id", c["id"]).execute()
+                        sb.table("contact_logs").delete().eq("client_id", c["id"]).eq("fc_id", fc_id).execute()
+                        sb.table("clients").delete().eq("id", c["id"]).eq("fc_id", fc_id).execute()
                         st.session_state.pop(confirm_key, None)
                         st.rerun()
                     except Exception as e:
@@ -204,8 +204,9 @@ def _render_detail():
         st.session_state.clients_view = "list"
         st.rerun()
 
+    fc_id = get_current_user_id()
     try:
-        res = sb.table("clients").select("*").eq("id", client_id).single().execute()
+        res = sb.table("clients").select("*").eq("id", client_id).eq("fc_id", fc_id).single().execute()
         client = res.data
     except Exception as e:
         st.error(f"조회 실패: {e}")
@@ -259,8 +260,8 @@ def _render_client_delete(sb, client_id: str):
         col_y, col_n = st.columns(2)
         if col_y.button("삭제 확인", type="primary", use_container_width=True):
             try:
-                sb.table("contact_logs").delete().eq("client_id", client_id).execute()
-                sb.table("clients").delete().eq("id", client_id).execute()
+                sb.table("contact_logs").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
+                sb.table("clients").delete().eq("id", client_id).eq("fc_id", fc_id).execute()
                 st.session_state.pop(confirm_key, None)
                 st.session_state.clients_view = "list"
                 st.rerun()
@@ -314,7 +315,7 @@ def _render_contact_logs(sb, client_id: str):
                 col_y, col_n = st.columns(2)
                 if col_y.button("삭제 확인", key=f"log_del_yes_{log['id']}", type="primary"):
                     try:
-                        sb.table("contact_logs").delete().eq("id", log["id"]).execute()
+                        sb.table("contact_logs").delete().eq("id", log["id"]).eq("fc_id", fc_id).execute()
                         st.session_state.pop(confirm_key, None)
                         st.rerun()
                     except Exception as e:
@@ -472,10 +473,10 @@ def _render_reminder_section(sb, fc_id: str, client_id: str):
             col_r, col_done, col_cancel = st.columns([5, 1, 1])
             col_r.caption(f"{icon} {r['reminder_date']} | {r.get('purpose','')} | {(r.get('memo') or '')[:30]}")
             if col_done.button("완료", key=f"r_done_{r['id']}", use_container_width=True):
-                complete_reminder(r["id"])
+                complete_reminder(fc_id, r["id"])
                 st.rerun()
             if col_cancel.button("취소", key=f"r_cancel_{r['id']}", use_container_width=True):
-                cancel_reminder(r["id"])
+                cancel_reminder(fc_id, r["id"])
                 st.rerun()
 
     # 등록 폼

@@ -1,6 +1,6 @@
 # MASTER.md — FCPilot
 
-> **최종 업데이트**: 2026-03-31 (Sprint 8 진행 중)
+> **최종 업데이트**: 2026-03-31 (Sprint 7 완료 기준)
 
 ---
 
@@ -61,23 +61,23 @@
 
 | # | 테이블명 | 용도 |
 |---|----------|------|
-| 1 | users_settings | FC 설정 (영업 모드, **role: admin/user**) |
-| 2 | clients | 고객 마스터 |
-| 3 | contact_logs | 상담 이력 (visit_reserved, visit_datetime 컬럼 포함) |
-| 4 | pioneer_shops | 개척 매장 |
-| 5 | pioneer_visits | 개척 방문 기록 |
-| 6 | analysis_records | 보장분석 기록 |
-| 7 | yakwan_records | 약관 분석 기록 |
+| 1 | fp_users_settings | FC 설정 (영업 모드, **role: admin/user**) |
+| 2 | fp_clients | 고객 마스터 |
+| 3 | fp_contact_logs | 상담 이력 |
+| 4 | fp_pioneer_shops | 개척 매장 |
+| 5 | fp_pioneer_visits | 개척 방문 기록 |
+| 6 | fp_analysis_records | 보장분석 기록 |
+| 7 | fp_yakwan_records | 약관 분석 기록 |
 | 8 | command_queue | 텔레그램 명령 큐 |
 | 9 | bot_sessions | 텔레그램 봇 세션 (인스턴스 간 상태 공유) |
 
-> **실제 테이블명**: `fp_` 접두사 없음 (CLAUDE.md 기준 — MASTER.md 이전 버전의 fp_ 표기는 오기)
+> **접두사 규칙**: `fp_` — FCPilot 테이블 식별 (독립 인스턴스이나 관례 유지)
 
 ---
 
 ## 5. 앱 구조
 
-### 5-1. 탭 구조
+### 5-1. 탭 구조 (배포 확인 완료)
 
 | 탭 | 파일 | 핵심 기능 |
 |----|------|-----------|
@@ -119,7 +119,6 @@
 - **기능**: 고객 등록/조회/수정/삭제, 상담기록, 방문예약, 검색, 통계 (10가지 action)
 - **세션**: bot_sessions 테이블 (Edge Function 인스턴스 간 상태 공유)
 - **테스트**: 자동 테스트 10/10 통과 (Sprint 7 완료)
-- **배포 방식**: Management API + raw TypeScript 소스 (`npm:@supabase/supabase-js@2` import)
 
 ### 6-2. 봇 분리 계획 (향후)
 
@@ -144,7 +143,6 @@
 | 리마인드 | reminder.py | 대상 조회 로직 (발송 트리거 미구현) |
 | 엑셀 생성 | excel_generator.py | master_template.xlsx 기반 보장분석표 |
 | 지도 | map_utils.py | folium AntPath + 번호 마커 |
-| 상담이력 파서 | services/contact_log_parser.py | 메모 텍스트 → 날짜별 contact_log 분리 저장 |
 
 ---
 
@@ -159,22 +157,15 @@
 | 5 | 텔레그램 봇 v4 (자연어 CRM) + QA + 보안 체크 + 배포 준비 | ✅ 완료 |
 | 6 | UI 정리 (views/ 이동) + Admin/User 역할 분리 + 보안 최종 점검 | ✅ 완료 |
 | 7 | 텔레그램 봇 v5 (10가지 action + 자동 테스트 10/10) | ✅ 완료 |
-| 8 | 엑셀 마이그레이션(99명+34건) + 통합 테스트 + 버그픽스 + 배포 | 🔄 진행 중 |
 
 ---
 
 ## 9. 다음 작업
 
-### Sprint 8: 통합 테스트 + 버그픽스 + 배포
-
-| Phase | 내용 | 상태 |
-|-------|------|------|
-| A | 엑셀 마이그레이션 (99명 + 상담이력 34건) | ✅ 완료 |
-| A | Streamlit Cloud 배포 (fcpilot-kr.streamlit.app) | ✅ 완료 |
-| B | 통합 테스트 버그픽스 (P0: 저장실패 2건, P1: 5건, P2: 6건) | 🔄 진행 중 |
-| C | 실사용 + 피드백 수집 | ⬜ B 완료 후 |
-
-> 상세: FCPilot_Sprint8B_Bugfix.md 참조
+### Sprint 8: 통합 테스트 + 버그픽스 + 실사용
+- CSV 마이그레이션 완료 (99명 + 상담이력)
+- Streamlit Cloud 배포 완료
+- 통합 테스트에서 발견된 이슈 수정 중 → 세부는 handoff.md 참조
 
 ### Sprint 9 이후 (백로그)
 
@@ -203,7 +194,6 @@
 | 2026-03-31 | Edge Function + webhook | 폴링 대비 실시간성, 서버리스 |
 | 2026-03-31 | views/ 폴더명 변경 | Streamlit 사이드바 자동 노출 차단 |
 | 2026-03-31 | Admin/User 역할 | 동료 FC 확장 대비, 설정 접근 제어 |
-| 2026-03-31 | contact_log_parser.py | 날짜별 상담이력 분리 저장 — 엑셀 마이그레이션 + 앱 신규 저장 공통 사용 |
 
 ---
 
@@ -219,10 +209,19 @@
 ## 12. 보안 규칙
 
 - GitHub repo: **private 필수** (고객 개인정보)
+- `fp_` 접두사: 테이블 네이밍 규칙 유지
 - 데이터 파일 git 커밋 금지
 - API 키 하드코딩 금지 → secrets.toml / 환경변수
 - bare except 금지
 - 보안 체크리스트: Sprint 6 ALL CLEAR 달성
+
+---
+
+## 12-1. 개발 원칙 (Sprint 8부터 적용)
+
+- **영민 수동 테스트 없이 Sprint 완료 선언 금지** — 세부 규칙은 CLAUDE.md
+- **한 번에 최대 3개 파일** 변경, 큰 작업은 쪼개서 중간 커밋
+- **P0 → P1 → P2** 순서 엄수, 확인 없이 다음 단계 금지
 
 ---
 
@@ -249,7 +248,7 @@
 ### 문서 간 역할 구분
 
 ```
-[Opus가 Sprint 설계서 작성] ← 방향/시나리오/테스트 기준 (예: FCPilot_Sprint8B_Bugfix.md)
+[Opus가 Sprint 설계서 작성] ← 방향/시나리오/테스트 기준 (예: FCPilot_Sprint7_Plan.md)
         ↓ 영민이 Claude Code에 전달
 [Claude Code가 plan.md로 변환] ← 실행 가능한 작업 단위로 쪼갬
         ↓ 작업 진행
@@ -264,7 +263,7 @@ Opus(claude.ai)에서 MASTER.md 업데이트
 Claude Code가 repo의 MASTER.md에 커밋
 ```
 
-> **Opus Sprint 설계서**: 별도 파일로 관리 (FCPilot_Sprint8B_Bugfix.md 등) — repo에는 넣지 않아도 됨
+> **Opus Sprint 설계서**: 별도 파일로 관리 (FCPilot_Sprint7_Plan.md 등) — repo에는 넣지 않아도 됨, Opus 채팅 + MASTER 반영으로 충분
 > **plan.md ≠ Sprint 설계서**: plan.md는 Claude Code의 실행 계획, Sprint 설계서는 Opus의 방향 설계
 > **새 채팅 시작 시**: MASTER.md + handoff.md 2개만 주면 맥락 100% 복원
 > **의사결정 로그**: 현재 MASTER 내 테이블로 관리, 20개 초과 시 decision-log.md로 분리

@@ -70,37 +70,37 @@ def create_reminder(fc_id: str, client_id: str, reminder_date: str,
         return False
 
 
-def complete_reminder(reminder_id: str) -> bool:
+def complete_reminder(fc_id: str, reminder_id: str) -> bool:
     try:
         from datetime import datetime
         get_supabase_client().table("fp_reminders").update({
             "status": "completed",
             "completed_at": datetime.now().isoformat(),
-        }).eq("id", reminder_id).execute()
+        }).eq("id", reminder_id).eq("fc_id", fc_id).execute()
         return True
     except Exception:
         return False
 
 
-def cancel_reminder(reminder_id: str) -> bool:
+def cancel_reminder(fc_id: str, reminder_id: str) -> bool:
     try:
         get_supabase_client().table("fp_reminders").update(
             {"status": "cancelled"}
-        ).eq("id", reminder_id).execute()
+        ).eq("id", reminder_id).eq("fc_id", fc_id).execute()
         return True
     except Exception:
         return False
 
 
-def update_reminder(reminder_id: str, reminder_date: str, purpose: str,
-                    product_ids: list | None, memo: str) -> bool:
+def update_reminder(fc_id: str, reminder_id: str, reminder_date: str,
+                    purpose: str, product_ids: list | None, memo: str) -> bool:
     try:
         get_supabase_client().table("fp_reminders").update({
             "reminder_date": reminder_date,
             "purpose": purpose,
             "product_ids": product_ids or None,
             "memo": memo or None,
-        }).eq("id", reminder_id).execute()
+        }).eq("id", reminder_id).eq("fc_id", fc_id).execute()
         return True
     except Exception:
         return False

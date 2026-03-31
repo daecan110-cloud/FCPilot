@@ -182,11 +182,10 @@ def _do_login(email: str, password: str):
 
         st.rerun()
     except Exception as e:
-        msg = str(e)
-        if "Invalid login" in msg:
+        if "Invalid login" in str(e) or "invalid_credentials" in str(e):
             st.error("이메일 또는 비밀번호가 올바르지 않습니다.")
         else:
-            st.error(f"로그인 실패: {msg}")
+            st.error("로그인에 실패했습니다. 잠시 후 다시 시도해주세요.")
 
 
 def _do_signup(email: str, password: str, display_name: str):
