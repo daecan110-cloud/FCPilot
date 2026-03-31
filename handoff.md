@@ -77,13 +77,24 @@
 
 ---
 
+## Sprint 10 — 완료 (2026-03-31)
+
+### Round 1
+- [x] 매장 수정 + 삭제 (pioneer_shops) — 팔로업 탭에서 수정/삭제 CRUD 완료
+- [x] 동선기록 달력 하이라이트 — 이전 기록 탭에 최근 90일 방문 날짜 요약 표시
+
+### Round 2
+- [x] 보장분석 Excel 영구 저장 — Supabase Storage `analysis-excel` 버킷 업로드
+- [x] DB 컬럼 버그 수정 (`analysis_result`→`result_summary`, `pdf_filename` 제거)
+- [x] 고객 상세 보장분석 이력 → 📥 엑셀 다운로드 버튼 추가
+- [x] analysis_records에 `excel_path TEXT` 컬럼 추가 (sql/010)
+
+---
+
 ## 미완료 항목 (다음 세션 우선순위)
 
 | 우선순위 | 항목 | 비고 |
 |----------|------|------|
-| 🔴 HIGH | 매장 수정 + 삭제 (pioneer_shops) | Sprint 8C Round 3 잔여 |
-| 🟡 MED | 동선기록 달력 하이라이트 | 방문 기록 있는 날 강조 |
-| 🟡 MED | 보장분석 Excel/PDF 영구 저장 | Supabase Storage 연동 필요 |
 | 🟢 LOW | 200줄 초과 파일 리팩토링 | page_clients.py 등 |
 
 ---
@@ -96,6 +107,7 @@
 | fp_reminders | 신규 생성 + RLS | 리마인드 |
 | users_settings | status TEXT 추가 | 회원가입 승인 |
 | contact_logs | proposed_product_ids uuid[] 추가 | 제안 상품 연동 |
+| analysis_records | excel_path TEXT 추가 | Excel 파일 Storage 경로 |
 
 ## 알려진 이슈
 
@@ -106,5 +118,4 @@
 ## 다음 세션 시작 시
 
 1. `git pull origin main`
-2. **매장 수정/삭제 구현** (pioneer_shops) — 최우선
-3. 실사용 피드백 수집 병행
+2. 실사용 피드백 수집 및 버그 수집
