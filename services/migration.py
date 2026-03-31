@@ -56,7 +56,7 @@ def migrate_clients_csv(csv_bytes: bytes) -> dict:
             if grade and grade.strip().upper() in ("A", "B", "C", "D"):
                 grade_val = grade.strip().upper()
 
-            sb.table("fp_clients").insert({
+            sb.table("clients").insert({
                 "fc_id": fc_id,
                 "name": name.strip(),
                 "phone_encrypted": phone_enc,

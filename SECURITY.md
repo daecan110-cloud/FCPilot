@@ -106,7 +106,7 @@ CREATE POLICY "fc_own_photos" ON storage.objects
 ## 3. 접근 제어
 
 ### 3-1. Supabase RLS (이미 설계됨)
-모든 `fp_` 테이블에 `fc_id = auth.uid()` 정책 적용.
+모든 테이블에 `fc_id = auth.uid()` 정책 적용.
 
 ### 3-2. 세션 관리
 ```python

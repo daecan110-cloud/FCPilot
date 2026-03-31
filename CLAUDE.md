@@ -6,7 +6,7 @@ FCPilot = 보험 FC 업무 통합 플랫폼 (보장분석 + CRM + 개척영업 +
 
 ## 기술 스택
 - Frontend: Streamlit
-- Backend: Supabase (Seoul, project: zrtjojphudopwzjpyzoy) — `fp_` 접두사 테이블
+- Backend: Supabase (project: ghglnszzjuuvrrwpvhhb) — FCPilot 전용
 - AI: Claude API (Sonnet) — 보장분석, 약관, OCR, 어시스턴트
 - 지도: folium + Naver Maps API (Search Local + Geocoding)
 - 엑셀: openpyxl
@@ -47,17 +47,17 @@ templates/          → 엑셀 템플릿 등 정적 파일.
 2. plan.md에 완료 체크
 3. `git add -A` → `git commit` → `git push origin main`
 
-## DB 테이블 (fp_ 접두사)
+## DB 테이블
 
 | 테이블 | 역할 |
 |--------|------|
-| fp_users_settings | FC 설정 (영업 모드 등) |
-| fp_clients | 고객 마스터 |
-| fp_contact_logs | 상담/터치 이력 |
-| fp_pioneer_shops | 개척 매장 |
-| fp_pioneer_visits | 개척 방문 기록 (동선) |
-| fp_analysis_records | 보장분석 기록 |
-| fp_yakwan_records | 약관 분석 기록 |
+| users_settings | FC 설정 (영업 모드 등) |
+| clients | 고객 마스터 |
+| contact_logs | 상담/터치 이력 |
+| pioneer_shops | 개척 매장 |
+| pioneer_visits | 개척 방문 기록 (동선) |
+| analysis_records | 보장분석 기록 |
+| yakwan_records | 약관 분석 기록 |
 
 ## 보안 규칙 (절대 위반 금지 — SECURITY.md 참조)
 
@@ -73,7 +73,7 @@ templates/          → 엑셀 템플릿 등 정적 파일.
 - app.py에 비즈니스 로직 넣기
 - 하드코딩 API 키 (secrets.toml 사용)
 - 고객 데이터 포함 파일 git commit
-- AlphaBot 테이블 접두사 없이 테이블 생성
+- Supabase 테이블명에 불필요한 접두사 사용
 - plan.md 없이 작업 시작
 - 200줄 넘는 파일 방치
 

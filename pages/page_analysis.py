@@ -123,7 +123,7 @@ def _save_to_db(data: dict):
     }
     try:
         sb = get_supabase_client()
-        sb.table("fp_analysis_records").insert({
+        sb.table("analysis_records").insert({
             "fc_id": get_current_user_id(),
             "client_name": data.get("고객명", ""),
             "analysis_result": save_data,
@@ -230,7 +230,7 @@ def _save_yakwan_to_db(idx: int, contract: dict, result: dict):
     """약관 분석 결과를 Supabase에 저장"""
     try:
         sb = get_supabase_client()
-        sb.table("fp_yakwan_records").insert({
+        sb.table("yakwan_records").insert({
             "fc_id": get_current_user_id(),
             "contract_index": idx,
             "company": contract.get("보험사", ""),

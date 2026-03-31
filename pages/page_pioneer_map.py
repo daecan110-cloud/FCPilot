@@ -28,7 +28,7 @@ def _render_map():
     fc_id = get_current_user_id()
 
     try:
-        res = sb.table("fp_pioneer_shops").select("*").eq("fc_id", fc_id).order("created_at", desc=True).execute()
+        res = sb.table("pioneer_shops").select("*").eq("fc_id", fc_id).order("created_at", desc=True).execute()
         shops = res.data or []
     except Exception as e:
         st.error(f"매장 조회 실패: {e}")
@@ -71,7 +71,7 @@ def _render_map():
             if new_status != s.get("status"):
                 if st.button("변경", key=f"change_{s['id']}"):
                     try:
-                        sb.table("fp_pioneer_shops").update(
+                        sb.table("pioneer_shops").update(
                             {"status": new_status}
                         ).eq("id", s["id"]).execute()
                         st.success("변경되었습니다.")
@@ -103,7 +103,7 @@ def _render_register():
 
                 try:
                     sb = get_supabase_client()
-                    sb.table("fp_pioneer_shops").insert({
+                    sb.table("pioneer_shops").insert({
                         "fc_id": get_current_user_id(),
                         "shop_name": shop_name.strip(),
                         "address": address.strip(),
@@ -152,7 +152,7 @@ def _render_ocr():
 
             try:
                 sb = get_supabase_client()
-                sb.table("fp_pioneer_shops").insert({
+                sb.table("pioneer_shops").insert({
                     "fc_id": get_current_user_id(),
                     "shop_name": shop_name.strip(),
                     "address": address.strip(),

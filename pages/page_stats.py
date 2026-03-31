@@ -42,7 +42,7 @@ def _render_crm_stats(sb, fc_id: str, since: str | None):
     st.subheader("고객 관리")
 
     try:
-        q = sb.table("fp_clients").select("id, prospect_grade").eq("fc_id", fc_id)
+        q = sb.table("clients").select("id, prospect_grade").eq("fc_id", fc_id)
         if since:
             q = q.gte("created_at", since)
         clients = q.execute().data or []
@@ -50,7 +50,7 @@ def _render_crm_stats(sb, fc_id: str, since: str | None):
         clients = []
 
     try:
-        q = sb.table("fp_contact_logs").select("id, touch_method").eq("fc_id", fc_id)
+        q = sb.table("contact_logs").select("id, touch_method").eq("fc_id", fc_id)
         if since:
             q = q.gte("created_at", since)
         logs = q.execute().data or []
@@ -89,14 +89,14 @@ def _render_pioneer_stats(sb, fc_id: str, since: str | None):
     st.subheader("개척 영업")
 
     try:
-        shops = sb.table("fp_pioneer_shops").select(
+        shops = sb.table("pioneer_shops").select(
             "id, status"
         ).eq("fc_id", fc_id).execute().data or []
     except Exception:
         shops = []
 
     try:
-        q = sb.table("fp_pioneer_visits").select("id, result").eq("fc_id", fc_id)
+        q = sb.table("pioneer_visits").select("id, result").eq("fc_id", fc_id)
         if since:
             q = q.gte("created_at", since)
         visits = q.execute().data or []
@@ -130,7 +130,7 @@ def _render_analysis_stats(sb, fc_id: str, since: str | None):
     st.subheader("보장분석")
 
     try:
-        q = sb.table("fp_analysis_records").select("id").eq("fc_id", fc_id)
+        q = sb.table("analysis_records").select("id").eq("fc_id", fc_id)
         if since:
             q = q.gte("created_at", since)
         analyses = q.execute().data or []
@@ -138,7 +138,7 @@ def _render_analysis_stats(sb, fc_id: str, since: str | None):
         analyses = []
 
     try:
-        q = sb.table("fp_yakwan_records").select("id").eq("fc_id", fc_id)
+        q = sb.table("yakwan_records").select("id").eq("fc_id", fc_id)
         if since:
             q = q.gte("created_at", since)
         yakwans = q.execute().data or []

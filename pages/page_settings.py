@@ -39,7 +39,7 @@ def render():
 def _load_settings(sb, user_id: str) -> dict:
     """사용자 설정 로드"""
     try:
-        res = sb.table("fp_users_settings").select("*").eq("id", user_id).execute()
+        res = sb.table("users_settings").select("*").eq("id", user_id).execute()
         if res.data:
             return res.data[0]
     except Exception:
@@ -50,7 +50,7 @@ def _load_settings(sb, user_id: str) -> dict:
 def _save_settings(sb, user_id: str, display_name: str, company: str, mode: str):
     """사용자 설정 저장"""
     try:
-        sb.table("fp_users_settings").upsert({
+        sb.table("users_settings").upsert({
             "id": user_id,
             "display_name": display_name,
             "company": company,

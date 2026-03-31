@@ -48,7 +48,7 @@ def _render_list():
             st.rerun()
 
     # 데이터 조회
-    query = sb.table("fp_clients").select("*").eq("fc_id", fc_id).order("created_at", desc=True)
+    query = sb.table("clients").select("*").eq("fc_id", fc_id).order("created_at", desc=True)
     if search:
         query = query.ilike("name", f"%{search}%")
     if grade_filter != "전체":
@@ -100,7 +100,7 @@ def _render_detail():
         st.rerun()
 
     try:
-        res = sb.table("fp_clients").select("*").eq("id", client_id).single().execute()
+        res = sb.table("clients").select("*").eq("id", client_id).single().execute()
         client = res.data
     except Exception as e:
         st.error(f"조회 실패: {e}")
@@ -149,7 +149,7 @@ def _render_detail():
 def _render_contact_logs(sb, client_id: str):
     st.subheader("상담 이력")
     try:
-        res = sb.table("fp_contact_logs").select("*").eq("client_id", client_id).order("created_at", desc=True).limit(50).execute()
+        res = sb.table("contact_logs").select("*").eq("client_id", client_id).order("created_at", desc=True).limit(50).execute()
         logs = res.data or []
     except Exception as e:
         st.error(f"이력 조회 실패: {e}")
@@ -189,7 +189,7 @@ def _render_new_contact(sb, client_id: str):
                 st.error("상담 내용을 입력해주세요.")
             else:
                 try:
-                    sb.table("fp_contact_logs").insert({
+                    sb.table("contact_logs").insert({
                         "fc_id": get_current_user_id(),
                         "client_id": client_id,
                         "contact_type": contact_type,
@@ -258,10 +258,10 @@ def _render_form(edit=False):
                 }
                 try:
                     if edit:
-                        sb.table("fp_clients").update(data).eq("id", client["id"]).execute()
+                        sb.table("clients").update(data).eq("id", client["id"]).execute()
                     else:
                         data["fc_id"] = get_current_user_id()
-                        sb.table("fp_clients").insert(data).execute()
+                        sb.table("clients").insert(data).execute()
                     st.success("저장되었습니다.")
                     st.session_state.clients_view = "list"
                     st.rerun()

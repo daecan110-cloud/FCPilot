@@ -26,7 +26,7 @@ def _render_today():
 
     # 오늘 방문 기록 조회
     try:
-        res = sb.table("fp_pioneer_visits").select(
+        res = sb.table("pioneer_visits").select(
             "*, fp_pioneer_shops(shop_name, lat, lng, address)"
         ).eq("fc_id", fc_id).eq("visit_date", today).order("created_at").execute()
         today_visits = res.data or []
@@ -36,7 +36,7 @@ def _render_today():
 
     # 매장 목록 (방문 기록 추가용)
     try:
-        shops_res = sb.table("fp_pioneer_shops").select("id, shop_name").eq("fc_id", fc_id).order("shop_name").execute()
+        shops_res = sb.table("pioneer_shops").select("id, shop_name").eq("fc_id", fc_id).order("shop_name").execute()
         shops = shops_res.data or []
     except Exception as e:
         st.error(f"매장 조회 실패: {e}")
@@ -64,7 +64,7 @@ def _render_today():
 
         if st.form_submit_button("기록 추가", use_container_width=True, type="primary"):
             try:
-                sb.table("fp_pioneer_visits").insert({
+                sb.table("pioneer_visits").insert({
                     "fc_id": fc_id,
                     "shop_id": shop_id,
                     "visit_date": today,
@@ -74,9 +74,9 @@ def _render_today():
 
                 # 매장 상태 업데이트
                 if result == "contracted":
-                    sb.table("fp_pioneer_shops").update({"status": "contracted"}).eq("id", shop_id).execute()
+                    sb.table("pioneer_shops").update({"status": "contracted"}).eq("id", shop_id).execute()
                 elif result:
-                    sb.table("fp_pioneer_shops").update({"status": "visited"}).eq("id", shop_id).execute()
+                    sb.table("pioneer_shops").update({"status": "visited"}).eq("id", shop_id).execute()
 
                 st.success("기록 추가!")
                 st.rerun()
@@ -90,7 +90,7 @@ def _render_today():
 
         visits_for_map = []
         for i, v in enumerate(today_visits, 1):
-            shop = v.get("fp_pioneer_shops", {}) or {}
+            shop = v.get("pioneer_shops", {}) or {}
             visits_for_map.append({
                 "lat": shop.get("lat"),
                 "lng": shop.get("lng"),
@@ -119,7 +119,7 @@ def _render_history():
     target_date = st.date_input("날짜 선택", value=date.today())
 
     try:
-        res = sb.table("fp_pioneer_visits").select(
+        res = sb.table("pioneer_visits").select(
             "*, fp_pioneer_shops(shop_name, lat, lng, address)"
         ).eq("fc_id", fc_id).eq("visit_date", str(target_date)).order("created_at").execute()
         visits = res.data or []
@@ -135,7 +135,7 @@ def _render_history():
 
     visits_for_map = []
     for i, v in enumerate(visits, 1):
-        shop = v.get("fp_pioneer_shops", {}) or {}
+        shop = v.get("pioneer_shops", {}) or {}
         visits_for_map.append({
             "lat": shop.get("lat"),
             "lng": shop.get("lng"),

@@ -9,7 +9,7 @@ def get_contact_reminders(fc_id: str) -> list[dict]:
     today = str(date.today())
 
     try:
-        res = sb.table("fp_contact_logs").select(
+        res = sb.table("contact_logs").select(
             "*, fp_clients(name, prospect_grade)"
         ).eq("fc_id", fc_id).lte("next_date", today).not_.is_("next_date", "null").order("next_date").execute()
         logs = res.data or []
@@ -20,7 +20,7 @@ def get_contact_reminders(fc_id: str) -> list[dict]:
     seen_clients = set()
 
     for log in logs:
-        client = log.get("fp_clients", {}) or {}
+        client = log.get("clients", {}) or {}
         client_id = log.get("client_id", "")
         if client_id in seen_clients:
             continue

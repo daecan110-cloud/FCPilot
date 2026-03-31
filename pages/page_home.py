@@ -100,7 +100,7 @@ def _render_recent_activity(fc_id: str):
 
     sb = get_supabase_client()
     try:
-        res = sb.table("fp_contact_logs").select(
+        res = sb.table("contact_logs").select(
             "*, fp_clients(name)"
         ).eq("fc_id", fc_id).order(
             "created_at", desc=True
@@ -114,7 +114,7 @@ def _render_recent_activity(fc_id: str):
         return
 
     for log in logs:
-        client = log.get("fp_clients", {}) or {}
+        client = log.get("clients", {}) or {}
         name = client.get("name", "")
         method = log.get("touch_method", "")
         memo = log.get("memo", "")

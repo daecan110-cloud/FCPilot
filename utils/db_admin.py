@@ -36,7 +36,7 @@ def run_sql(sql: str) -> dict:
     Returns: {"ok": bool, "message": str}
     """
     try:
-        res = get_admin_client().rpc("fp_exec_sql", {"query": sql}).execute()
+        res = get_admin_client().rpc("exec_sql", {"query": sql}).execute()
         return {"ok": True, "message": res.data or "OK"}
     except Exception as e:
         return {"ok": False, "message": str(e)}
@@ -107,13 +107,13 @@ def _split_sql(content: str) -> list[str]:
 def check_migration_status() -> dict:
     """마이그레이션 상태 확인"""
     tables = {
-        "fp_users_settings": "001",
-        "fp_clients": "001",
-        "fp_contact_logs": "001",
-        "fp_analysis_records": "001",
-        "fp_pioneer_shops": "003",
-        "fp_pioneer_visits": "003",
-        "fp_yakwan_records": "004",
+        "users_settings": "001",
+        "clients": "001",
+        "contact_logs": "001",
+        "analysis_records": "001",
+        "pioneer_shops": "003",
+        "pioneer_visits": "003",
+        "yakwan_records": "004",
     }
     status = {}
     for tbl, sql_num in tables.items():
