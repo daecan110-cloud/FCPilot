@@ -87,16 +87,37 @@ def notify_warning(message: str):
     send_message(f"⚠️ *알림*\n\n{message}")
 
 
-def notify_reminder(reminders: list[dict]):
-    """리마인드 대상 알림 발송"""
-    if not reminders:
-        return
-    lines = ["📋 *오늘의 리마인드*\n"]
-    for r in reminders:
-        name = r.get("client_name", r.get("shop_name", ""))
-        action = r.get("action", r.get("memo", ""))
-        overdue = "🔴" if r.get("overdue") else "🟡"
-        lines.append(f"{overdue} {name} — {action}")
+def notify_reminder(reminders: list[dict], pioneers: list[dict] | None = None):
+    """리마인드 대상 알림 발송
+
+    reminders: fp_reminders rows (clients 조인 포함)
+    pioneers: followup dict 목록 (shop 중첩)
+    """
+    from datetime import date as _date
+    today_str = str(_date.today())
+    lines = [f"📋 *오늘의 리마인드* ({_date.today().strftime('%m/%d')})\n"]
+
+    if reminders:
+        lines.append("*💬 상담 리마인드*")
+        for r in reminders:
+            client = r.get("clients") or {}
+            name = client.get("name", "이름 없음")
+            grade = client.get("prospect_grade", "")
+            purpose = r.get("purpose", "")
+            d = r.get("reminder_date", "")
+            badge = "🔴" if d < today_str else "🟡"
+            grade_str = f" [{grade}]" if grade else ""
+            lines.append(f"{badge} {name}{grade_str} — {purpose} ({d})")
+
+    if pioneers:
+        if reminders:
+            lines.append("")
+        lines.append("*🗺️ 개척 팔로업*")
+        for p in pioneers:
+            shop_name = (p.get("shop") or {}).get("shop_name", "매장명 없음")
+            action = p.get("action", "팔로업")
+            lines.append(f"🔴 {shop_name} — {action}")
+
     send_message("\n".join(lines))
 
 

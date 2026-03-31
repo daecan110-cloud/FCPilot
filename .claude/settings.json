@@ -1,0 +1,85 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "cd C:/FCPilot && git pull origin main 2>/dev/null; echo '최신 코드 동기화 완료'"
+      },
+      {
+        "type": "command",
+        "command": "cd C:/FCPilot && echo '=== 보안 스캔 ===' && (grep -rn 'sk-ant-\\|eyJ\\|bot_token\\|api_key\\s*=' --include='*.py' | grep -v secrets | grep -v '\\.toml' | grep -v 'st\\.secrets' | grep -v '#' && echo '❌ API 키 하드코딩 발견!' || echo '✅ API 키 하드코딩 없음') && (grep -rn 'except:' --include='*.py' | grep -v 'except Exception' && echo '❌ bare except 발견!' || echo '✅ bare except 없음') && (git ls-files | grep -iE '\\.(csv|xlsx|xls)$' | grep -v templates && echo '❌ 데이터 파일 git 포함!' || echo '✅ 데이터 파일 git 미포함')"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "type": "command",
+        "command": "cd C:/FCPilot && git add -A && git diff --cached --quiet || git commit -m 'auto: session end save' && git push origin main 2>/dev/null; echo '세션 종료 자동 저장'"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -q 'master_template.xlsx'; then echo 'BLOCK: master_template.xlsx 수정 금지!' && exit 1; fi"
+      },
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then python -m py_compile \"$filepath\" 2>&1 && echo '구문 검사 통과' || echo '구문 오류 발견!'; fi"
+      },
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then grep -n 'print.*phone\\|print.*이름\\|print.*name.*=\\|print.*전화' \"$filepath\" && echo '⚠️ 경고: 고객 정보 print 출력 감지!' || true; fi"
+      },
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then grep -n 'sk-ant-\\|eyJ\\|bot_token\\|SUPABASE_KEY\\|api_key\\s*=' \"$filepath\" | grep -v '#' | grep -v 'secrets' && echo '❌ BLOCK: API 키 하드코딩 감지!' && exit 1 || true; fi"
+      },
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then grep -n 'except:' \"$filepath\" | grep -v 'except Exception' && echo '⚠️ 경고: bare except 감지! except Exception as e: 로 변경 필요' || true; fi"
+      },
+      {
+        "matcher": "Bash",
+        "type": "command",
+        "command": "if echo \"$CLAUDE_TOOL_ARG_COMMAND\" | grep -qiE 'curl.*supabase|curl.*api\\.anthropic|wget.*secret|curl.*token'; then echo '❌ BLOCK: 외부로 민감 데이터 전송 시도 차단!' && exit 1; fi"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '(secrets\\.toml|\\.env|\\.env\\..*)'; then echo '❌ BLOCK: 민감 파일 수정 차단!' && exit 1; fi"
+      },
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '(MASTER\\.md)'; then echo '❌ BLOCK: MASTER.md는 Opus가 관리. Claude Code 수정 금지!' && exit 1; fi"
+      },
+      {
+        "matcher": "Read",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '(secrets\\.toml|\\.env|\\.env\\..*)'; then echo '❌ BLOCK: 민감 파일 읽기 차단!' && exit 1; fi"
+      },
+      {
+        "matcher": "Bash",
+        "type": "command",
+        "command": "if echo \"$CLAUDE_TOOL_ARG_COMMAND\" | grep -qiE 'rm\\s+-rf\\s+/|rm\\s+-rf\\s+\\*|DROP\\s+TABLE|DELETE\\s+FROM.*WHERE\\s+1|TRUNCATE'; then echo '❌ BLOCK: 위험 명령 차단!' && exit 1; fi"
+      },
+      {
+        "matcher": "Bash",
+        "type": "command",
+        "command": "if echo \"$CLAUDE_TOOL_ARG_COMMAND\" | grep -qiE 'pip install(?!.*--break-system)'; then echo '⚠️ 경고: pip install은 --break-system-packages 필요할 수 있음'; fi"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "cd C:/FCPilot && echo '--- 최근 변경 ---' && git diff --stat HEAD~1 2>/dev/null || echo '변경사항 없음'"
+      }
+    ]
+  }
+}
