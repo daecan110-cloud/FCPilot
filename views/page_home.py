@@ -4,7 +4,7 @@ from datetime import date
 import streamlit as st
 
 from auth import get_current_user_id
-from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes
+from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes, create_reminder
 from services.remind_trigger import check_and_send_daily_reminder
 from utils.supabase_client import get_supabase_client
 
@@ -32,31 +32,29 @@ def render():
     c3.metric("이번 주", f"{len(this_week)}건")
     c4.metric("전체 대기", f"{len(overdue)+len(today)+len(this_week)}건")
 
+    # 리마인드 추가
+    with st.expander("➕ 리마인드 추가"):
+        _render_add_reminder_form(fc_id)
+
     st.divider()
 
-    # 지연
     if overdue:
         st.subheader(f"🔴 지연 ({len(overdue)}건)")
         for r in overdue:
             _render_reminder_card(r, "overdue")
         st.divider()
 
-    # 오늘
     st.subheader(f"🟡 오늘 예정 ({len(today)}건)")
-    if today:
-        for r in today:
-            _render_reminder_card(r, "today")
-    else:
+    for r in today:
+        _render_reminder_card(r, "today")
+    if not today:
         st.success("오늘 예정된 리마인드가 없습니다.")
 
     st.divider()
-
-    # 이번 주
     st.subheader(f"🔵 이번 주 ({len(this_week)}건)")
-    if this_week:
-        for r in this_week:
-            _render_reminder_card(r, "week")
-    else:
+    for r in this_week:
+        _render_reminder_card(r, "week")
+    if not this_week:
         st.info("이번 주 예정된 리마인드가 없습니다.")
 
     st.divider()
@@ -110,38 +108,69 @@ def _render_reminder_card(r: dict, bucket: str):
             _render_edit_form(r, edit_key)
 
 
-def _render_edit_form(r: dict, edit_key: str):
-    """리마인드 인라인 편집 폼"""
-    from datetime import date as _date
+def _render_add_reminder_form(fc_id: str):
     from views.page_settings_products import get_active_products
-
-    rid = r["id"]
     sb = get_supabase_client()
-    fc_id = r.get("fc_id", "")
+
+    search = st.text_input("고객 이름 검색", placeholder="이름 입력 후 선택", key="home_remind_search")
+    client_id = client_label = None
+    if search.strip():
+        try:
+            results = (sb.table("clients").select("id, name, prospect_grade")
+                       .eq("fc_id", fc_id).ilike("name", f"%{search.strip()}%")
+                       .limit(10).execute().data or [])
+        except Exception:
+            results = []
+        if results:
+            opts = {f"{r['name']} [{r.get('prospect_grade','')}]": r["id"] for r in results}
+            lbl = st.selectbox("고객 선택", list(opts.keys()), key="home_remind_client")
+            client_id, client_label = opts[lbl], lbl
+        else:
+            st.caption("검색 결과가 없습니다.")
+
+    if not client_id:
+        return
 
     products = get_active_products(sb, fc_id)
     prod_map = {p["name"]: p["id"] for p in products}
-    current_prod_names = []
-    if r.get("product_ids") and products:
-        id_to_name = {p["id"]: p["name"] for p in products}
-        current_prod_names = [id_to_name[pid] for pid in r["product_ids"] if pid in id_to_name]
+    with st.form("home_add_reminder"):
+        r_date = st.date_input("예정일", value=date.today())
+        r_purpose = st.selectbox("상담 목적", purposes())
+        sel_prods = st.multiselect("제안 상품", list(prod_map.keys())) if products else []
+        r_memo = st.text_input("메모", placeholder="선택 사항")
+        if st.form_submit_button("등록", type="primary", use_container_width=True):
+            pids = [prod_map[n] for n in sel_prods if n in prod_map] or None
+            if create_reminder(fc_id, client_id, str(r_date), r_purpose, pids, r_memo):
+                st.success(f"{client_label} 리마인드 등록 완료")
+                st.rerun()
+            else:
+                st.error("등록 실패")
 
+
+def _render_edit_form(r: dict, edit_key: str):
+    from datetime import date as _date
+    from views.page_settings_products import get_active_products
+    rid = r["id"]
+    sb = get_supabase_client()
+    fc_id = r.get("fc_id", "")
+    products = get_active_products(sb, fc_id)
+    prod_map = {p["name"]: p["id"] for p in products}
+    id_to_name = {p["id"]: p["name"] for p in products}
+    current_names = [id_to_name[pid] for pid in (r.get("product_ids") or []) if pid in id_to_name]
     with st.form(f"edit_form_{rid}"):
         try:
             default_date = _date.fromisoformat(r.get("reminder_date", str(_date.today())))
         except Exception:
             default_date = _date.today()
-
         new_date = st.date_input("예정일", value=default_date)
-        purpose_idx = purposes().index(r["purpose"]) if r.get("purpose") in purposes() else 0
-        new_purpose = st.selectbox("상담 목적", purposes(), index=purpose_idx)
-        new_prods = st.multiselect("제안 상품", list(prod_map.keys()), default=current_prod_names) if products else []
+        p_idx = purposes().index(r["purpose"]) if r.get("purpose") in purposes() else 0
+        new_purpose = st.selectbox("상담 목적", purposes(), index=p_idx)
+        new_prods = st.multiselect("제안 상품", list(prod_map.keys()), default=current_names) if products else []
         new_memo = st.text_input("메모", value=r.get("memo") or "")
-
         c1, c2 = st.columns(2)
         if c1.form_submit_button("저장", type="primary", use_container_width=True):
-            pid_list = [prod_map[n] for n in new_prods if n in prod_map] or None
-            if update_reminder(rid, str(new_date), new_purpose, pid_list, new_memo):
+            pids = [prod_map[n] for n in new_prods if n in prod_map] or None
+            if update_reminder(rid, str(new_date), new_purpose, pids, new_memo):
                 st.session_state.pop(edit_key, None)
                 st.rerun()
             else:
@@ -164,11 +193,6 @@ def _render_recent_activity(fc_id: str):
     if not logs:
         st.info("최근 활동 기록이 없습니다.")
         return
-
     for log in logs:
-        client = log.get("clients") or {}
-        name = client.get("name", "")
-        method = log.get("touch_method", "")
-        memo = (log.get("memo") or "")[:30]
-        created = log.get("created_at", "")[:10]
-        st.caption(f"{created} | {name} | {method} | {memo}")
+        c = log.get("clients") or {}
+        st.caption(f"{log.get('created_at','')[:10]} | {c.get('name','')} | {log.get('touch_method','')} | {(log.get('memo') or '')[:30]}")
