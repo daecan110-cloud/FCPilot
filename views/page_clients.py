@@ -33,7 +33,7 @@ def _render_list():
     with col1:
         search = st.text_input("검색 (이름)", placeholder="이름으로 검색", label_visibility="collapsed")
     with col2:
-        grade_filter = st.selectbox("등급", ["전체", "A", "B", "C", "D"], label_visibility="collapsed")
+        grade_filter = st.selectbox("등급", ["전체", "VIP", "S", "A", "B", "C", "D"], label_visibility="collapsed")
     with col3:
         source_filter = st.selectbox("유입경로", ["전체"] + DB_SOURCE_OPTIONS, label_visibility="collapsed")
 
@@ -106,7 +106,7 @@ def _render_list():
 
     for c in clients:
         grade = c.get("prospect_grade", "C")
-        grade_color = {"A": "red", "B": "orange", "C": "blue", "D": "gray"}.get(grade, "blue")
+        grade_color = {"VIP": "violet", "S": "green", "A": "red", "B": "orange", "C": "blue", "D": "gray"}.get(grade, "blue")
         col_name, col_info, col_detail, col_del = st.columns([3, 4, 1, 1])
         with col_name:
             st.markdown(f"**{c['name']}** :{grade_color}[{grade}]")
@@ -310,6 +310,8 @@ def _render_form(edit=False):
             pass
 
     with st.expander("💡 등급 기준 보기"):
+        st.caption("**VIP**: 기계약자 중 계약 3건 이상 또는 월 납입 보험료 50만원 이상. 최우선 케어 대상, 추가 계약·소개 기대 고객")
+        st.caption("**S**: 기계약자 (계약 1~2건 또는 월 납입 50만원 미만). 유지 관리 + 추가 니즈 발굴 대상")
         st.caption("**A**: 보험 니즈 확인 + 상담 의향 있음 (계약 가능성 높음)")
         st.caption("**B**: 관심은 있으나 구체적 니즈 미확인")
         st.caption("**C**: 접촉만 됨, 니즈/의향 미파악")
@@ -329,8 +331,11 @@ def _render_form(edit=False):
             )
         with col2:
             grade = st.selectbox(
-                "등급", ["A", "B", "C", "D"],
-                index=["A", "B", "C", "D"].index(client.get("prospect_grade", "C")),
+                "등급", ["VIP", "S", "A", "B", "C", "D"],
+                index=["VIP", "S", "A", "B", "C", "D"].index(
+                    client.get("prospect_grade", "C")
+                    if client.get("prospect_grade") in ("VIP", "S", "A", "B", "C", "D") else "C"
+                ),
             )
             current_source = client.get("db_source", "")
             source_idx = DB_SOURCE_OPTIONS.index(current_source) if current_source in DB_SOURCE_OPTIONS else 0
