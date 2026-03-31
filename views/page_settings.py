@@ -34,6 +34,12 @@ def render():
 
     st.divider()
 
+    # 상품 관리
+    from views.page_settings_products import render_product_section
+    render_product_section()
+
+    st.divider()
+
     # 유입경로 카테고리 관리
     _render_source_categories(sb, user_id)
 
