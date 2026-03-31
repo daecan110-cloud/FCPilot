@@ -1,87 +1,110 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 8C Round 2 완료 + 통계 개선 + 버그픽스**
+- Phase: **Sprint 9 Round 3 완료 + 보안강화 + UI개선**
 - 마지막 세션: 2026-03-31 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
-
-## Sprint 1~7 — 완료
-
----
-
-## Sprint 8 완료 내역
-
-### Phase 1: 엑셀 마이그레이션 — 완료
-- [x] `신한라이프 tool의 사본.xlsx` → clients 99명 + contact_logs 34건 이관
-- [x] `scripts/migrate_excel.py` 작성 (dry-run/run 모드)
-- [x] FC_ID: `ee41ae34-feef-4689-b005-f144cab4e4a6` (김영민fc)
-
-### Phase 2: Sprint 8B 버그픽스 — 완료 (commit: 56bd463)
-- [x] BUG-01: `source` → `db_source` 컬럼명 수정
-- [x] BUG-02: `contact_type`/`content` → `touch_method`/`memo`
-- [x] BUG-03: 새로고침/뒤로가기 로그아웃 → `streamlit-cookies-controller` 쿠키 기반 세션 복원 (commit: 09bf70a)
-- [x] BUG-04: 전화번호 표시 형식 수정
-- [x] BUG-05: OCR 프롬프트 개선 + 업종 드롭다운
-- [x] BUG-06: EXIF GPS → Naver Reverse Geocoding 주소 자동 추출
-- [x] BUG-07: 매장 클릭 → 지도 center 이동 (session_state 기반)
-- [x] BUG-08: `fp_pioneer_shops` → `pioneer_shops` 조인 수정 + 팔로업 개선
-- [x] UX-01: 출처 → 유입경로 라벨
-- [x] UX-02: 고객 목록 필터 (나이대/지역/상담유무/정렬)
-- [x] UX-03: 업종 드롭다운 (BUG-05에 포함)
-- [x] UX-04: 영업 모드별 탭 순서 변경
-- [x] UX-05: CSV 가져오기 → 설정 탭으로 이동
-
-### Phase 3: Sprint 8C Round 1 — 완료 (commit: b69d9e7)
-- [x] 전화번호 마스킹 제거 (상세 화면에서 원본 표시)
-- [x] 상담 이력 삭제 (2-step 확인)
-- [x] 고객 삭제 버튼 (목록 + 상세 양쪽)
-- [x] 보장분석 자동 저장 + 통계 0건 수정 (count="exact")
-
-### Phase 4: Sprint 8C Round 2 — 완료 (commits: 9ff197f~82c9b37)
-- [x] 등급 판별 기준 안내 (VIP/S/A/B/C/D 설명 expander)
-- [x] 약관 PDF 동시 업로드 + AI 상담 대화창 (page_analysis.py 재구성)
-- [x] 고객 목록 정렬 드롭다운 (메인 행 4번째 컬럼)
-- [x] gender 빈 문자열 ValueError 수정
-- [x] 약관 분석 429 rate limit → 자동 재시도 + 카운트다운
-- [x] 유입경로 카테고리 커스터마이징 (설정 탭 + users_settings.source_categories JSONB)
-- [x] 정렬 설정 DB 영구 저장 (users_settings.clients_sort, commit: 7ed4995)
-
-### Phase 5: 통계 대시보드 개선 — 완료 (commit: 19420a3)
-- [x] 등급 카드 6개: VIP🟣/S🟢/A🔴/B🟠/C🔵/D⚫ (전체 기준)
-- [x] 기간별 신규 고객 수 (created_at 필터)
-- [x] 기간당 평균 상담: 총 건수 + 일 평균
-- [x] 고객 분포 드롭다운: 등급별/유입경로별/나이대별/지역별
-
-### Phase 6: 텔레그램 알림 수정 — 완료 (commit: e9970bc)
-- [x] send_message 사일런트 실패 제거
-- [x] 성공: `[TELEGRAM] OK: 200` 출력
-- [x] 실패: `[TELEGRAM] FAIL: <코드> <내용>` 출력
-- [x] Markdown 400 오류 시 plain text 자동 재시도
+- 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
 
 ---
 
-## Sprint 8C Round 3 — 미완료 (다음 세션)
-- [ ] 매장 수정 + 삭제 (pioneer_shops)
-- [ ] 팔로업 수정 + 삭제 (contact_logs / pioneer_visits)
-- [ ] 간판 OCR 주소 자동입력 (Naver Search Local 폴백)
-- [ ] 동선기록 이전 기록 달력 하이라이트
+## Sprint 1~8C Round 2 — 완료 (상세는 git log 참조)
 
-## 알려진 이슈
-- Gemini 무료 tier: 분당 2회 제한 → 429 시 재시도 대응
-- 200줄 초과 파일: page_clients.py(428줄), page_analysis.py 등 — 향후 분리 예정
-- UX-06: 약관분석 AI 대화창 P2 deferred (구현 틀은 있음, 정교화 필요)
+주요 완료 항목 요약:
+- 보장분석 + 약관분석 AI (Claude API)
+- 고객 CRM (목록/상세/등록/수정/삭제, 전화번호 암호화)
+- 상담이력 CRUD (등록/수정/삭제)
+- 개척지도 + OCR + 팔로업
+- 동선기록 탭
+- 텔레그램 양방향 봇 (Gemini NLP)
+- 쿠키 기반 세션 유지 (새로고침 로그아웃 방지)
+- 회원가입 승인 시스템 (pending/approved/rejected)
+- 영업 모드별 탭 순서 변경
+- 유입경로 드래그앤드롭 커스터마이징
 
-## 배포 상태
-- **fcpilot-kr.streamlit.app** — 자동 배포 (git push → 자동 반영)
-- requirements.txt: `streamlit-cookies-controller>=0.0.4` (extra-streamlit-components 교체)
+---
 
-## DB 스키마 변경 이력 (이번 세션)
+## Sprint 8C Round 3 — 부분 완료
+
+- [x] 간판 OCR 주소 자동입력 — EXIF GPS + Reverse Geocoding + Nominatim 폴백
+- [x] 동선기록 이전 기록 조회 개선 — 날짜 선택 + Naver Maps 지도
+- [ ] **매장 수정 + 삭제** (pioneer_shops) — 미완료
+- [ ] **동선기록 달력 하이라이트** — 방문 기록 있는 날 달력에 표시 — 미완료
+
+---
+
+## Sprint 9 Round 1 (상품 관리) — 완료
+
+- [x] fp_products 테이블 생성 + RLS
+- [x] 설정 탭 상품 관리 섹션 (이름+카테고리, data_editor, 카테고리별 색상 아이콘)
+- [x] 상담 기록에 제안 상품 다중 선택 (contact_logs.proposed_product_ids)
+- [x] 상품 CRUD (등록/수정/삭제/활성화 토글)
+
+---
+
+## Sprint 9 Round 2 (상담 리마인드) — 완료
+
+- [x] fp_reminders 테이블 생성 + RLS 정책 (sql/009)
+- [x] 홈 탭 리마인드 3구역 표시 (지연🔴/오늘🟡/이번주🔵)
+- [x] 홈 탭 리마인드 추가 (고객 검색 → 날짜/목적/상품/메모)
+- [x] 홈 탭 리마인드 인라인 수정 + 완료 처리
+- [x] 고객 상세 → 리마인드 섹션 (등록/완료/취소)
+
+---
+
+## Sprint 9 Round 3 (캘린더 + 기능 개선) — 완료
+
+- [x] 홈 탭 월간 캘린더 (대기●/완료✓ 배지, 월 이동, 날짜 클릭 상세)
+- [x] 개척지도/동선기록 Naver Maps JS API v3로 교체
+- [x] 지오코딩 Nominatim 폴백 (Naver NCP 실패 시 OpenStreetMap)
+- [x] 동선 좌표 없는 매장 경고 + 일괄 재조회 버튼
+- [x] 홈 최근활동 — 👤고객추가 / 📝활동추가 빠른 버튼
+- [x] 통계 기간 6단계 (오늘/3일/7일/30일/3개월/전체)
+- [x] 상담이력 인라인 수정 (수정/저장/취소)
+- [x] 고객 상세 보장분석 이력 섹션
+- [x] 메뉴 "홈" → "오늘의 할일"
+
+---
+
+## 보안 강화 — 완료 (commit: 63463e3)
+
+- [x] 고객 상세 조회에 fc_id 필터 추가 (CRITICAL 수정)
+- [x] 삭제 쿼리 전체 fc_id 소유권 검증
+- [x] 리마인드 완료/취소/수정 fc_id 파라미터 추가
+- [x] fp_reminders RLS 활성화 (sql/009 DB 적용 완료)
+- [x] 로그인 에러 메시지 내부 정보 노출 차단
+- 방어 구조: **앱 레이어 fc_id 필터 + DB RLS 이중 방어**
+
+---
+
+## 미완료 항목 (다음 세션 우선순위)
+
+| 우선순위 | 항목 | 비고 |
+|----------|------|------|
+| 🔴 HIGH | 매장 수정 + 삭제 (pioneer_shops) | Sprint 8C Round 3 잔여 |
+| 🟡 MED | 동선기록 달력 하이라이트 | 방문 기록 있는 날 강조 |
+| 🟡 MED | 보장분석 Excel/PDF 영구 저장 | Supabase Storage 연동 필요 |
+| 🟢 LOW | 200줄 초과 파일 리팩토링 | page_clients.py 등 |
+
+---
+
+## DB 스키마 변경 이력 (Sprint 9 이후)
+
 | 테이블 | 변경 | 용도 |
 |--------|------|------|
-| users_settings | `source_categories JSONB` 추가 | 유입경로 카테고리 커스터마이징 |
-| users_settings | `clients_sort TEXT` 추가 | 정렬 설정 영구 저장 |
+| fp_products | 신규 생성 | 상품 관리 |
+| fp_reminders | 신규 생성 + RLS | 리마인드 |
+| users_settings | status TEXT 추가 | 회원가입 승인 |
+| contact_logs | proposed_product_ids uuid[] 추가 | 제안 상품 연동 |
+
+## 알려진 이슈
+
+- Naver Maps JS API: NCP 콘솔에서 `fcpilot-kr.streamlit.app` 도메인 등록 필요
+- Gemini 무료 tier: 분당 2회 제한 → 429 시 자동 재시도 대응 완료
+- page_clients.py 530줄 (200줄 초과) — 향후 분리 예정
 
 ## 다음 세션 시작 시
+
 1. `git pull origin main`
-2. Sprint 8C Round 3 시작: `매장 수정/삭제` 먼저
+2. **매장 수정/삭제 구현** (pioneer_shops) — 최우선
 3. 실사용 피드백 수집 병행
