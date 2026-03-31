@@ -139,7 +139,7 @@ command (개발/PC 명령):
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -149,11 +149,39 @@ command (개발/PC 명령):
         }),
       },
     );
+
+    const httpStatus = res.status;
     const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    return JSON.parse(raw.replace(/```json\n?/g, "").replace(/```/g, "").trim());
+    const errorMsg = data?.error?.message || "";
+
+    // 디버그: Gemini 응답 원본을 텔레그램으로 전송
+    const debugLines = [
+      `🔍 *DEBUG Gemini*`,
+      `HTTP: ${httpStatus}`,
+      `Raw: ${raw.slice(0, 300) || "(empty)"}`,
+    ];
+    if (errorMsg) debugLines.push(`Error: ${errorMsg}`);
+
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: CHAT_ID, text: debugLines.join("\n") }),
+    });
+
+    if (!raw) return { action: "unknown" };
+
+    const cleaned = raw.replace(/```json\n?/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    return parsed;
   } catch (e) {
-    console.error("Gemini error:", e);
+    // 파싱 에러도 텔레그램으로 전송
+    const errText = `❌ *DEBUG Error*\n${String(e).slice(0, 300)}`;
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: CHAT_ID, text: errText }),
+    });
     return { action: "unknown" };
   }
 }
