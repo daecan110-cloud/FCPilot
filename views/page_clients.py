@@ -272,13 +272,27 @@ def _render_analysis_history(sb, fc_id: str, client_name: str):
         return
     for r in records:
         created = r.get("created_at", "")[:10]
-        result = r.get("analysis_result") or {}
-        contracts = result.get("계약수", 0)
-        gender = result.get("성별", "")
-        age = result.get("나이", "")
+        summary = r.get("result_summary") or {}
+        contracts = r.get("contract_count", 0)
+        gender = summary.get("성별", "")
+        age = summary.get("나이", "")
         with st.expander(f"📊 {created} | 계약 {contracts}건 {('| '+gender) if gender else ''} {(str(age)+'세') if age else ''}"):
             st.caption(f"고객명: {r.get('client_name','')}")
             st.caption(f"분석일: {created}")
+            if r.get("excel_path"):
+                try:
+                    from utils.db_admin import get_admin_client
+                    excel_bytes = get_admin_client().storage.from_("analysis-excel").download(r["excel_path"])
+                    st.download_button(
+                        "📥 엑셀 다운로드",
+                        data=excel_bytes,
+                        file_name=f"보장분석_{r.get('client_name','')}_{created}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_analysis_{r['id']}",
+                        use_container_width=True,
+                    )
+                except Exception:
+                    pass
             if st.button("보장분석 다시 실행", key=f"rerun_analysis_{r['id']}", use_container_width=True):
                 st.session_state._nav_to = "보장분석"
                 st.rerun()

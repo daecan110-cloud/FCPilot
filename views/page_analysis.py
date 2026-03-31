@@ -118,20 +118,34 @@ def _show_result(data: dict):
 
 
 def _save_to_db(data: dict, silent: bool = False):
-    save_data = {
-        "고객명": data.get("고객명", ""),
-        "성별": data.get("성별", ""),
-        "나이": data.get("나이", 0),
-        "계약수": len(data.get("_all_contracts", [])),
-    }
     try:
         sb = get_supabase_client()
-        sb.table("analysis_records").insert({
-            "fc_id": get_current_user_id(),
+        fc_id = get_current_user_id()
+        contracts = data.get("_all_contracts", [])
+        res = sb.table("analysis_records").insert({
+            "fc_id": fc_id,
             "client_name": data.get("고객명", ""),
-            "analysis_result": save_data,
-            "pdf_filename": "",
+            "contract_count": len(contracts),
+            "result_summary": {"성별": data.get("성별", ""), "나이": data.get("나이", 0)},
         }).execute()
+        record_id = res.data[0]["id"] if res.data else None
+
+        if record_id:
+            excel_files = st.session_state.get("excel_files", [])
+            if excel_files:
+                _, excel_bytes = excel_files[0]
+                path = f"{fc_id}/{record_id}.xlsx"
+                try:
+                    from utils.db_admin import get_admin_client
+                    admin_sb = get_admin_client()
+                    admin_sb.storage.from_("analysis-excel").upload(
+                        path, excel_bytes,
+                        {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+                    )
+                    sb.table("analysis_records").update({"excel_path": path}).eq("id", record_id).execute()
+                except Exception:
+                    pass  # 업로드 실패해도 분석 기록은 유지
+
         if not silent:
             st.success("분석 기록이 저장되었습니다.")
     except Exception as e:
