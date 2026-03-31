@@ -42,9 +42,43 @@ const COMMAND_KEYWORDS = [
 ];
 
 const CREATE_KEYWORDS = [
-  "새 고객", "새고객", "고객 등록", "고객등록", "신규 고객", "신규고객",
-  "등록해", "추가해",
+  "새고객", "새 고객", "고객등록", "고객 등록", "신규고객", "신규 고객",
+  "등록해", "등록해줘", "등록", "추가해", "추가해줘", "추가",
 ];
+
+function extractCreateParams(text: string): Record<string, string> {
+  // "김영민 등록해줘 시흥사는 20대" → {name: "김영민", address: "시흥", age: "20"}
+  const t = text.replace(/\s+/g, " ").trim();
+
+  // 키워드 제거하여 순수 정보만 남기기
+  let cleaned = t;
+  for (const k of ["새 고객", "새고객", "고객 등록", "고객등록", "신규 고객", "신규고객",
+    "등록해줘", "등록해", "등록", "추가해줘", "추가해", "추가", ":", "："]) {
+    cleaned = cleaned.replace(k, " ");
+  }
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+
+  const params: Record<string, string> = {};
+
+  // 이름 추출: 첫 번째 한글 2~4글자
+  const nameMatch = cleaned.match(/([가-힣]{2,4})/);
+  if (nameMatch) params.name = nameMatch[1];
+
+  // 나이 추출: "20대", "30세", "45살" 등
+  const ageMatch = cleaned.match(/(\d{1,3})\s*(대|세|살)/);
+  if (ageMatch) params.age = ageMatch[1];
+
+  // 주소 추출: "사는" 앞 단어, 또는 "서울/수원/시흥" 등
+  const addrMatch = cleaned.match(/([가-힣]{2,10})\s*사는/) ||
+    cleaned.match(/(서울|부산|대구|인천|광주|대전|울산|세종|수원|성남|시흥|용인|안양|고양|안산|화성|평택|의정부|파주|김포|제주|춘천|청주|전주|포항|창원|천안|구미|경주)/);
+  if (addrMatch) params.address = addrMatch[1];
+
+  // 메모: 남은 텍스트에서 추출 시도
+  const memoMatch = cleaned.match(/메모\s*[:：]?\s*(.+)/);
+  if (memoMatch) params.memo = memoMatch[1].trim();
+
+  return params;
+}
 
 function localMatch(text: string): Intent | null {
   const t = text.replace(/\s+/g, " ").trim();
@@ -56,9 +90,13 @@ function localMatch(text: string): Intent | null {
     return { intent: "reminder_list", params: {} };
   }
 
-  // 고객 등록 — "새 고객: 홍길동, ..." 또는 "홍길동 등록해"
+  // 고객 등록 — 로컬에서 직접 파라미터 추출
   if (CREATE_KEYWORDS.some((k) => tNoSpace.includes(k.replace(/\s/g, "")))) {
-    return null; // Gemini에 위임 (파라미터 추출 필요)
+    const params = extractCreateParams(t);
+    if (params.name) {
+      return { intent: "customer_create", params };
+    }
+    return null; // 이름 추출 실패 시 Gemini 위임
   }
 
   // 개발 명령 — "테스트해줘", "git push", "handoff 업데이트"
@@ -67,7 +105,6 @@ function localMatch(text: string): Intent | null {
   }
 
   // 고객 조회 — "김철수 고객정보", "김철수 정보", "김철수 조회"
-  // 또는 한글 이름만 (2~4글자, 고객 조회로 간주)
   const searchPatterns = [
     /^(.{2,10})\s*(고객|정보|조회|검색|보여|찾아|알려)/,
     /^(고객|정보|조회)\s+(.{2,10})$/,
