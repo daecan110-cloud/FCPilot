@@ -1,10 +1,11 @@
 """텔레그램 양방향 소통 모듈
 
-송신: Sprint 완료 / 확인 필요 / 경고 알림
-수신: getUpdates 폴링 → 명령어 파싱
+송신: Sprint 완료 / 확인 필요 / 경고 / 상태 보고
+수신: getUpdates 폴링 → 명령어 파싱 + 자유 텍스트 지시
 """
 import os
 import time
+from datetime import datetime
 
 import requests
 import streamlit as st
@@ -67,6 +68,21 @@ def notify_reminder(reminders: list[dict]):
     send_message("\n".join(lines))
 
 
+def report_status(status_text: str):
+    """현재 상태를 텔레그램으로 보고"""
+    send_message(f"📊 *현재 상태*\n\n{status_text}")
+
+
+def ack_instruction(text: str):
+    """자유 텍스트 지시 수신 확인"""
+    send_message(f"📩 *지시 수신*\n\n\"{text}\"\n\n🔄 처리 중...")
+
+
+def report_result(instruction: str, result: str):
+    """자유 텍스트 지시 처리 결과 보고"""
+    send_message(f"✅ *처리 완료*\n\n📩 {instruction}\n\n{result}")
+
+
 # ── 수신 (getUpdates 폴링) ────────────────────────────
 
 COMMAND_MAP = {
@@ -77,6 +93,10 @@ COMMAND_MAP = {
     "상태": "status",
     "중단": "stop",
 }
+
+# 모듈 레벨 offset — 세션 동안 유지
+_last_offset: int | None = None
+_pending_instructions: list[dict] = []
 
 
 def get_updates(offset: int | None = None, timeout: int = 5) -> list[dict]:
@@ -101,18 +121,23 @@ def parse_command(text: str) -> dict:
     """메시지 텍스트 → 명령어 파싱
 
     Returns: {"action": str, "text": str}
-    - action: proceed / wait / status / stop / free_text
+    - action: proceed / wait / status / stop / instruction
     """
-    cleaned = text.strip().lower()
-    action = COMMAND_MAP.get(cleaned, "free_text")
-    return {"action": action, "text": text.strip()}
+    cleaned = text.strip()
+    action = COMMAND_MAP.get(cleaned.lower(), "instruction")
+    return {"action": action, "text": cleaned}
+
+
+def skip_old_messages():
+    """기존 메시지 스킵 — 세션 시작 시 호출"""
+    global _last_offset
+    updates = get_updates(offset=None, timeout=1)
+    if updates:
+        _last_offset = updates[-1]["update_id"] + 1
 
 
 def poll_once(last_offset: int | None = None) -> tuple[dict | None, int | None]:
-    """1회 폴링 → (명령 dict | None, 새 offset)
-
-    내 chat_id에서 온 메시지만 처리.
-    """
+    """1회 폴링 → (명령 dict | None, 새 offset)"""
     _, my_chat_id = _get_config()
     updates = get_updates(offset=last_offset, timeout=3)
     if not updates:
@@ -131,23 +156,88 @@ def poll_once(last_offset: int | None = None) -> tuple[dict | None, int | None]:
     return parse_command(text), new_offset
 
 
-def poll_loop(callback, interval: int = 10, max_polls: int = 60):
-    """폴링 루프 — callback(command_dict)이 False 반환 시 중단
+def check_for_commands() -> list[dict]:
+    """새 명령어/지시 확인 — 작업 사이에 호출
 
-    Args:
-        callback: 명령어 처리 함수. {"action": str, "text": str} 받음.
-                  False 반환 시 루프 중단.
-        interval: 폴링 간격 (초)
-        max_polls: 최대 폴링 횟수 (무한루프 방지)
+    Returns: 새 명령어 리스트. 빈 리스트면 새 메시지 없음.
+    각 항목: {"action": str, "text": str, "timestamp": str}
     """
-    offset = None
-    # 기존 메시지 스킵 — 현재 offset 확보
-    updates = get_updates(offset=None, timeout=1)
-    if updates:
-        offset = updates[-1]["update_id"] + 1
+    global _last_offset
+    _, my_chat_id = _get_config()
+    updates = get_updates(offset=_last_offset, timeout=1)
+    if not updates:
+        return []
+
+    commands = []
+    for u in updates:
+        _last_offset = u["update_id"] + 1
+        msg = u.get("message", {})
+        chat_id = str(msg.get("chat", {}).get("id", ""))
+        text = msg.get("text", "")
+        ts = msg.get("date", 0)
+
+        if chat_id != str(my_chat_id) or not text:
+            continue
+
+        cmd = parse_command(text)
+        cmd["timestamp"] = datetime.fromtimestamp(ts).strftime("%H:%M:%S")
+        commands.append(cmd)
+
+    return commands
+
+
+def get_pending_instructions() -> list[dict]:
+    """미처리 자유 텍스트 지시 목록 반환 후 비움"""
+    global _pending_instructions
+    pending = _pending_instructions.copy()
+    _pending_instructions.clear()
+    return pending
+
+
+def process_commands(commands: list[dict], status_text: str = "") -> str | None:
+    """명령어 리스트 처리 — 자동 응답 포함
+
+    Returns:
+        None: 계속 진행
+        "wait": 대기 요청
+        "stop": 중단 요청
+        "proceed": 다음 단계 진행
+    """
+    global _pending_instructions
+    result = None
+
+    for cmd in commands:
+        action = cmd["action"]
+        text = cmd["text"]
+
+        if action == "status":
+            report_status(status_text or "작업 진행 중")
+
+        elif action == "wait":
+            send_message("⏸️ *대기*\n\n작업을 일시 중단합니다.\n\"진행\" 또는 \"ㅇㅇ\"으로 재개하세요.")
+            result = "wait"
+
+        elif action == "stop":
+            send_message("🛑 *중단*\n\n현재 작업을 중단합니다.")
+            result = "stop"
+
+        elif action == "proceed":
+            send_message("▶️ *진행*\n\n다음 단계로 진행합니다.")
+            result = "proceed"
+
+        elif action == "instruction":
+            ack_instruction(text)
+            _pending_instructions.append(cmd)
+
+    return result
+
+
+def poll_loop(callback, interval: int = 10, max_polls: int = 60):
+    """폴링 루프 — callback(command_dict)이 False 반환 시 중단"""
+    skip_old_messages()
 
     for _ in range(max_polls):
-        cmd, offset = poll_once(offset)
+        cmd, _offset_unused = poll_once(_last_offset)
         if cmd is not None:
             result = callback(cmd)
             if result is False:
