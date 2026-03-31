@@ -96,6 +96,74 @@ function parseAge(input: string) {
 
 // ── Gemini API ──────────────────────────────────────
 
+// ── Gemini 실패 시 로컬 폴백 ────────────────────────
+
+function localFallback(text: string): Record<string, unknown> {
+  const t = text.replace(/\s+/g, " ").trim();
+  const tn = t.replace(/\s/g, "");
+
+  // 리마인드
+  if (/(할일|할 일|오늘|뭐해|일정|스케줄|리마인드)/.test(tn))
+    return { action: "reminder" };
+
+  // 전체삭제
+  if (/(전체삭제|전부삭제|다삭제|다지워)/.test(tn)) {
+    const nm = t.match(/([가-힣]{2,4})/);
+    return { action: "delete_all", name: nm?.[1] || "" };
+  }
+
+  // 삭제
+  if (/(삭제|빼줘|제거|지워)/.test(t)) {
+    const nm = t.match(/([가-힣]{2,4})/);
+    return { action: "delete", name: nm?.[1] || "" };
+  }
+
+  // 등록
+  if (/(등록|추가|새고객|신규|넣어)/.test(t)) {
+    const nm = [...t.matchAll(/([가-힣]{2,4})/g)].find(m => !/(등록|추가|새고객|신규|고객|사는)/.test(m[1]));
+    const age = t.match(/(\d{1,4}\s*(?:대|세|살|년생))/);
+    const grade = t.match(/([A-Da-d])\s*등급/i) || t.match(/등급\s*([A-Da-d])/i);
+    const cities = "서울|부산|대구|인천|광주|대전|울산|세종|수원|성남|시흥|용인|안양|고양|안산|화성|평택|의정부|파주|김포|제주|춘천|청주|전주|포항|창원|천안|구미|경주";
+    const addr = t.match(new RegExp(`(${cities})`));
+    return {
+      action: "register",
+      params: {
+        name: nm?.[1] || "",
+        ...(age ? { age: age[1] } : {}),
+        ...(grade ? { grade: (grade[1]).toUpperCase() } : {}),
+        ...(addr ? { address: addr[1] } : {}),
+      },
+    };
+  }
+
+  // 수정
+  if (/(변경|수정|바꿔|올려|내려|으로)/.test(t)) {
+    const nm = t.match(/([가-힣]{2,4})/);
+    const fields: Record<string, string> = {};
+    const gr = t.match(/등급\s*([A-Da-d])/i) || t.match(/([A-Da-d])\s*(?:등급|로)/i);
+    if (gr) fields["등급"] = gr[1].toUpperCase();
+    const age = t.match(/(?:나이|)\s*(\d{1,4}\s*(?:대|세|살|년생))/);
+    if (age) fields["나이"] = age[1];
+    const name = nm?.[1] || "";
+    if (/(변경|수정|바꿔|올려|내려|등급|나이|지역|주소)/.test(name)) return { action: "update", fields };
+    return { action: "update", name: name || undefined, fields };
+  }
+
+  // 명령
+  if (/(테스트|git |push|pull|commit|handoff|배포|빌드)/.test(t.toLowerCase()))
+    return { action: "command", params: { command: t } };
+
+  // 한글 이름 2~4글자만 → 조회
+  if (/^[가-힣]{2,4}$/.test(t))
+    return { action: "query", name: t };
+
+  // 이름 + 정보/고객 → 조회
+  const qm = t.match(/([가-힣]{2,4})\s*(고객|정보|조회|검색|보여|찾아|알려)/);
+  if (qm) return { action: "query", name: qm[1] };
+
+  return { action: "unknown" };
+}
+
 async function callGemini(text: string, session: Session) {
   const ctx = session.last_customer_name
     ? `직전 대화 고객: "${session.last_customer_name}"`
@@ -140,26 +208,37 @@ select: 번호 선택. "1","1번","2번" → {"action":"select","select":1}
 
 메시지: "${text}"`;
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
-      {
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
+  const reqBody = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 512 },
+  });
+
+  // 최대 2회 시도 (429 시 4초 대기 후 재시도)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0, maxOutputTokens: 512 },
-        }),
-      },
-    );
-    const data = await res.json();
-    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    if (!raw) return { action: "unknown" };
-    return JSON.parse(raw.replace(/```json\n?/g, "").replace(/```/g, "").trim());
-  } catch (e) {
-    console.error("Gemini:", e);
-    return { action: "unknown" };
+        body: reqBody,
+      });
+
+      if (res.status === 429 && attempt === 0) {
+        await new Promise(r => setTimeout(r, 4000));
+        continue;
+      }
+
+      const data = await res.json();
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (!raw) break;
+      return JSON.parse(raw.replace(/```json\n?/g, "").replace(/```/g, "").trim());
+    } catch (e) {
+      console.error("Gemini:", e);
+    }
   }
+
+  // Gemini 실패 → 로컬 폴백
+  return localFallback(text);
 }
 
 // ── 핸들러 ──────────────────────────────────────────
