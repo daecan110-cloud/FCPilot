@@ -1,9 +1,10 @@
 """개척지도 탭 — 매장 등록/지도 표시/팔로업"""
 import streamlit as st
-from streamlit_folium import st_folium
+import streamlit.components.v1 as components
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
-from utils.map_utils import create_map, STATUS_LABELS
+from utils.map_utils import STATUS_LABELS
+from utils.naver_map import pioneer_map_html
 from services.geocoding import geocode
 from config import ALLOWED_FILE_TYPES, MAX_FILE_SIZE_MB
 
@@ -48,12 +49,7 @@ def _render_map():
     filtered = [s for s in shops if s.get("status") in status_filter]
     st.caption(f"전체 {len(shops)}개 | 표시 {len(filtered)}개")
 
-    # BUG-07: 선택 매장으로 지도 센터 이동
-    selected_id = st.session_state.get("map_focus_shop")
-    center_shop = next((s for s in filtered if s["id"] == selected_id), None)
-
-    m = create_map(filtered, center_shop=center_shop)
-    st_folium(m, width=700, height=500, key="pioneer_map")
+    components.html(pioneer_map_html(filtered, height=500), height=500)
 
     # 매장 목록 — 클릭 시 지도 포커스
     for s in filtered:

@@ -2,11 +2,12 @@
 from datetime import date
 
 import streamlit as st
-from streamlit_folium import st_folium
+import streamlit.components.v1 as components
 
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
-from utils.map_utils import create_route_map, VISIT_RESULT_LABELS
+from utils.map_utils import VISIT_RESULT_LABELS
+from utils.naver_map import route_map_html
 from services.geocoding import geocode
 
 
@@ -115,7 +116,7 @@ def _render_today():
                 _regeocode_missing(sb, fc_id)
 
         m = create_route_map(visits_for_map)
-        st_folium(m, width=700, height=400, key="route_map_today")
+        components.html(route_map_html(visits_for_map, height=420), height=420)
 
         for v in visits_for_map:
             result_text = VISIT_RESULT_LABELS.get(v["result"], "")
@@ -173,7 +174,7 @@ def _render_history():
                 _regeocode_missing(sb, fc_id)
 
     m = create_route_map(visits_for_map)
-    st_folium(m, width=700, height=400, key="route_map_hist")
+    components.html(route_map_html(visits_for_map, height=420), height=420)
 
     for v in visits_for_map:
         result_text = VISIT_RESULT_LABELS.get(v["result"], "")
