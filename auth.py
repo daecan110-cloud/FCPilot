@@ -6,7 +6,7 @@ from config import SESSION_TIMEOUT
 
 
 def check_session_timeout():
-    """30분 무활동 시 자동 로그아웃"""
+    """60분 무활동 시 자동 로그아웃"""
     if "last_activity" not in st.session_state:
         st.session_state.last_activity = time.time()
         return
@@ -14,7 +14,7 @@ def check_session_timeout():
     elapsed = time.time() - st.session_state.last_activity
     if elapsed > SESSION_TIMEOUT:
         st.session_state.clear()
-        st.warning("30분 동안 활동이 없어 자동 로그아웃되었습니다.")
+        st.warning("60분 동안 활동이 없어 자동 로그아웃되었습니다.")
         st.rerun()
     else:
         st.session_state.last_activity = time.time()

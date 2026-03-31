@@ -18,7 +18,7 @@ ALLOWED_FILE_TYPES = ["pdf", "jpg", "jpeg", "png"]
 MAX_FILE_SIZE_MB = 10
 
 # 세션 타임아웃 (초)
-SESSION_TIMEOUT = 30 * 60  # 30분
+SESSION_TIMEOUT = 60 * 60  # 60분
 
 # Claude API 설정
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
