@@ -150,38 +150,12 @@ command (개발/PC 명령):
       },
     );
 
-    const httpStatus = res.status;
     const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const errorMsg = data?.error?.message || "";
-
-    // 디버그: Gemini 응답 원본을 텔레그램으로 전송
-    const debugLines = [
-      `🔍 *DEBUG Gemini*`,
-      `HTTP: ${httpStatus}`,
-      `Raw: ${raw.slice(0, 300) || "(empty)"}`,
-    ];
-    if (errorMsg) debugLines.push(`Error: ${errorMsg}`);
-
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: CHAT_ID, text: debugLines.join("\n") }),
-    });
-
     if (!raw) return { action: "unknown" };
-
-    const cleaned = raw.replace(/```json\n?/g, "").replace(/```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
-    return parsed;
+    return JSON.parse(raw.replace(/```json\n?/g, "").replace(/```/g, "").trim());
   } catch (e) {
-    // 파싱 에러도 텔레그램으로 전송
-    const errText = `❌ *DEBUG Error*\n${String(e).slice(0, 300)}`;
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: CHAT_ID, text: errText }),
-    });
+    console.error("Gemini error:", e);
     return { action: "unknown" };
   }
 }
@@ -231,7 +205,7 @@ async function handleRegister(params: Record<string, string>, fcId: string): Pro
     name,
     address: params.address || "",
     memo: params.memo || "",
-    prospect_grade: params.grade || "C",
+    prospect_grade: (params.grade || params.prospect_grade || params["등급"] || "C").toUpperCase(),
   };
 
   if (params.age) {
