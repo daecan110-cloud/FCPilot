@@ -1,8 +1,8 @@
 /**
- * FCPilot 텔레그램 봇 — Supabase Edge Function
+ * FCPilot 텔레그램 봇 — 100% Gemini 자연어 처리
  *
- * 1단계: 로컬 키워드 매칭 (빠름, Gemini 호출 없음)
- * 2단계: Gemini 자연어 파싱 (애매한 경우만)
+ * 모든 메시지 → Gemini API → 구조화 JSON → DB 처리
+ * 직전 대화 고객명 세션 저장 (이름 생략 대응)
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -14,6 +14,10 @@ const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+// ── 직전 고객 세션 (메모리) ─────────────────────────
+
+let lastCustomerName = "";
+
 // ── 텔레그램 응답 ──────────────────────────────────
 
 async function reply(chatId: string, text: string) {
@@ -24,84 +28,12 @@ async function reply(chatId: string, text: string) {
   });
 }
 
-// ── 1단계: 로컬 키워드 매칭 ─────────────────────────
-
-interface Intent {
-  intent: string;
-  params: Record<string, string>;
-}
-
-const REMINDER_KEYWORDS = [
-  "할일", "할 일", "오늘", "리마인드", "일정", "예정", "뭐해", "뭐하지",
-  "스케줄", "todo", "할거", "할 거",
-];
-
-const COMMAND_KEYWORDS = [
-  "테스트", "git ", "push", "pull", "commit", "handoff", "배포", "빌드",
-  "상태", "status",
-];
-
-const CREATE_KEYWORDS = [
-  "새고객", "새 고객", "고객등록", "고객 등록", "신규고객", "신규 고객",
-  "등록해", "등록해줘", "등록", "추가해", "추가해줘", "추가",
-];
-
-const NOISE_WORDS = [
-  "새 고객", "새고객", "고객 등록", "고객등록", "신규 고객", "신규고객",
-  "등록해줘", "등록해", "등록", "추가해줘", "추가해", "추가",
-  "고객", "사는", ":", "：",
-];
-
-function extractCreateParams(text: string): Record<string, string> {
-  const t = text.replace(/\s+/g, " ").trim();
-
-  // 키워드 제거하여 순수 정보만 남기기
-  let cleaned = t;
-  for (const k of NOISE_WORDS) {
-    cleaned = cleaned.replaceAll(k, " ");
-  }
-  cleaned = cleaned.replace(/\s+/g, " ").trim();
-
-  const params: Record<string, string> = {};
-
-  // 나이 추출 먼저 (이름과 분리하기 위해)
-  const ageMatch = cleaned.match(/(\d{1,4})\s*(대|세|살|년생)/);
-  const ageRaw = ageMatch ? ageMatch[0] : "";
-
-  // 이름 추출: 한글 2~4글자 (나이/주소 키워드 제외)
-  const nameExclude = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
-    "수원", "성남", "시흥", "용인", "안양", "고양", "안산", "화성", "평택",
-    "의정부", "파주", "김포", "제주", "춘천", "청주", "전주", "포항", "창원",
-    "천안", "구미", "경주", "메모"];
-  const nameMatches = [...cleaned.matchAll(/([가-힣]{2,4})/g)];
-  for (const m of nameMatches) {
-    if (!nameExclude.includes(m[1])) {
-      params.name = m[1];
-      break;
-    }
-  }
-
-  // 나이 추출: "20대", "30세", "00년생" 등
-  if (ageRaw) params.age = ageRaw;
-
-  // 주소 추출: "사는" 앞 단어, 또는 "서울/수원/시흥" 등
-  const addrMatch = cleaned.match(/([가-힣]{2,10})\s*사는/) ||
-    cleaned.match(/(서울|부산|대구|인천|광주|대전|울산|세종|수원|성남|시흥|용인|안양|고양|안산|화성|평택|의정부|파주|김포|제주|춘천|청주|전주|포항|창원|천안|구미|경주)/);
-  if (addrMatch) params.address = addrMatch[1];
-
-  // 메모: 남은 텍스트에서 추출 시도
-  const memoMatch = cleaned.match(/메모\s*[:：]?\s*(.+)/);
-  if (memoMatch) params.memo = memoMatch[1].trim();
-
-  return params;
-}
-
-// ── 나이 파싱 유틸 ──────────────────────────────────
+// ── 나이 파싱 ───────────────────────────────────────
 
 interface AgeInfo {
-  age_group: string;   // "20대", "20대 (26세)" 등
-  age: number | null;  // 정수 나이 (계산 가능 시)
-  birth_year: number | null; // 출생년도
+  age_group: string;
+  age: number | null;
+  birth_year: number | null;
 }
 
 function parseAge(input: string): AgeInfo {
@@ -115,234 +47,95 @@ function parseAge(input: string): AgeInfo {
     if (year < 100) year += year <= (currentYear % 100) ? 2000 : 1900;
     const exactAge = currentYear - year;
     const decade = Math.floor(exactAge / 10) * 10;
-    return {
-      age_group: `${decade}대 (${exactAge}세)`,
-      age: exactAge,
-      birth_year: year,
-    };
+    return { age_group: `${decade}대 (${exactAge}세)`, age: exactAge, birth_year: year };
   }
 
-  // "26살", "26세"
+  // "26살", "36세"
   const exactMatch = t.match(/(\d{1,3})\s*(살|세)/);
   if (exactMatch) {
     const exactAge = parseInt(exactMatch[1]);
     const decade = Math.floor(exactAge / 10) * 10;
-    return {
-      age_group: `${decade}대 (${exactAge}세)`,
-      age: exactAge,
-      birth_year: currentYear - exactAge,
-    };
+    return { age_group: `${decade}대 (${exactAge}세)`, age: exactAge, birth_year: currentYear - exactAge };
   }
 
-  // "20대", "30대"
+  // "20대"
   const decadeMatch = t.match(/(\d{1,2})0?\s*대/);
   if (decadeMatch) {
     const decade = parseInt(decadeMatch[1]) * 10;
     return { age_group: `${decade}대`, age: decade, birth_year: null };
   }
 
-  // 숫자만 ("25")
-  const numMatch = t.match(/^(\d{1,3})$/);
-  if (numMatch) {
-    const n = parseInt(numMatch[1]);
+  // 숫자만 ("36")
+  const numOnly = t.match(/^(\d{1,3})$/);
+  if (numOnly) {
+    const n = parseInt(numOnly[1]);
     if (n >= 10 && n <= 99) {
       const decade = Math.floor(n / 10) * 10;
-      return {
-        age_group: `${decade}대 (${n}세)`,
-        age: n,
-        birth_year: currentYear - n,
-      };
+      return { age_group: `${decade}대 (${n}세)`, age: n, birth_year: currentYear - n };
     }
   }
 
   return { age_group: t, age: null, birth_year: null };
 }
 
-const UPDATE_KEYWORDS = [
-  "변경", "수정", "바꿔", "바꿔줘", "변경해", "변경해줘", "수정해", "수정해줘",
-  "으로 해", "으로 해줘",
-];
+// ── Gemini API ──────────────────────────────────────
 
-const FIELD_PATTERNS: Array<{
-  keywords: string[];
-  field: string;
-  valueExtractor: (text: string) => string | null;
-}> = [
-  {
-    keywords: ["등급"],
-    field: "등급",
-    valueExtractor: (t) => {
-      const m = t.match(/등급\s*([A-Da-d])/i);
-      return m ? m[1].toUpperCase() : null;
-    },
-  },
-  {
-    keywords: ["나이", "살", "세", "년생", "대"],
-    field: "나이",
-    valueExtractor: (t) => {
-      const m = t.match(/나이\s*(.+?)(?:\s*(?:으?로|변경|수정|바꿔|하고|$))/) ||
-        t.match(/(\d{1,4}\s*(?:대|세|살|년생))/);
-      return m ? m[1].trim() : null;
-    },
-  },
-  {
-    keywords: ["지역", "주소", "사는곳", "사는 곳"],
-    field: "주소",
-    valueExtractor: (t) => {
-      const m = t.match(/(?:지역|주소|사는\s*곳?)\s*([가-힣]{2,10})/) ||
-        t.match(/([가-힣]{2,10})(?:으?로\s*(?:변경|수정|바꿔))/);
-      return m ? m[1] : null;
-    },
-  },
-  {
-    keywords: ["메모"],
-    field: "메모",
-    valueExtractor: (t) => {
-      const m = t.match(/메모\s*[:：]?\s*(.+?)(?:\s*(?:으?로|변경|수정|바꿔|$))/);
-      return m ? m[1].trim() : null;
-    },
-  },
-  {
-    keywords: ["직업"],
-    field: "직업",
-    valueExtractor: (t) => {
-      const m = t.match(/직업\s*[:：]?\s*([가-힣a-zA-Z]+)/);
-      return m ? m[1] : null;
-    },
-  },
-];
-
-function extractUpdateParams(text: string): Record<string, string> | null {
-  const t = text.replace(/\s+/g, " ").trim();
-
-  // 수정 의도 감지: 키워드 또는 "등급 A" 같은 필드+값 패턴
-  const hasUpdateKeyword = UPDATE_KEYWORDS.some((k) => t.includes(k));
-  const hasFieldValue = FIELD_PATTERNS.some((fp) =>
-    fp.keywords.some((k) => t.includes(k)) && fp.valueExtractor(t) !== null
-  );
-
-  if (!hasUpdateKeyword && !hasFieldValue) return null;
-
-  // 이름 추출 (첫 번째 한글 2~4글자, 필드 키워드가 아닌 것)
-  const fieldKeywords = FIELD_PATTERNS.flatMap((fp) => fp.keywords).concat(UPDATE_KEYWORDS);
-  const nameMatch = t.match(/([가-힣]{2,4})/);
-  if (!nameMatch) return null;
-
-  const name = nameMatch[1];
-  if (fieldKeywords.includes(name)) return null;
-
-  // 필드+값 추출 (복수 필드 지원 → JSON 문자열로 전달)
-  const updates: Array<{ field: string; value: string }> = [];
-  for (const fp of FIELD_PATTERNS) {
-    if (!fp.keywords.some((k) => t.includes(k))) continue;
-    const val = fp.valueExtractor(t);
-    if (val) updates.push({ field: fp.field, value: val });
-  }
-
-  if (updates.length === 0) return null;
-
-  if (updates.length === 1) {
-    return { name, field: updates[0].field, value: updates[0].value };
-  }
-
-  // 복수 필드: updates_json으로 전달
-  return { name, updates_json: JSON.stringify(updates) };
+interface GeminiResult {
+  action: "query" | "register" | "update" | "reminder" | "command" | "unknown";
+  name?: string;
+  fields?: Record<string, string>;
+  params?: Record<string, string>;
 }
 
-function localMatch(text: string): Intent | null {
-  const t = text.replace(/\s+/g, " ").trim();
-  const tNoSpace = t.replace(/\s/g, "");
-  const tLower = t.toLowerCase();
+async function callGemini(text: string): Promise<GeminiResult> {
+  const systemPrompt = `너는 보험 FC(재무설계사) 업무 봇이다. 사용자 메시지를 분석해서 반드시 JSON만 응답해.
 
-  // 1. 리마인드 — "할일", "오늘 할 일", "뭐해" 등
-  if (REMINDER_KEYWORDS.some((k) => tNoSpace.includes(k.replace(/\s/g, "")))) {
-    return { intent: "reminder_list", params: {} };
-  }
-
-  // 2. 고객 등록 — 위치 상관없이 키워드 포함 시 등록 우선
-  //    "양종학 00년생 수원 등록" = "등록 양종학 00년생 수원"
-  if (CREATE_KEYWORDS.some((k) => tNoSpace.includes(k.replace(/\s/g, "")))) {
-    const params = extractCreateParams(t);
-    if (params.name) {
-      return { intent: "customer_create", params };
-    }
-    return null; // 이름 추출 실패 → Gemini 위임
-  }
-
-  // 3. 고객 수정 — "김영민 등급 B", "김영민 나이 20대로 변경"
-  const updateMatch = extractUpdateParams(t);
-  if (updateMatch) {
-    return { intent: "customer_update", params: updateMatch };
-  }
-
-  // 4. 개발 명령 — "테스트해줘", "git push", "handoff 업데이트"
-  if (COMMAND_KEYWORDS.some((k) => tLower.includes(k))) {
-    return { intent: "command", params: { command: t } };
-  }
-
-  // 5. 고객 조회 — "김철수 고객정보", "김철수 정보"
-  const searchPatterns = [
-    /^(.{2,10})\s*(고객|정보|조회|검색|보여|찾아|알려)/,
-    /^(고객|정보|조회)\s+(.{2,10})$/,
-  ];
-  for (const pat of searchPatterns) {
-    const m = t.match(pat);
-    if (m) {
-      const name = (m[1] || m[2]).replace(/(고객|정보|조회|검색|보여|찾아|알려)/g, "").trim();
-      if (name.length >= 2) return { intent: "customer_search", params: { name } };
-    }
-  }
-
-  // 6. 순수 한글 이름 2~4글자만 입력 → 고객 검색
-  if (/^[가-힣]{2,4}$/.test(t)) {
-    return { intent: "customer_search", params: { name: t } };
-  }
-
-  return null; // 매칭 안 됨 → Gemini에 위임
+{
+  "action": "query" | "register" | "update" | "reminder" | "command",
+  "name": "고객 이름 (있으면)",
+  "fields": { "수정할 필드": "값" },
+  "params": { "등록 파라미터" }
 }
 
-// ── 2단계: Gemini 자연어 파싱 ───────────────────────
+## action별 규칙
 
-async function geminiParse(text: string): Promise<Intent> {
-  const prompt = `당신은 보험 FC(재무설계사) 업무 어시스턴트입니다.
-사용자의 자연어 메시지를 분석하여 의도를 JSON으로 반환하세요.
+query (고객 조회):
+  "김철수" → {"action":"query","name":"김철수"}
+  "김철수 고객 정보" → {"action":"query","name":"김철수"}
+  "김철수 정보 알려줘" → {"action":"query","name":"김철수"}
+  이름만 있고 다른 키워드 없으면 → query
 
-## intent 종류와 예시
+register (고객 등록):
+  "등록" 키워드 위치 상관없이 등록으로 처리
+  "양종학 00년생 수원 등록" → {"action":"register","params":{"name":"양종학","age":"00년생","address":"수원"}}
+  "등록 홍길동 40대 서울" → {"action":"register","params":{"name":"홍길동","age":"40대","address":"서울"}}
+  "김영민 등록해줘 시흥 20대" → {"action":"register","params":{"name":"김영민","age":"20대","address":"시흥"}}
+  키워드: 등록, 등록해줘, 추가, 새고객, 신규
 
-customer_search (고객 정보 조회):
-  "김철수" → {"intent":"customer_search","params":{"name":"김철수"}}
-  "김철수 고객" → 같음
-  "김철수 정보 알려줘" → 같음
-  "철수씨 보험 뭐 들었어?" → {"intent":"customer_search","params":{"name":"철수"}}
+update (고객 수정):
+  "김철수 등급 B" → {"action":"update","name":"김철수","fields":{"등급":"B"}}
+  "나이 36으로 변경" → {"action":"update","fields":{"나이":"36살"}} (이름 없으면 name 생략)
+  "김철수 등급 B로 변경하고 나이 20대로 수정" → {"action":"update","name":"김철수","fields":{"등급":"B","나이":"20대"}}
+  "김영민 지역 수원" → {"action":"update","name":"김영민","fields":{"주소":"수원"}}
+  키워드: 변경, 수정, 바꿔, 으로
 
-customer_create (새 고객 등록):
-  "새 고객 홍길동 40대 서울" → {"intent":"customer_create","params":{"name":"홍길동","age":"40","address":"서울"}}
-  "이영희 등록해줘 수원 사는 30대" → {"intent":"customer_create","params":{"name":"이영희","age":"30","address":"수원"}}
-
-customer_update (고객 정보 수정 — 단일 또는 복수 필드):
-  "김철수 등급 A로" → {"intent":"customer_update","params":{"name":"김철수","field":"등급","value":"A"}}
-  "김철수 나이 30대" → {"intent":"customer_update","params":{"name":"김철수","field":"나이","value":"30"}}
-  "김철수 지역 수원" → {"intent":"customer_update","params":{"name":"김철수","field":"주소","value":"수원"}}
-  "박영수 메모: VIP 고객" → {"intent":"customer_update","params":{"name":"박영수","field":"메모","value":"VIP 고객"}}
-  복수 수정: "김철수 등급 B로 변경하고 나이 20대로 수정" → {"intent":"customer_update","params":{"name":"김철수","updates_json":"[{\"field\":\"등급\",\"value\":\"B\"},{\"field\":\"나이\",\"value\":\"20\"}]"}}
-
-reminder_list (오늘 할 일 조회):
-  "오늘 뭐해", "할일", "할 일", "일정", "스케줄", "리마인드" → {"intent":"reminder_list","params":{}}
-
-reminder_done (리마인드 완료):
-  "김철수 완료" → {"intent":"reminder_done","params":{"name":"김철수"}}
+reminder (리마인드):
+  "할일", "할 일", "오늘할일", "오늘 할 일", "뭐해", "일정", "스케줄", "오늘 뭐하지" → {"action":"reminder"}
 
 command (개발/PC 명령):
-  "테스트해줘", "git push", "handoff 업데이트해" → {"intent":"command","params":{"command":"원문 그대로"}}
+  "테스트해줘", "git push", "handoff 업데이트", "배포" → {"action":"command","params":{"command":"원문 그대로"}}
 
-unknown: 위 어디에도 해당 안 되면
+## 나이 표기 규칙 (params.age 또는 fields.나이)
+- "20대" → "20대" 그대로
+- "00년생" → "00년생" 그대로
+- "36살", "36세" → "36살" 그대로
+- 숫자만 "36" → "36살"
 
-## 규칙
-- 한국어 자연어를 유연하게 해석하세요
-- 맞춤법 틀려도, 띄어쓰기 없어도, 줄임말이어도 최선을 다해 파악하세요
-- JSON만 반환. 설명 없이. 코드 블록 없이.
-
-메시지: "${text}"`;
+## 중요
+- JSON만 반환. 설명 없이. 코드블록 없이.
+- 한국어 맞춤법 틀려도, 띄어쓰기 없어도, 줄임말이어도 최선을 다해 파악
+- 이름이 메시지에 없으면 name 필드 생략 (직전 대화 고객에 적용됨)
+- action을 판별할 수 없으면 "unknown"`;
 
   try {
     const res = await fetch(
@@ -351,30 +144,25 @@ unknown: 위 어디에도 해당 안 되면
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0, maxOutputTokens: 256 },
+          contents: [{ parts: [{ text: `${systemPrompt}\n\n사용자 메시지: "${text}"` }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 512 },
         }),
       },
     );
     const data = await res.json();
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     return JSON.parse(raw.replace(/```json\n?/g, "").replace(/```/g, "").trim());
-  } catch {
-    return { intent: "unknown", params: {} };
+  } catch (e) {
+    console.error("Gemini error:", e);
+    return { action: "unknown" };
   }
-}
-
-// ── 의도 파악 (로컬 → Gemini 폴백) ─────────────────
-
-async function resolveIntent(text: string): Promise<Intent> {
-  const local = localMatch(text);
-  if (local) return local;
-  return await geminiParse(text);
 }
 
 // ── 핸들러 ──────────────────────────────────────────
 
-async function searchCustomer(name: string): Promise<string> {
+async function handleQuery(name: string): Promise<string> {
+  lastCustomerName = name;
+
   const { data, error } = await supabase
     .from("clients")
     .select("name, prospect_grade, age, age_group, birth_year, gender, occupation, address, memo")
@@ -386,209 +174,145 @@ async function searchCustomer(name: string): Promise<string> {
 
   return data
     .map((c) => {
-      // 나이 표시: age_group 우선, birth_year 있으면 년생 추가
       let ageDisplay = "";
       if (c.age_group) {
         ageDisplay = c.age_group;
         if (c.birth_year) {
           const shortYear = String(c.birth_year).slice(-2);
-          // age_group에 이미 세 정보가 있으면 년생만 추가
           if (!ageDisplay.includes("년생")) ageDisplay += ` (${shortYear}년생)`;
         }
       } else if (c.age) {
         ageDisplay = `${c.age}세`;
       }
-
-      const info = [
-        ageDisplay,
-        c.gender === "M" ? "남" : c.gender === "F" ? "여" : "",
-        c.occupation,
-        c.address,
-      ]
-        .filter(Boolean)
-        .join(" / ");
+      const info = [ageDisplay, c.gender === "M" ? "남" : c.gender === "F" ? "여" : "", c.occupation, c.address]
+        .filter(Boolean).join(" / ");
       const memo = c.memo ? `\n  메모: ${c.memo}` : "";
       return `👤 *${c.name}* [${c.prospect_grade || "-"}등급]\n  ${info}${memo}`;
     })
     .join("\n\n");
 }
 
-async function createCustomer(p: Record<string, string>, fcId: string): Promise<string> {
-  if (!p.name) return "❌ 고객 이름이 필요합니다.";
+async function handleRegister(params: Record<string, string>, fcId: string): Promise<string> {
+  const name = params.name;
+  if (!name) return "❌ 고객 이름이 필요합니다.";
+
+  lastCustomerName = name;
 
   const insertData: Record<string, unknown> = {
     fc_id: fcId,
-    name: p.name,
-    address: p.address || "",
-    memo: p.memo || "",
-    prospect_grade: "C",
+    name,
+    address: params.address || "",
+    memo: params.memo || "",
+    prospect_grade: params.grade || "C",
   };
 
-  if (p.age) {
-    const info = parseAge(p.age);
+  if (params.age) {
+    const info = parseAge(params.age);
     insertData.age_group = info.age_group;
     if (info.age !== null) insertData.age = info.age;
     if (info.birth_year !== null) insertData.birth_year = info.birth_year;
   }
 
   const { error } = await supabase.from("clients").insert(insertData);
-
   if (error) return `❌ 등록 실패: ${error.message}`;
+
   const ageDisplay = insertData.age_group ? ` / ${insertData.age_group}` : "";
-  return `✅ *${p.name}* 고객 등록 완료 (C등급${ageDisplay})`;
+  const addrDisplay = params.address ? ` / ${params.address}` : "";
+  return `✅ *${name}* 등록 완료 (C등급${ageDisplay}${addrDisplay})`;
 }
 
-async function updateCustomer(p: Record<string, string>): Promise<string> {
-  if (!p.name) return "❌ 고객 이름이 필요합니다.";
+async function handleUpdate(name: string, fields: Record<string, string>): Promise<string> {
+  lastCustomerName = name;
 
   const fieldMap: Record<string, string> = {
-    등급: "prospect_grade",
-    메모: "memo",
-    주소: "address",
-    지역: "address",
-    나이: "age",
-    직업: "occupation",
+    등급: "prospect_grade", 메모: "memo", 주소: "address",
+    지역: "address", 나이: "age", 직업: "occupation",
   };
 
   const { data: clients } = await supabase
-    .from("clients")
-    .select("id, name")
-    .ilike("name", `%${p.name}%`)
-    .limit(1);
-
-  if (!clients?.length) return `🔍 "${p.name}" 고객을 찾을 수 없습니다.`;
+    .from("clients").select("id, name").ilike("name", `%${name}%`).limit(1);
+  if (!clients?.length) return `🔍 "${name}" 고객을 찾을 수 없습니다.`;
 
   const clientName = clients[0].name;
   const clientId = clients[0].id;
-
-  // 복수 필드 수정
-  let updates: Array<{ field: string; value: string }>;
-  if (p.updates_json) {
-    updates = JSON.parse(p.updates_json);
-  } else if (p.field && p.value) {
-    updates = [{ field: p.field, value: p.value }];
-  } else {
-    return "❌ 수정할 항목과 값이 필요합니다.";
-  }
-
   const updateData: Record<string, unknown> = {};
   const changeLog: string[] = [];
 
-  for (const u of updates) {
-    if (u.field === "나이") {
-      const info = parseAge(u.value);
+  for (const [field, value] of Object.entries(fields)) {
+    if (field === "나이") {
+      const info = parseAge(value);
       updateData.age_group = info.age_group;
       if (info.age !== null) updateData.age = info.age;
       if (info.birth_year !== null) updateData.birth_year = info.birth_year;
       changeLog.push(`나이 → "${info.age_group}"`);
     } else {
-      const dbField = fieldMap[u.field] || u.field;
-      updateData[dbField] = u.value;
-      changeLog.push(`${u.field} → "${u.value}"`);
+      const dbField = fieldMap[field] || field;
+      updateData[dbField] = value;
+      changeLog.push(`${field} → "${value}"`);
     }
   }
 
-  const { error } = await supabase
-    .from("clients")
-    .update(updateData)
-    .eq("id", clientId);
+  if (!Object.keys(updateData).length) return "❌ 수정할 항목이 없습니다.";
 
+  const { error } = await supabase.from("clients").update(updateData).eq("id", clientId);
   if (error) return `❌ 수정 실패: ${error.message}`;
   return `✅ *${clientName}* 수정 완료\n${changeLog.map((c) => `  • ${c}`).join("\n")}`;
 }
 
-async function listReminders(): Promise<string> {
+async function handleReminder(): Promise<string> {
   const today = new Date().toISOString().split("T")[0];
-
   const { data: logs } = await supabase
     .from("contact_logs")
     .select("client_id, next_date, next_action, clients(name, prospect_grade)")
-    .lte("next_date", today)
-    .not("next_date", "is", null)
-    .order("next_date")
-    .limit(10);
+    .lte("next_date", today).not("next_date", "is", null)
+    .order("next_date").limit(10);
 
   if (!logs?.length) return "✅ 오늘 예정된 리마인드가 없습니다.";
 
   const seen = new Set<string>();
   const lines = ["📋 *오늘의 할 일*\n"];
-
   for (const log of logs) {
     if (seen.has(log.client_id)) continue;
     seen.add(log.client_id);
-
     const c = (log.clients as Record<string, string>) || {};
     const icon = log.next_date < today ? "🔴" : "🟡";
-    lines.push(
-      `${icon} *${c.name || "?"}* [${c.prospect_grade || "-"}] — ${log.next_action || "연락"} (${log.next_date})`,
-    );
+    lines.push(`${icon} *${c.name || "?"}* [${c.prospect_grade || "-"}] — ${log.next_action || "연락"} (${log.next_date})`);
   }
-
   return lines.join("\n");
 }
 
-async function queueCommand(command: string, fcId: string): Promise<string> {
+async function handleCommand(command: string, fcId: string): Promise<string> {
   const { error } = await supabase.from("command_queue").insert({
-    fc_id: fcId,
-    command,
-    status: "pending",
+    fc_id: fcId, command, status: "pending",
   });
-
   if (error) return `❌ 명령 저장 실패: ${error.message}`;
   return `📩 *명령 접수*\n\n"${command}"\n\nPC 켜져있으면 곧 실행됩니다.`;
 }
 
-async function resolveFcId(chatId: string): Promise<string> {
-  // 1. telegram_chat_id로 기존 사용자 조회
-  const { data: existing } = await supabase
-    .from("users_settings")
-    .select("id")
-    .eq("telegram_chat_id", chatId)
-    .limit(1);
+// ── fc_id 확보 ──────────────────────────────────────
 
+async function resolveFcId(chatId: string): Promise<string> {
+  const { data: existing } = await supabase
+    .from("users_settings").select("id").eq("telegram_chat_id", chatId).limit(1);
   if (existing?.length) return existing[0].id;
 
-  // 2. 없으면 — users_settings에 행이 있는지 확인 (Streamlit 가입자)
   const { data: anyUser } = await supabase
-    .from("users_settings")
-    .select("id")
-    .limit(1);
-
+    .from("users_settings").select("id").limit(1);
   if (anyUser?.length) {
-    // 기존 사용자에 chat_id 연결
-    await supabase
-      .from("users_settings")
-      .update({ telegram_chat_id: chatId })
-      .eq("id", anyUser[0].id);
+    await supabase.from("users_settings").update({ telegram_chat_id: chatId }).eq("id", anyUser[0].id);
     return anyUser[0].id;
   }
 
-  // 3. 아예 없으면 — 서비스 역할로 auth 사용자 + settings 생성
   const email = `fc_${chatId}@fcpilot.local`;
   const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
-    email,
-    password: crypto.randomUUID(),
-    email_confirm: true,
+    email, password: crypto.randomUUID(), email_confirm: true,
     user_metadata: { display_name: "FC영민", telegram_chat_id: chatId },
   });
-
-  if (authErr || !authData?.user) {
-    console.error("Auto-create user failed:", authErr);
-    return "";
-  }
+  if (authErr || !authData?.user) return "";
 
   const userId = authData.user.id;
-
-  // handle_new_user 트리거가 users_settings 자동 생성하지만
-  // telegram_chat_id는 수동 업데이트 필요
-  // 트리거 실행 대기
   await new Promise((r) => setTimeout(r, 500));
-
-  await supabase
-    .from("users_settings")
-    .update({ telegram_chat_id: chatId })
-    .eq("id", userId);
-
+  await supabase.from("users_settings").update({ telegram_chat_id: chatId }).eq("id", userId);
   return userId;
 }
 
@@ -605,38 +329,42 @@ Deno.serve(async (req) => {
     const chatId = String(msg.chat.id);
     if (chatId !== CHAT_ID) return new Response("OK");
 
-    // fc_id 확보 (없으면 자동 생성)
     const fcId = await resolveFcId(chatId);
     if (!fcId) {
-      await reply(chatId, "❌ 사용자 설정 초기화 실패. 다시 시도해주세요.");
+      await reply(chatId, "❌ 사용자 초기화 실패. 다시 시도해주세요.");
       return new Response("OK");
     }
 
     const text = msg.text.trim();
-    const { intent, params } = await resolveIntent(text);
+
+    // 100% Gemini 파싱
+    const result = await callGemini(text);
+    const action = result.action || "unknown";
+
+    // 이름 없으면 직전 대화 고객 사용
+    const name = result.name || lastCustomerName;
 
     let response: string;
-    switch (intent) {
-      case "customer_search":
-        response = await searchCustomer(params.name || text);
+    switch (action) {
+      case "query":
+        if (!name) { response = "❌ 고객 이름을 알려주세요."; break; }
+        response = await handleQuery(name);
         break;
-      case "customer_create":
-        response = await createCustomer(params, fcId);
+      case "register":
+        response = await handleRegister(result.params || {}, fcId);
         break;
-      case "customer_update":
-        response = await updateCustomer(params);
+      case "update":
+        if (!name) { response = "❌ 고객 이름을 알려주세요."; break; }
+        response = await handleUpdate(name, result.fields || {});
         break;
-      case "reminder_list":
-        response = await listReminders();
-        break;
-      case "reminder_done":
-        response = `✅ "${params.name}" 리마인드 완료 처리`;
+      case "reminder":
+        response = await handleReminder();
         break;
       case "command":
-        response = await queueCommand(params.command || text, fcId);
+        response = await handleCommand(result.params?.command || text, fcId);
         break;
       default:
-        response = `🤖 이해하지 못했습니다.\n\n사용 예시:\n• "김철수" → 고객 조회\n• "할일" → 오늘 할 일\n• "새 고객: 이영희, 30대" → 등록\n• "테스트해줘" → PC 명령`;
+        response = `🤖 이해하지 못했습니다.\n\n사용 예시:\n• "김철수" → 조회\n• "양종학 00년생 수원 등록"\n• "등급 B로 변경" (직전 고객)\n• "할일" → 리마인드\n• "테스트해줘" → PC 명령`;
     }
 
     await reply(chatId, response);
