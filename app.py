@@ -21,7 +21,7 @@ def main():
 
         tab = st.radio(
             "메뉴",
-            ["보장분석", "고객관리", "개척지도", "동선기록", "설정"],
+            ["홈", "보장분석", "고객관리", "개척지도", "동선기록", "통계", "설정"],
             label_visibility="collapsed",
         )
 
@@ -29,7 +29,10 @@ def main():
         if st.button("로그아웃", use_container_width=True):
             logout()
 
-    if tab == "보장분석":
+    if tab == "홈":
+        from pages.page_home import render
+        render()
+    elif tab == "보장분석":
         from pages.page_analysis import render
         render()
     elif tab == "고객관리":
@@ -40,6 +43,9 @@ def main():
         render()
     elif tab == "동선기록":
         from pages.page_pioneer_route import render
+        render()
+    elif tab == "통계":
+        from pages.page_stats import render
         render()
     elif tab == "설정":
         from pages.page_settings import render
