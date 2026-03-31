@@ -84,6 +84,11 @@
 - [x] analysis_records DB 컬럼 버그 수정
 - [x] 텔레그램 리마인드 버그 수정 (fp_reminders 미조회, 매장명 누락, 포맷 개선)
 
+## 개발환경 자동화 — 완료 (2026-03-31)
+- [x] `.claude/agents/` 서브에이전트 3개 (code-reviewer, codebase-explorer, test-runner)
+- [x] CLAUDE.md 한국어 별칭 등록
+- [x] `.claude/settings.json` hooks (SessionStart/End, PreToolUse, PostToolUse, UserPromptSubmit)
+
 ---
 
 ## 백로그 (우선순위 없음)
