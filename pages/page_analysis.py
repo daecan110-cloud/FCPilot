@@ -139,7 +139,7 @@ def _save_to_db(data: dict):
 def _render_yakwan_section(data: dict):
     st.subheader("약관 분석")
     st.caption("계약을 선택하고 약관 PDF를 업로드하면 면책/특이사항을 분석합니다.")
-    st.caption("분석 결과는 보장분석표 I열(특이사항)에 자동 반영됩니다.")
+    st.caption("분석 결과는 보장분석표 K열(특이사항)에 자동 반영됩니다.")
 
     contracts = data.get("_all_contracts", data.get("계약", []))
     if not contracts:
@@ -192,7 +192,7 @@ def _render_yakwan_section(data: dict):
             st.markdown(format_display(result))
             k_text = result.get("k_column", "")
             if k_text:
-                st.info(f"I열 반영: {k_text}")
+                st.info(f"K열 반영: {k_text}")
 
     # 엑셀 재생성 (K열 반영)
     if st.button("약관 분석 결과 반영하여 엑셀 재생성", use_container_width=True, type="primary"):
