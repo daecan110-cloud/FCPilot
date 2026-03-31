@@ -29,7 +29,7 @@ def _render_today():
     # 오늘 방문 기록 조회
     try:
         res = sb.table("pioneer_visits").select(
-            "*, fp_pioneer_shops(shop_name, lat, lng, address)"
+            "*, pioneer_shops(shop_name, lat, lng, address)"
         ).eq("fc_id", fc_id).eq("visit_date", today).order("created_at").execute()
         today_visits = res.data or []
     except Exception as e:
@@ -122,7 +122,7 @@ def _render_history():
 
     try:
         res = sb.table("pioneer_visits").select(
-            "*, fp_pioneer_shops(shop_name, lat, lng, address)"
+            "*, pioneer_shops(shop_name, lat, lng, address)"
         ).eq("fc_id", fc_id).eq("visit_date", str(target_date)).order("created_at").execute()
         visits = res.data or []
     except Exception as e:

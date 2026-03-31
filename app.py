@@ -27,11 +27,16 @@ def main():
         if user:
             st.caption(user.email)
 
-        tab = st.radio(
-            "메뉴",
-            ["홈", "보장분석", "고객관리", "개척지도", "동선기록", "통계", "설정"],
-            label_visibility="collapsed",
-        )
+        # UX-04: 영업 모드에 따라 탭 순서 변경
+        mode = _get_sales_mode()
+        if mode == "pioneer":
+            menu = ["홈", "개척지도", "동선기록", "고객관리", "보장분석", "통계", "설정"]
+        elif mode == "referral":
+            menu = ["홈", "고객관리", "보장분석", "통계", "개척지도", "동선기록", "설정"]
+        else:
+            menu = ["홈", "보장분석", "고객관리", "개척지도", "동선기록", "통계", "설정"]
+
+        tab = st.radio("메뉴", menu, label_visibility="collapsed")
 
         st.divider()
         if st.button("로그아웃", use_container_width=True):
@@ -58,6 +63,22 @@ def main():
     elif tab == "설정":
         from views.page_settings import render
         render()
+
+
+def _get_sales_mode() -> str:
+    try:
+        from auth import get_current_user_id
+        from utils.supabase_client import get_supabase_client
+        user_id = get_current_user_id()
+        if not user_id:
+            return "both"
+        sb = get_supabase_client()
+        res = sb.table("users_settings").select("mode").eq("id", user_id).execute()
+        if res.data:
+            return res.data[0].get("mode", "both")
+    except Exception:
+        pass
+    return "both"
 
 
 if __name__ == "__main__":

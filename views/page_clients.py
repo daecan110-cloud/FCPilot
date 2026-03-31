@@ -5,6 +5,9 @@ from utils.supabase_client import get_supabase_client
 from services.crypto import encrypt_phone, decrypt_phone, hash_phone_last4
 from utils.helpers import mask_phone
 
+TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
+DB_SOURCE_OPTIONS = ["DB고객", "개인(지인)", "개척", "소개", "기타"]
+
 
 def render():
     st.header("고객관리")
@@ -17,8 +20,6 @@ def render():
         _render_form()
     elif view == "edit":
         _render_form(edit=True)
-    elif view == "migrate":
-        _render_migrate()
     else:
         _render_list()
 
@@ -35,33 +36,61 @@ def _render_list():
     with col2:
         grade_filter = st.selectbox("등급", ["전체", "A", "B", "C", "D"], label_visibility="collapsed")
     with col3:
-        source_filter = st.text_input("출처", placeholder="출처 필터", label_visibility="collapsed")
+        source_filter = st.selectbox("유입경로", ["전체"] + DB_SOURCE_OPTIONS, label_visibility="collapsed")
 
-    btn_col1, btn_col2 = st.columns(2)
-    with btn_col1:
-        if st.button("고객 등록", use_container_width=True, type="primary"):
-            st.session_state.clients_view = "new"
-            st.rerun()
-    with btn_col2:
-        if st.button("CSV 가져오기", use_container_width=True):
-            st.session_state.clients_view = "migrate"
-            st.rerun()
+    # 추가 필터 (UX-02)
+    with st.expander("상세 필터"):
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            age_filter = st.selectbox("나이대", ["전체", "20대", "30대", "40대", "50대", "60대 이상"])
+        with col_b:
+            region_filter = st.text_input("지역", placeholder="예: 수원")
+        with col_c:
+            contact_filter = st.selectbox("상담 기록", ["전체", "있음", "없음"])
+        sort_by = st.selectbox("정렬", ["등록일 최신순", "이름순", "등급순"])
+
+    if st.button("고객 등록", use_container_width=True, type="primary"):
+        st.session_state.clients_view = "new"
+        st.rerun()
 
     # 데이터 조회
-    query = sb.table("clients").select("*").eq("fc_id", fc_id).order("created_at", desc=True)
+    query = sb.table("clients").select("*").eq("fc_id", fc_id)
     if search:
         query = query.ilike("name", f"%{search}%")
     if grade_filter != "전체":
         query = query.eq("prospect_grade", grade_filter)
-    if source_filter:
-        query = query.ilike("source", f"%{source_filter}%")
+    if source_filter != "전체":
+        query = query.ilike("db_source", f"%{source_filter}%")
+    if age_filter != "전체":
+        query = query.ilike("age_group", f"%{age_filter}%")
+    if region_filter:
+        query = query.ilike("address", f"%{region_filter}%")
+
+    if sort_by == "이름순":
+        query = query.order("name")
+    elif sort_by == "등급순":
+        query = query.order("prospect_grade")
+    else:
+        query = query.order("created_at", desc=True)
 
     try:
-        res = query.limit(100).execute()
+        res = query.limit(200).execute()
         clients = res.data or []
     except Exception as e:
         st.error(f"조회 실패: {e}")
         return
+
+    # 상담 기록 유무 필터 (클라이언트 사이드)
+    if contact_filter != "전체":
+        try:
+            logs_res = sb.table("contact_logs").select("client_id").eq("fc_id", fc_id).execute()
+            has_logs = {r["client_id"] for r in (logs_res.data or [])}
+            if contact_filter == "있음":
+                clients = [c for c in clients if c["id"] in has_logs]
+            else:
+                clients = [c for c in clients if c["id"] not in has_logs]
+        except Exception:
+            pass
 
     if not clients:
         st.info("등록된 고객이 없습니다.")
@@ -76,11 +105,13 @@ def _render_list():
         with col_name:
             st.markdown(f"**{c['name']}** :{grade_color}[{grade}]")
         with col_info:
-            source = c.get("source", "")
-            age = c.get("age", "")
-            info = f"{age}세" if age else ""
+            source = c.get("db_source", "")
+            age = c.get("age_group") or (f"{c['age']}세" if c.get("age") else "")
+            info = age
             if source:
                 info += f" | {source}"
+            if c.get("address"):
+                info += f" | {c['address']}"
             st.caption(info)
         with col_btn:
             if st.button("상세", key=f"detail_{c['id']}"):
@@ -95,7 +126,7 @@ def _render_detail():
     sb = get_supabase_client()
     client_id = st.session_state.get("selected_client_id")
 
-    if st.button("목록으로"):
+    if st.button("← 목록으로"):
         st.session_state.clients_view = "list"
         st.rerun()
 
@@ -110,11 +141,11 @@ def _render_detail():
         st.warning("고객 정보를 찾을 수 없습니다.")
         return
 
-    # 기본 정보
     st.subheader(client["name"])
     col1, col2, col3 = st.columns(3)
     col1.metric("등급", client.get("prospect_grade", "-"))
-    col2.metric("나이", f"{client.get('age', '-')}세" if client.get("age") else "-")
+    age_display = client.get("age_group") or (f"{client['age']}세" if client.get("age") else "-")
+    col2.metric("나이", age_display)
     col3.metric("성별", {"M": "남", "F": "여"}.get(client.get("gender"), "-"))
 
     phone = ""
@@ -123,26 +154,20 @@ def _render_detail():
             phone = decrypt_phone(client["phone_encrypted"])
         except Exception:
             phone = "(복호화 실패)"
-    st.text(f"연락처: {phone or '미등록'}")
+    st.text(f"연락처: {mask_phone(phone) if phone else '미등록'}")
     st.text(f"직업: {client.get('occupation', '-')}")
     st.text(f"주소: {client.get('address', '-')}")
-    st.text(f"출처: {client.get('source', '-')}")
+    st.text(f"유입경로: {client.get('db_source', '-')}")
     if client.get("memo"):
         st.text(f"메모: {client['memo']}")
 
-    col_edit, col_del = st.columns(2)
-    with col_edit:
-        if st.button("수정", use_container_width=True):
-            st.session_state.clients_view = "edit"
-            st.session_state.edit_client = client
-            st.rerun()
+    if st.button("수정", use_container_width=True):
+        st.session_state.clients_view = "edit"
+        st.session_state.edit_client = client
+        st.rerun()
 
     st.divider()
-
-    # 상담 이력
     _render_contact_logs(sb, client_id)
-
-    # 새 상담 기록
     _render_new_contact(sb, client_id)
 
 
@@ -159,13 +184,12 @@ def _render_contact_logs(sb, client_id: str):
         st.caption("상담 이력이 없습니다.")
         return
 
-    type_labels = {"visit": "방문", "call": "전화", "message": "문자", "email": "이메일", "other": "기타"}
-
-    for log in logs:
-        t = type_labels.get(log.get("contact_type", ""), "기타")
-        date = log.get("created_at", "")[:10]
-        with st.expander(f"{date} | {t}", expanded=False):
-            st.write(log.get("content", ""))
+    for i, log in enumerate(logs):
+        method = log.get("touch_method", "") or "기타"
+        date_str = log.get("created_at", "")[:10]
+        label = f"{date_str} | {method}"
+        with st.expander(label, expanded=(i == 0)):
+            st.write(log.get("memo", ""))
             if log.get("next_action"):
                 st.caption(f"다음 할 일: {log['next_action']}")
             if log.get("next_date"):
@@ -175,25 +199,21 @@ def _render_contact_logs(sb, client_id: str):
 def _render_new_contact(sb, client_id: str):
     st.subheader("상담 기록 추가")
     with st.form("new_contact"):
-        contact_type = st.selectbox(
-            "방식",
-            ["visit", "call", "message", "email", "other"],
-            format_func=lambda x: {"visit": "방문", "call": "전화", "message": "문자", "email": "이메일", "other": "기타"}[x],
-        )
-        content = st.text_area("상담 내용", placeholder="상담 내용을 입력하세요")
+        touch_method = st.selectbox("방식", TOUCH_OPTIONS)
+        memo = st.text_area("상담 내용", placeholder="상담 내용을 입력하세요")
         next_action = st.text_input("다음 할 일", placeholder="선택 사항")
         next_date = st.date_input("예정일", value=None)
 
         if st.form_submit_button("저장", use_container_width=True, type="primary"):
-            if not content:
+            if not memo:
                 st.error("상담 내용을 입력해주세요.")
             else:
                 try:
                     sb.table("contact_logs").insert({
                         "fc_id": get_current_user_id(),
                         "client_id": client_id,
-                        "contact_type": contact_type,
-                        "content": content,
+                        "touch_method": touch_method,
+                        "memo": memo,
                         "next_action": next_action,
                         "next_date": str(next_date) if next_date else None,
                     }).execute()
@@ -208,13 +228,12 @@ def _render_new_contact(sb, client_id: str):
 def _render_form(edit=False):
     sb = get_supabase_client()
 
-    if st.button("목록으로"):
+    if st.button("← 목록으로"):
         st.session_state.clients_view = "list"
         st.rerun()
 
     client = st.session_state.get("edit_client", {}) if edit else {}
-    title = "고객 수정" if edit else "고객 등록"
-    st.subheader(title)
+    st.subheader("고객 수정" if edit else "고객 등록")
 
     phone_display = ""
     if edit and client.get("phone_encrypted"):
@@ -228,14 +247,20 @@ def _render_form(edit=False):
         phone = st.text_input("전화번호", value=phone_display, placeholder="010-1234-5678")
         col1, col2 = st.columns(2)
         with col1:
-            age = st.number_input("나이", value=client.get("age") or 0, min_value=0, max_value=120)
-            gender = st.selectbox("성별", [None, "M", "F"],
-                                   format_func=lambda x: {"M": "남", "F": "여", None: "선택"}[x],
-                                   index=[None, "M", "F"].index(client.get("gender")))
+            age_group = st.text_input("나이대", value=client.get("age_group", ""), placeholder="예: 30대, 40대")
+            gender = st.selectbox(
+                "성별", [None, "M", "F"],
+                format_func=lambda x: {"M": "남", "F": "여", None: "선택"}[x],
+                index=[None, "M", "F"].index(client.get("gender")),
+            )
         with col2:
-            grade = st.selectbox("등급", ["A", "B", "C", "D"],
-                                  index=["A", "B", "C", "D"].index(client.get("prospect_grade", "C")))
-            source = st.text_input("출처 (DB종류)", value=client.get("source", ""))
+            grade = st.selectbox(
+                "등급", ["A", "B", "C", "D"],
+                index=["A", "B", "C", "D"].index(client.get("prospect_grade", "C")),
+            )
+            current_source = client.get("db_source", "")
+            source_idx = DB_SOURCE_OPTIONS.index(current_source) if current_source in DB_SOURCE_OPTIONS else 0
+            db_source = st.selectbox("유입경로", DB_SOURCE_OPTIONS, index=source_idx)
         occupation = st.text_input("직업", value=client.get("occupation", ""))
         address = st.text_input("주소", value=client.get("address", ""))
         memo = st.text_area("메모", value=client.get("memo", ""))
@@ -248,10 +273,10 @@ def _render_form(edit=False):
                     "name": name.strip(),
                     "phone_encrypted": encrypt_phone(phone) if phone else "",
                     "phone_last4_hash": hash_phone_last4(phone) if phone else "",
-                    "age": age if age > 0 else None,
+                    "age_group": age_group.strip(),
                     "gender": gender,
                     "prospect_grade": grade,
-                    "source": source.strip(),
+                    "db_source": db_source,
                     "occupation": occupation.strip(),
                     "address": address.strip(),
                     "memo": memo.strip(),
@@ -267,26 +292,3 @@ def _render_form(edit=False):
                     st.rerun()
                 except Exception as e:
                     st.error(f"저장 실패: {e}")
-
-
-# ── CSV 마이그레이션 ──
-
-def _render_migrate():
-    if st.button("목록으로"):
-        st.session_state.clients_view = "list"
-        st.rerun()
-
-    st.subheader("CSV 가져오기")
-    st.caption("구글시트에서 CSV로 내보낸 파일을 업로드하세요.")
-    st.caption("컬럼: 이름, 전화번호, 나이, 성별, 직업, 주소, 등급, 출처, 메모")
-
-    csv_file = st.file_uploader("CSV 파일", type=["csv"])
-    if csv_file and st.button("가져오기 시작", type="primary"):
-        from services.migration import migrate_clients_csv
-        with st.spinner("마이그레이션 중..."):
-            result = migrate_clients_csv(csv_file.read())
-        st.success(f"{result['success']}명 가져오기 완료")
-        if result["errors"]:
-            with st.expander(f"오류 {len(result['errors'])}건"):
-                for e in result["errors"]:
-                    st.caption(e)

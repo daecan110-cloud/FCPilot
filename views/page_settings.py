@@ -33,6 +33,21 @@ def render():
             _save_settings(sb, user_id, display_name, company, mode)
 
     st.divider()
+
+    # 데이터 관리 (UX-05: CSV 가져오기/내보내기)
+    with st.expander("데이터 관리"):
+        st.caption("고객 데이터를 CSV로 가져오거나 내보낼 수 있습니다.")
+        csv_file = st.file_uploader("CSV 가져오기", type=["csv"], key="settings_csv")
+        if csv_file and st.button("가져오기 시작", type="primary"):
+            from services.migration import migrate_clients_csv
+            with st.spinner("마이그레이션 중..."):
+                result = migrate_clients_csv(csv_file.read())
+            st.success(f"{result['success']}명 가져오기 완료")
+            if result["errors"]:
+                with st.expander(f"오류 {len(result['errors'])}건"):
+                    for e in result["errors"]:
+                        st.caption(e)
+
     st.caption(f"FCPilot v1.0.0 | User ID: {user_id[:8]}... | 역할: {settings.get('role', 'user')}")
 
     # Admin 전용 섹션
