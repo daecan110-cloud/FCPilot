@@ -46,27 +46,43 @@ const CREATE_KEYWORDS = [
   "등록해", "등록해줘", "등록", "추가해", "추가해줘", "추가",
 ];
 
+const NOISE_WORDS = [
+  "새 고객", "새고객", "고객 등록", "고객등록", "신규 고객", "신규고객",
+  "등록해줘", "등록해", "등록", "추가해줘", "추가해", "추가",
+  "고객", "사는", ":", "：",
+];
+
 function extractCreateParams(text: string): Record<string, string> {
-  // "김영민 등록해줘 시흥사는 20대" → {name: "김영민", address: "시흥", age: "20"}
   const t = text.replace(/\s+/g, " ").trim();
 
   // 키워드 제거하여 순수 정보만 남기기
   let cleaned = t;
-  for (const k of ["새 고객", "새고객", "고객 등록", "고객등록", "신규 고객", "신규고객",
-    "등록해줘", "등록해", "등록", "추가해줘", "추가해", "추가", ":", "："]) {
-    cleaned = cleaned.replace(k, " ");
+  for (const k of NOISE_WORDS) {
+    cleaned = cleaned.replaceAll(k, " ");
   }
   cleaned = cleaned.replace(/\s+/g, " ").trim();
 
   const params: Record<string, string> = {};
 
-  // 이름 추출: 첫 번째 한글 2~4글자
-  const nameMatch = cleaned.match(/([가-힣]{2,4})/);
-  if (nameMatch) params.name = nameMatch[1];
+  // 나이 추출 먼저 (이름과 분리하기 위해)
+  const ageMatch = cleaned.match(/(\d{1,4})\s*(대|세|살|년생)/);
+  const ageRaw = ageMatch ? ageMatch[0] : "";
 
-  // 나이 추출: "20대", "30세", "45살" 등
-  const ageMatch = cleaned.match(/(\d{1,3})\s*(대|세|살)/);
-  if (ageMatch) params.age = ageMatch[1];
+  // 이름 추출: 한글 2~4글자 (나이/주소 키워드 제외)
+  const nameExclude = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
+    "수원", "성남", "시흥", "용인", "안양", "고양", "안산", "화성", "평택",
+    "의정부", "파주", "김포", "제주", "춘천", "청주", "전주", "포항", "창원",
+    "천안", "구미", "경주", "메모"];
+  const nameMatches = [...cleaned.matchAll(/([가-힣]{2,4})/g)];
+  for (const m of nameMatches) {
+    if (!nameExclude.includes(m[1])) {
+      params.name = m[1];
+      break;
+    }
+  }
+
+  // 나이 추출: "20대", "30세", "00년생" 등
+  if (ageRaw) params.age = ageRaw;
 
   // 주소 추출: "사는" 앞 단어, 또는 "서울/수원/시흥" 등
   const addrMatch = cleaned.match(/([가-힣]{2,10})\s*사는/) ||
@@ -238,33 +254,33 @@ function localMatch(text: string): Intent | null {
   const tNoSpace = t.replace(/\s/g, "");
   const tLower = t.toLowerCase();
 
-  // 리마인드 — "할일", "오늘 할 일", "오늘할일", "뭐해" 등
+  // 1. 리마인드 — "할일", "오늘 할 일", "뭐해" 등
   if (REMINDER_KEYWORDS.some((k) => tNoSpace.includes(k.replace(/\s/g, "")))) {
     return { intent: "reminder_list", params: {} };
   }
 
-  // 고객 수정 — "김영민 등급 B", "김영민 나이 20대로 변경" 등
-  // 등록보다 먼저 체크 (등록 키워드와 겹치지 않는 패턴)
-  const updateMatch = extractUpdateParams(t);
-  if (updateMatch) {
-    return { intent: "customer_update", params: updateMatch };
-  }
-
-  // 고객 등록 — 로컬에서 직접 파라미터 추출
+  // 2. 고객 등록 — 위치 상관없이 키워드 포함 시 등록 우선
+  //    "양종학 00년생 수원 등록" = "등록 양종학 00년생 수원"
   if (CREATE_KEYWORDS.some((k) => tNoSpace.includes(k.replace(/\s/g, "")))) {
     const params = extractCreateParams(t);
     if (params.name) {
       return { intent: "customer_create", params };
     }
-    return null; // 이름 추출 실패 시 Gemini 위임
+    return null; // 이름 추출 실패 → Gemini 위임
   }
 
-  // 개발 명령 — "테스트해줘", "git push", "handoff 업데이트"
+  // 3. 고객 수정 — "김영민 등급 B", "김영민 나이 20대로 변경"
+  const updateMatch = extractUpdateParams(t);
+  if (updateMatch) {
+    return { intent: "customer_update", params: updateMatch };
+  }
+
+  // 4. 개발 명령 — "테스트해줘", "git push", "handoff 업데이트"
   if (COMMAND_KEYWORDS.some((k) => tLower.includes(k))) {
     return { intent: "command", params: { command: t } };
   }
 
-  // 고객 조회 — "김철수 고객정보", "김철수 정보", "김철수 조회"
+  // 5. 고객 조회 — "김철수 고객정보", "김철수 정보"
   const searchPatterns = [
     /^(.{2,10})\s*(고객|정보|조회|검색|보여|찾아|알려)/,
     /^(고객|정보|조회)\s+(.{2,10})$/,
@@ -277,7 +293,7 @@ function localMatch(text: string): Intent | null {
     }
   }
 
-  // 순수 한글 이름 2~4글자만 입력 → 고객 검색
+  // 6. 순수 한글 이름 2~4글자만 입력 → 고객 검색
   if (/^[가-힣]{2,4}$/.test(t)) {
     return { intent: "customer_search", params: { name: t } };
   }
