@@ -1,7 +1,9 @@
 """동선 기록 탭 — 일별 방문 기록 + 동선 지도"""
-import streamlit as st
 from datetime import date
+
+import streamlit as st
 from streamlit_folium import st_folium
+
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from utils.map_utils import create_route_map, VISIT_RESULT_LABELS

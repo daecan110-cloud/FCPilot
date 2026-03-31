@@ -1,6 +1,7 @@
 """SQL 마이그레이션 실행 스크립트 (1회용)"""
-import pg8000
 import sys
+
+import pg8000
 
 DB_PASSWORD = r"7nj$NJ5z8,-e#.$"
 PROJECT_REF = "ghglnszzjuuvrrwpvhhb"
