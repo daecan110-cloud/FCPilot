@@ -35,6 +35,23 @@
 
 ---
 
+## Sprint 6 — 완료 (2026-03-31)
+
+### 완료 내역
+- [x] pages/ → views/ 이름 변경 (Streamlit 사이드바 자동 노출 차단)
+- [x] config.toml: toolbarMode=minimal, showSidebarNavigation=false
+- [x] app.py: 풋터/메인메뉴 CSS 숨김
+- [x] users_settings.role 컬럼 추가 (admin/user, DB 반영 완료)
+- [x] auth.py: is_admin() 추가
+- [x] page_settings.py: admin 전용 섹션 (역할 관리 + DB 통계)
+- [x] 보안 점검 ALL CLEAR (bare except 0건, API 키 하드코딩 0건)
+
+### 영민 수동 작업 필요
+- [ ] Supabase SQL Editor: `UPDATE users_settings SET role = 'admin' WHERE id = '본인_user_id';`
+  - 본인 user_id는 설정 탭 하단에 표시됨 (User ID: xxxxxxxx...)
+
+---
+
 ## 알려진 이슈
 - Gemini 무료 tier: 분당 2회 제한 → 429 시 재시도 + 로컬 폴백 대응
 - 200줄 초과 파일 7개: 기존 코드, 향후 Sprint에서 분리
