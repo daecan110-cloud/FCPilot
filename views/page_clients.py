@@ -470,7 +470,7 @@ def _render_reminder_section(sb, fc_id: str, client_id: str):
         for r in pending:
             icon = "🔴" if r["reminder_date"] < str(__import__("datetime").date.today()) else "🟡"
             col_r, col_done, col_cancel = st.columns([5, 1, 1])
-            col_r.caption(f"{icon} {r['reminder_date']} | {r.get('purpose','')} | {r.get('memo','')[:30]}")
+            col_r.caption(f"{icon} {r['reminder_date']} | {r.get('purpose','')} | {(r.get('memo') or '')[:30]}")
             if col_done.button("완료", key=f"r_done_{r['id']}", use_container_width=True):
                 complete_reminder(r["id"])
                 st.rerun()
