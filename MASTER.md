@@ -1,6 +1,6 @@
 # MASTER.md — FCPilot
 
-> **최종 업데이트**: 2026-03-31 (Sprint 6 완료 기준)
+> **최종 업데이트**: 2026-03-31 (Sprint 7 완료 기준)
 
 ---
 
@@ -12,7 +12,7 @@
 | **목적** | 보험 FC 업무 통합 플랫폼 |
 | **핵심 기능** | 보장분석 자동화, 고객 CRM, 개척영업 관리(간판OCR+지도), 약관분석, 동선추적, 팔로업/리마인드, 텔레그램 AI 어시스턴트 |
 | **사용자** | 신한라이프 FC 영민 (1차) → 동료 FC (2차) |
-| **현재 상태** | Sprint 6 완료 — 배포 준비 완료 |
+| **현재 상태** | Sprint 7 완료 — 텔레그램 봇 v5 + 배포 준비 완료 |
 | **배포 URL** | fcpilot-kr.streamlit.app (수동 배포 필요) |
 
 ---
@@ -110,12 +110,13 @@
 
 ## 6. 텔레그램 봇
 
-### 6-1. 현재 구현 (Sprint 5~6)
+### 6-1. 현재 구현 (Sprint 5~7)
 
 - **방식**: Supabase Edge Function (telegram-bot) + webhook
 - **AI 엔진**: Gemini 2.5 Flash (429 대응: 재시도 + 로컬 폴백)
-- **기능**: 고객 등록/조회/수정/삭제, 자연어 대화, 동명이인 처리, DB 세션 관리
+- **기능**: 고객 등록/조회/수정/삭제, 상담기록, 방문예약, 검색, 통계 (10가지 action)
 - **세션**: bot_sessions 테이블 (Edge Function 인스턴스 간 상태 공유)
+- **테스트**: 자동 테스트 10/10 통과 (Sprint 7 완료)
 
 ### 6-2. 봇 분리 계획 (향후)
 
@@ -153,33 +154,34 @@
 | 4 | Supabase 독립 분리 + 텔레그램 양방향 (webhook + Gemini) + Edge Functions | ✅ 완료 |
 | 5 | 텔레그램 봇 v4 (자연어 CRM) + QA + 보안 체크 + 배포 준비 | ✅ 완료 |
 | 6 | UI 정리 (views/ 이동) + Admin/User 역할 분리 + 보안 최종 점검 | ✅ 완료 |
+| 7 | 텔레그램 봇 v5 (10가지 action + 자동 테스트 10/10) | ✅ 완료 |
 
 ---
 
-## 9. 다음 작업 (Sprint 7~)
+## 9. 다음 작업
 
-### 우선순위 (확정)
+### Sprint 8: CSV 마이그레이션 + 배포 + 실사용 (가볍게)
 
-| # | 작업 | 비고 |
-|---|------|------|
-| 1 | ~~텔레그램 자연어 개선 마무리~~ | **Claude Code 진행 중** |
-| 2 | CSV 마이그레이션 | 기존 구글시트 데이터 → Supabase |
-| 3 | 실사용 테스트 | 실제 영업 현장에서 전체 플로우 검증 |
-| 4 | UI/UX 개선 | 실사용 피드백 기반 |
+| Phase | 내용 | 담당 |
+|-------|------|------|
+| 1 | CSV 마이그레이션 (구글시트 → fp_clients) | Claude Code + 영민(CSV 제공) |
+| 2 | 로컬 통합 테스트 (전체 기능 플로우) | 영민 + Claude Code(버그픽스) |
+| 3 | Streamlit Cloud 배포 | 영민(수동) + Claude Code(이슈 대응) |
+| 4 | 실사용 + 피드백 수집 (1~2주) | 영민 |
 
-### 미구현/잔여 작업
+> 상세: FCPilot_Sprint8_Plan.md 참조
 
-| 작업 | 출처 |
+### Sprint 9 이후 (백로그)
+
+| 작업 | 비고 |
 |------|------|
+| UI/UX 개선 | 실사용 피드백 기반 |
+| 홈 탭 (오늘의 할 일) | page_home.py |
+| 통계 대시보드 | page_stats.py |
 | 리마인드 발송 트리거 구현 | Sprint 3 잔여 |
-| Daily Reminder cron 설정 (pg_cron + pg_net) | Sprint 5 — 영민 수동 |
-| Streamlit Cloud 배포 | Sprint 5 — 영민 수동 |
-| Admin role SQL 실행 | Sprint 6 — 영민 수동 |
+| 텔레그램 봇 분리 (고객관리 vs 개발알림) | 실사용 후 시점 결정 |
+| 200줄 초과 파일 리팩토링 | 7개 파일 |
 | 보장분석표 하단 셀 병합 검증 | Sprint 1 잔여 |
-| 홈 탭 (오늘의 할 일) | Sprint 3 handoff 계획 |
-| 통계 대시보드 | Sprint 3 handoff 계획 |
-| 텔레그램 봇 분리 (고객관리 vs 개발알림) | 향후 |
-| 200줄 초과 파일 7개 리팩토링 | Sprint 6 이슈 |
 
 ---
 
@@ -232,13 +234,32 @@
 
 ## 14. 문서 체계
 
-| 문서 | 역할 | 관리 |
-|------|------|------|
-| **MASTER.md** | 전체 설계/아키텍처/의사결정 (이 문서) | Opus |
-| **handoff.md** | 세션 인수인계 (Sprint 상태 + 다음 할 일) | Claude Code |
-| **CLAUDE.md** | Claude Code 작업 규칙 | Claude Code |
-| **plan.md** | 현재 Sprint 상세 계획 | Claude Code |
+| 문서 | 역할 | 관리 | 비고 |
+|------|------|------|------|
+| **MASTER.md** | 전체 설계/아키텍처/의사결정 | Opus | Opus 업데이트 → Claude Code에 전달 → 커밋 |
+| **handoff.md** | 세션 인수인계 (Sprint 상태 + 다음 할 일) | Claude Code | Phase 완료/에러3회/세션종료 시 자동 작성 |
+| **plan.md** | 현재 Sprint 실행 계획 (Claude Code 작업용) | Claude Code | Sprint 시작 시 생성, 진행하며 업데이트 |
+| **CLAUDE.md** | Claude Code 행동 규칙 | Claude Code | 작업 규칙/금지사항/완료조건 |
 
-> **Opus 역할**: 설계/방향/QA 리뷰 — MASTER.md 관리
-> **Claude Code 역할**: 구현/버그수정 — handoff.md, plan.md, CLAUDE.md 관리
+### 문서 간 역할 구분
+
+```
+[Opus가 Sprint 설계서 작성] ← 방향/시나리오/테스트 기준 (예: FCPilot_Sprint7_Plan.md)
+        ↓ 영민이 Claude Code에 전달
+[Claude Code가 plan.md로 변환] ← 실행 가능한 작업 단위로 쪼갬
+        ↓ 작업 진행
+[Claude Code가 handoff.md 갱신] ← 완료/미완료/이슈 기록
+```
+
+### MASTER.md 동기화 플로우
+
+```
+Opus(claude.ai)에서 MASTER.md 업데이트
+        ↓ 영민이 내용 전달
+Claude Code가 repo의 MASTER.md에 커밋
+```
+
+> **Opus Sprint 설계서**: 별도 파일로 관리 (FCPilot_Sprint7_Plan.md 등) — repo에는 넣지 않아도 됨, Opus 채팅 + MASTER 반영으로 충분
+> **plan.md ≠ Sprint 설계서**: plan.md는 Claude Code의 실행 계획, Sprint 설계서는 Opus의 방향 설계
 > **새 채팅 시작 시**: MASTER.md + handoff.md 2개만 주면 맥락 100% 복원
+> **의사결정 로그**: 현재 MASTER 내 테이블로 관리, 20개 초과 시 decision-log.md로 분리
