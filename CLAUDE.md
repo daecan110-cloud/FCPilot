@@ -29,9 +29,10 @@ FCPilot = 보험 FC 업무 통합 플랫폼 (보장분석 + CRM + 개척영업 +
 app.py              → 라우터/탭 관리만. 로직 넣지 말 것.
 auth.py             → Supabase Auth만.
 config.py           → 설정/클라이언트 초기화만.
-pages/              → 각 탭 UI. 비즈니스 로직은 services/로 분리.
+views/              → 각 탭 UI. 비즈니스 로직은 services/로 분리.
 services/           → 핵심 로직. 각 파일 200줄 이내.
 utils/              → 공통 유틸.
+sql/                → DB 마이그레이션 SQL 파일.
 templates/          → 엑셀 템플릿 등 정적 파일.
 tests/              → 자동 테스트 스크립트.
 scripts/            → 로컬 실행 스크립트 (command_poller 등).
@@ -52,22 +53,21 @@ supabase/functions/ → Edge Function (TypeScript/Deno).
 3. `git add -A` → `git commit` → `git push origin main`
 4. 텔레그램 Sprint 완료 알림 발송
 
-## 텔레그램 자동 알림 규칙 (절대 누락 금지)
+## 텔레그램 알림 규칙
 
-매 작업에서 아래 상황 발생 시 **즉시** 텔레그램 알림을 발송한다:
+Sprint 완료 또는 영민 확인이 필요한 상황에서 발송한다:
 
-| 상황 | 함수 | 예시 |
-|------|------|------|
-| git commit 완료 | `send_message("✅ 커밋: {메시지}")` | 파일 수정 후 커밋할 때마다 |
-| Sprint 완료 | `notify_sprint_complete(sprint, summary)` | Sprint 종료 시 |
-| 영민 확인 필요 | `notify_action_needed(message)` | DB 수동 작업, 키 입력 등 |
-| 에러/경고 | `notify_warning(message)` | 빌드 실패, 연결 오류 등 |
+| 상황 | 함수 |
+|------|------|
+| Sprint 완료 | `notify_sprint_complete(sprint, summary)` |
+| 영민 확인 필요 | `notify_action_needed(message)` |
+| 에러/경고 | `notify_warning(message)` |
 
-**실행 방법:** Python -c로 직접 호출 (Streamlit 컨텍스트 불필요)
+**실행 방법:**
 ```bash
 python -c "
 from utils.telegram import send_message
-send_message('✅ 커밋: 메시지 내용')
+send_message('✅ 메시지 내용')
 "
 ```
 
@@ -81,14 +81,11 @@ send_message('✅ 커밋: 메시지 내용')
 | 3개 이상 파일 변경 시 | 필수 — 커밋 전 실행 |
 | 영민이 "테스트해줘" | 즉시 실행 |
 
-테스트 항목: Supabase 연결(7테이블+RPC), 모듈 import(pages+services+utils), config 검증, 템플릿 존재, 문법 체크, fp_ 잔여, 텔레그램 발송
-결과는 **항상 텔레그램으로 보고** (--quiet 없이 실행)
-
 ## DB 테이블
 
 | 테이블 | 역할 |
 |--------|------|
-| users_settings | FC 설정 (영업 모드 등) |
+| users_settings | FC 설정 (영업 모드, role 등) |
 | clients | 고객 마스터 |
 | contact_logs | 상담/터치 이력 |
 | pioneer_shops | 개척 매장 |
@@ -96,6 +93,7 @@ send_message('✅ 커밋: 메시지 내용')
 | analysis_records | 보장분석 기록 |
 | yakwan_records | 약관 분석 기록 |
 | command_queue | 텔레그램 명령 큐 (Claude Code 제어) |
+| bot_sessions | 텔레그램 봇 세션 (Edge Function 상태 저장) |
 
 ## 보안 규칙 (절대 위반 금지 — SECURITY.md 참조)
 
@@ -119,20 +117,10 @@ send_message('✅ 커밋: 메시지 내용')
 
 ### Claude Code → 영민 (알림)
 - ✅ Sprint 완료
-- 🔧 영민 직접 확인 필요 (+ ⏳ waiting 메시지)
+- 🔧 영민 직접 확인 필요
 - ⚠️ 경고/알림
-- 📊 상태 보고 (영민이 "상태" 보내면 자동 응답)
-- 📩 지시 수신 확인 + ✅ 처리 완료 보고
 
-### 영민 → Claude Code (명령)
-텔레그램에서 봇에게 메시지 보내면 Claude Code가 읽고 대응:
-- "ㅇㅇ" / "진행" → 다음 단계 진행 (▶️ 확인 응답)
-- "대기" / "잠깐" → 현재 작업 중단 대기 (⏸️ 확인 응답)
-- "상태" → 현재 진행 상황 텔레그램으로 보고 (📊 자동 응답)
-- "중단" → 현재 Sprint 중단 (🛑 확인 응답)
-- **그 외 자유 텍스트** → 작업 지시로 처리 (📩 수신 확인 → 실행 → ✅ 결과 보고)
-
-### 작업 중 텔레그램 체크 규칙
-- 매 task 완료 후 `check_for_commands()` 호출하여 새 메시지 확인
-- `process_commands()`로 자동 응답 + 대기/중단 처리
-- 자유 텍스트 지시는 `get_pending_instructions()`로 꺼내서 실행
+### 영민 → FCPilot 봇 (명령)
+- 고객 조회/등록/수정/삭제
+- "오늘 할 일" → 리마인드 목록
+- 자유 텍스트 → Gemini NLP 처리

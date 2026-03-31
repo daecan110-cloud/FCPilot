@@ -1,7 +1,7 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 5 완료 — 텔레그램 AI 어시스턴트 + QA**
+- Phase: **Sprint 6 완료 — 보안/UI 점검 + Admin 역할 분리**
 - 마지막 세션: 2026-03-31 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 

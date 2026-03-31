@@ -38,13 +38,13 @@ TABLES = [
 ]
 
 PAGE_MODULES = [
-    "pages.page_home",
-    "pages.page_analysis",
-    "pages.page_clients",
-    "pages.page_pioneer_map",
-    "pages.page_pioneer_route",
-    "pages.page_stats",
-    "pages.page_settings",
+    "views.page_home",
+    "views.page_analysis",
+    "views.page_clients",
+    "views.page_pioneer_map",
+    "views.page_pioneer_route",
+    "views.page_stats",
+    "views.page_settings",
 ]
 
 SERVICE_MODULES = [
