@@ -101,7 +101,7 @@ def _render_reminder_card(r: dict, bucket: str):
             if st.button("고객", key=f"goto_{rid}_{bucket}", use_container_width=True):
                 st.session_state.clients_view = "detail"
                 st.session_state.selected_client_id = r.get("client_id")
-                st.session_state.main_nav = "고객관리"
+                st.session_state._nav_to = "고객관리"
                 st.rerun()
 
         if st.session_state.get(edit_key):

@@ -51,6 +51,10 @@ def main():
         else:
             menu = ["홈", "보장분석", "고객관리", "개척지도", "동선기록", "통계", "설정"]
 
+        if "_nav_to" in st.session_state:
+            nav_target = st.session_state.pop("_nav_to")
+            if nav_target in menu:
+                st.session_state["main_nav"] = nav_target
         tab = st.radio("메뉴", menu, label_visibility="collapsed", key="main_nav")
 
         st.divider()
