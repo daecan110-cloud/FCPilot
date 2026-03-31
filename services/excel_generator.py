@@ -342,7 +342,7 @@ def _fill_review_values(ws, all_contracts, k_column=None):
         prem = c.get("월보험료", 0)
         safe_val(ws, r, 4, f"{prem:,}원" if prem > 0 else "0원\n(단체/무료)")
         safe_val(ws, r, 5, _build_review(c))
-        # I열: 약관 분석 결과 있으면 반영, 없으면 기본값
+        # K열(I~K 병합): 약관 분석 결과. col 9(I열)에 설정 → 병합 셀 전체 표시
         k_text = k_column.get(i, k_column.get(str(i), ""))
         safe_val(ws, r, 9, k_text if k_text else "약관 제공 시\n분석 가능")
 
@@ -433,7 +433,10 @@ def _fill_tax_values(ws, full_data, offset):
     r92 = 92 + offset
     r93 = 93 + offset
 
-    for i, c in enumerate(all_contracts[:7]):
+    # D~H열(5개)까지만 개별 표시. I:K는 병합 셀(합계용)이므로 6~7번째 제외.
+    max_individual = min(len(all_contracts), 5)
+    for i in range(max_individual):
+        c = all_contracts[i]
         col = COL_IDX[COL_LTRS[i]]
         monthly = c.get("월보험료", 0)
         annual = monthly * 12

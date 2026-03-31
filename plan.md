@@ -2,99 +2,92 @@
 
 ---
 
-# Sprint 1 (Phase 1: MVP) — 완료
-
-- [x] 프로젝트 초기화 (repo, 파일 구조, requirements.txt)
-- [x] Supabase 테이블 생성 (fp_users_settings, fp_clients, fp_contact_logs, fp_analysis_records)
-- [x] Auth 구현 (로그인/회원가입/세션 타임아웃)
-- [x] 보장분석 탭 (PDF 업로드 → pdfplumber 추출 → 엑셀 생성)
-- [x] 보장분석 엔진 v4 (상세 페이지 파싱, 원/만원 변환, 중복 허용)
+## Sprint 1 — 완료
+- [x] 프로젝트 초기화, Supabase 테이블, Auth
+- [x] 보장분석 탭 (PDF → 엑셀)
 - [x] 텔레그램 알림 모듈
 - [x] 약관 분석 AI 대화창
+- [x] 세액공제 셀 병합 수정
 
-### 미해결 이슈 (병행 수정)
-- [ ] 보장분석표 서식: 하단 섹션(가족/세액공제) 셀 병합 패턴 정밀 검증
-- [ ] Streamlit Cloud 배포
+## Sprint 2 — 완료
+- [x] 고객 목록/상세/등록/수정 UI
+- [x] 상담 이력 기록
+- [x] 간판 OCR (Claude Vision)
+- [x] 개척지도 탭 (folium)
+- [x] Naver Maps Geocoding
 
----
+## Sprint 3 — 완료
+- [x] 약관분석 K열 반영
+- [x] 동선 추적 탭
+- [x] 팔로업 상태머신
+- [x] 리마인드 모듈
 
-# Sprint 2 (Phase 2: CRM + 개척) — 완료
+## Sprint 4 — 완료
+- [x] 텔레그램 양방향
+- [x] 홈/통계 대시보드
+- [x] Supabase 신규 프로젝트 마이그레이션 (fp_ 접두사 제거)
 
-## 목표
-- [ ] 1. 구글시트 CSV → Supabase 마이그레이션 (fp_clients, fp_contact_logs)
-- [ ] 2. 고객 목록/상세 UI (등급·DB종류·터치방식 필터, 상담 타임라인)
-- [ ] 3. 고객 등록/수정 폼
-- [ ] 4. 상담 내용 기록 (개별 로그)
-- [ ] 5. 간판 OCR (Claude Vision → 가게명/주소 추출)
-- [ ] 6. 개척 매장 등록 (fp_pioneer_shops)
-- [ ] 7. 개척지도 탭 (folium 마커)
-- [ ] 8. 모바일 빠른 입력 UI
-- [ ] 9. UI 한국어 다듬기 (영업 모드, 개척 등)
+## Sprint 5 — 완료
+- [x] command_queue 테이블
+- [x] Supabase Edge Function (telegram-bot, daily-reminder)
+- [x] 텔레그램 봇 v4 (Gemini NLP + DB 세션 + 동명이인)
+- [x] scripts/command_poller.py
+- [x] 텔레그램 webhook 설정
 
-## 완료 기준
-- 기존 구글시트 데이터 마이그레이션 완료
-- 고객 목록 → 상세 → 상담 기록 플로우 정상
-- 간판 사진 → 가게명 자동 추출 → 지도 마커 표시
-- 모바일에서 메모/고객 등록 가능
-- 전체 UI 한국어 자연스럽게
+## Sprint 6 — 완료 (2026-03-31)
+- [x] pages/ → views/ (Streamlit 사이드바 자동 노출 차단)
+- [x] config.toml toolbarMode=minimal, 풋터 CSS 숨김
+- [x] users_settings.role 컬럼 (admin/user)
+- [x] is_admin() + 설정 탭 admin 전용 섹션
+- [x] 보안 점검 ALL CLEAR
+- [x] CLAUDE.md / plan.md / tests/test_all.py 정합성 수정
 
-## 건드릴 파일
-```
-신규:
-- pages/page_clients.py        # 고객 목록/상세/등록/수정
-- pages/page_pioneer_map.py    # 개척지도 (folium)
-- services/ocr_engine.py       # 간판 OCR (Claude Vision)
-- services/geocoding.py        # Naver Maps 주소→좌표
-- services/migration.py        # CSV→Supabase 마이그레이션
-- utils/map_utils.py           # folium 헬퍼
-
-수정:
-- app.py                       # 탭 추가 (고객관리, 개척지도)
-- config.py                    # Maps API 설정
-- pages/page_settings.py       # UI 한국어 수정
-```
-
-## Supabase 추가 테이블
-```sql
--- fp_pioneer_shops (Sprint 1에서 미생성)
--- fp_pioneer_visits (Sprint 1에서 미생성)
-```
-
-## 작업 순서 (의존성 순)
-1. Supabase 추가 테이블 SQL (fp_pioneer_shops, fp_pioneer_visits)
-2. UI 한국어 다듬기 (app.py, page_settings.py)
-3. services/migration.py (CSV 파서)
-4. pages/page_clients.py (목록 + 상세 + 등록/수정 + 상담 기록)
-5. services/ocr_engine.py (Claude Vision)
-6. services/geocoding.py (Naver Maps)
-7. pages/page_pioneer_map.py (folium 지도)
-8. 모바일 UI 최적화
+## Sprint 7 — 완료 (2026-03-31)
+- [x] 텔레그램 봇 v5 (10가지 action, Gemini 100%)
+- [x] handleContact/handleVisit/handleSearch/handleStats
+- [x] contact_logs 방문 예약 컬럼 추가
+- [x] Edge Function npm: import 방식 배포
+- [x] 자동 테스트 10/10 통과
 
 ---
 
-# Sprint 3 (Phase 3: 개척 고도화 + 약관) — 완료
+## Sprint 8 — 진행 중 (CSV 마이그레이션 + 배포 + 실사용)
 
-- [x] yakwan_engine.py (약관 PDF → 구조화 JSON + K열 요약)
-- [x] page_analysis.py (약관 분석 → I열 반영 → 엑셀 재생성)
-- [x] excel_generator.py (k_column_data 지원)
-- [x] fp_yakwan_records 테이블 SQL
-- [x] map_utils.py (polyline + 번호 마커)
-- [x] page_pioneer_route.py (동선 추적 탭)
-- [x] app.py (동선기록 탭 추가)
-- [x] followup.py (팔로업 상태머신)
-- [x] page_pioneer_map.py (팔로업 탭)
-- [x] reminder.py (리마인드 대상 조회)
+### Phase 1: 엑셀 마이그레이션 — 완료
+- [x] 신한라이프 tool.xlsx → clients 99명 이관
+- [x] contact_logs 34건 날짜별 파싱 저장
+- [x] 전화번호 정규화 (38건 보정)
+- [x] services/contact_log_parser.py 작성
+
+### Phase 2: 버그픽스 (Sprint 8B) — 완료
+- [x] BUG-01~08 수정 (db_source, touch_method, OCR, 지도, 팔로업)
+- [x] UX-01~05 개선 (유입경로, 필터, 탭 순서, CSV 이동)
+- [ ] UX-06: 약관분석 AI 대화창 (P2 — 다음 Sprint)
+
+### Phase 3: Streamlit Cloud 배포 — 자동 완료
+- [x] fcpilot-kr.streamlit.app 배포 중 (git push → 자동 재빌드)
+- [ ] 스모크 테스트: fcpilot-kr.streamlit.app 접속 → 5개 탭 + 보장분석 + 텔레그램 확인
+
+### Phase 4: 실사용 + 피드백 수집
+- [ ] 영민: 1~2주 현장 실사용
+- [ ] 피드백 수집 → Sprint 9 인풋
 
 ---
 
-# Sprint 4 계획 (Phase 4: 통합 대시보드)
+## 영민 확인 사항
 
-## 건드릴 파일
-```
-신규:
-- pages/page_home.py
-- pages/page_stats.py
+- [x] 엑셀 데이터 이관 완료
+- [x] Streamlit Cloud 자동 배포 (fcpilot-kr.streamlit.app)
+- [ ] Daily Reminder cron — Supabase Dashboard → pg_cron + pg_net 활성화
 
-수정:
-- app.py (홈 탭 추가)
-```
+---
+
+## Sprint 9 이후 (백로그)
+
+| 작업 | 비고 |
+|------|------|
+| UI/UX 개선 | 실사용 피드백 기반 |
+| 리마인드 발송 트리거 구현 | Sprint 3 잔여 |
+| 텔레그램 봇 분리 (고객관리 vs 개발알림) | 실사용 후 시점 결정 |
+| 200줄 초과 파일 리팩토링 | 7개 파일 |
+| 보장분석표 하단 셀 병합 검증 | Sprint 1 잔여 |

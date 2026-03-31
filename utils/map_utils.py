@@ -25,9 +25,12 @@ VISIT_RESULT_LABELS = {
 }
 
 
-def create_map(shops: list, center: tuple = (37.5665, 126.9780), zoom: int = 13) -> folium.Map:
-    """매장 목록으로 folium 지도 생성"""
-    if shops:
+def create_map(shops: list, center: tuple = (37.5665, 126.9780), zoom: int = 13, center_shop=None) -> folium.Map:
+    """매장 목록으로 folium 지도 생성. center_shop 지정 시 해당 매장으로 포커스."""
+    if center_shop and center_shop.get("lat") and center_shop.get("lng"):
+        center = (center_shop["lat"], center_shop["lng"])
+        zoom = 16
+    elif shops:
         lats = [s["lat"] for s in shops if s.get("lat")]
         lngs = [s["lng"] for s in shops if s.get("lng")]
         if lats and lngs:

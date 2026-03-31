@@ -18,7 +18,7 @@ def get_followup_list(fc_id: str) -> list[dict]:
 
     # 전체 매장 + 최근 방문 기록 조회
     try:
-        shops_res = sb.table("fp_pioneer_shops").select("*").eq("fc_id", fc_id).neq("status", "contracted").execute()
+        shops_res = sb.table("pioneer_shops").select("*").eq("fc_id", fc_id).neq("status", "contracted").execute()
         shops = shops_res.data or []
     except Exception:
         return []
@@ -29,7 +29,7 @@ def get_followup_list(fc_id: str) -> list[dict]:
     for shop in shops:
         # 최근 방문 기록
         try:
-            visit_res = sb.table("fp_pioneer_visits").select("*").eq("shop_id", shop["id"]).order("created_at", desc=True).limit(1).execute()
+            visit_res = sb.table("pioneer_visits").select("*").eq("shop_id", shop["id"]).order("created_at", desc=True).limit(1).execute()
             last_visit = visit_res.data[0] if visit_res.data else None
         except Exception:
             last_visit = None
