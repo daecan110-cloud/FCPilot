@@ -95,6 +95,12 @@ send_message('✅ 메시지 내용')
 | command_queue | 텔레그램 명령 큐 (Claude Code 제어) |
 | bot_sessions | 텔레그램 봇 세션 (Edge Function 상태 저장) |
 
+## DB 작업 규칙
+
+- SQL 실행이 필요하면 항상 db_admin.py로 직접 실행. 영민에게 Supabase Dashboard 가라고 하지 마.
+- exec_sql RPC 사용 가능. 테이블 생성, 수정, 데이터 업데이트 전부 Python에서 처리.
+- 영민에게 수동 SQL 실행 요청 금지.
+
 ## 보안 규칙 (절대 위반 금지 — SECURITY.md 참조)
 
 1. **전화번호는 반드시 암호화 저장** → services/crypto.py 사용
