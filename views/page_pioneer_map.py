@@ -309,8 +309,62 @@ def _render_followup():
                 )
                 if st.button("상태 저장", key=f"fu_save_{shop['id']}"):
                     try:
-                        sb.table("pioneer_shops").update({"status": new_status}).eq("id", shop["id"]).execute()
+                        sb.table("pioneer_shops").update({"status": new_status}).eq("id", shop["id"]).eq("fc_id", fc_id).execute()
                         st.success("저장됨")
                         st.rerun()
                     except Exception as e:
                         st.error(f"실패: {e}")
+
+            st.divider()
+            edit_key = f"edit_shop_{shop['id']}"
+            del_key = f"del_shop_{shop['id']}"
+
+            if st.session_state.get(edit_key):
+                with st.form(f"shop_edit_{shop['id']}"):
+                    new_name = st.text_input("매장명", value=shop.get("shop_name", ""))
+                    new_addr = st.text_input("주소", value=shop.get("address", ""))
+                    cat_list = CATEGORY_OPTIONS
+                    cat_idx = cat_list.index(shop.get("category", "기타")) if shop.get("category") in cat_list else len(cat_list) - 1
+                    new_cat = st.selectbox("업종", cat_list, index=cat_idx)
+                    new_memo = st.text_area("메모", value=shop.get("memo") or "")
+                    sc1, sc2 = st.columns(2)
+                    if sc1.form_submit_button("저장", type="primary", use_container_width=True):
+                        try:
+                            upd = {"shop_name": new_name.strip(), "address": new_addr.strip(),
+                                   "category": new_cat, "memo": new_memo.strip()}
+                            if new_addr.strip() and new_addr.strip() != shop.get("address", ""):
+                                coords = geocode(new_addr.strip())
+                                if coords:
+                                    upd["lat"], upd["lng"] = coords
+                            sb.table("pioneer_shops").update(upd).eq("id", shop["id"]).eq("fc_id", fc_id).execute()
+                            st.session_state.pop(edit_key, None)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"수정 실패: {e}")
+                    if sc2.form_submit_button("취소", use_container_width=True):
+                        st.session_state.pop(edit_key, None)
+                        st.rerun()
+
+            elif st.session_state.get(del_key):
+                st.warning(f"'{shop.get('shop_name','')}' 매장과 모든 방문 기록({visit_count}건)을 삭제합니다.")
+                dc1, dc2 = st.columns(2)
+                if dc1.button("삭제 확인", key=f"del_confirm_{shop['id']}", type="primary", use_container_width=True):
+                    try:
+                        sb.table("pioneer_visits").delete().eq("shop_id", shop["id"]).eq("fc_id", fc_id).execute()
+                        sb.table("pioneer_shops").delete().eq("id", shop["id"]).eq("fc_id", fc_id).execute()
+                        st.session_state.pop(del_key, None)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"삭제 실패: {e}")
+                if dc2.button("취소", key=f"del_cancel_{shop['id']}", use_container_width=True):
+                    st.session_state.pop(del_key, None)
+                    st.rerun()
+
+            else:
+                bc1, bc2 = st.columns(2)
+                if bc1.button("수정", key=f"edit_btn_{shop['id']}", use_container_width=True):
+                    st.session_state[edit_key] = True
+                    st.rerun()
+                if bc2.button("삭제", key=f"del_btn_{shop['id']}", use_container_width=True):
+                    st.session_state[del_key] = True
+                    st.rerun()

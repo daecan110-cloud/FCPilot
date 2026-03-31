@@ -131,6 +131,30 @@ def _render_history():
     sb = get_supabase_client()
     fc_id = get_current_user_id()
 
+    # 최근 90일 방문 기록 있는 날짜 목록
+    try:
+        from datetime import timedelta
+        since90 = str(date.today() - timedelta(days=90))
+        date_rows = (sb.table("pioneer_visits").select("visit_date")
+                     .eq("fc_id", fc_id).gte("visit_date", since90)
+                     .order("visit_date", desc=True).execute().data or [])
+        visited_dates = sorted({r["visit_date"] for r in date_rows}, reverse=True)
+    except Exception:
+        visited_dates = []
+
+    if visited_dates:
+        # 월별 그룹핑
+        months: dict = {}
+        for d in visited_dates:
+            m = d[:7]  # "2026-03"
+            months.setdefault(m, []).append(d[5:])  # "03-31"
+        summary = " | ".join(
+            f"{m}: {', '.join(days)}" for m, days in months.items()
+        )
+        st.caption(f"📅 방문 기록 있는 날  {summary}")
+    else:
+        st.caption("최근 90일 방문 기록이 없습니다.")
+
     target_date = st.date_input("날짜 선택", value=date.today())
 
     try:
