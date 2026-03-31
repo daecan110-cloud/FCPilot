@@ -72,38 +72,29 @@ _DEFAULT_CATEGORIES = ["DB고객", "개인(지인)", "개척", "소개", "기타
 
 def _render_source_categories(sb, user_id: str):
     """유입경로 카테고리 관리"""
+    import pandas as pd
     st.subheader("유입경로 카테고리")
-    st.caption("고객 등록·수정 시 표시되는 유입경로 항목을 관리합니다.")
+    st.caption("셀 직접 수정 · + 버튼으로 추가 · 행 선택 후 Delete로 삭제 → 저장 버튼 필수")
 
     try:
         res = sb.table("users_settings").select("source_categories").eq("id", user_id).execute()
         cats = (res.data[0].get("source_categories") if res.data else None) or _DEFAULT_CATEGORIES
     except Exception:
-        cats = _DEFAULT_CATEGORIES
+        cats = list(_DEFAULT_CATEGORIES)
 
-    # 현재 목록 + 삭제 버튼
-    for i, cat in enumerate(cats):
-        col1, col2 = st.columns([5, 1])
-        col1.text(cat)
-        if col2.button("삭제", key=f"del_cat_{i}"):
-            new_cats = [c for j, c in enumerate(cats) if j != i]
-            _save_categories(sb, user_id, new_cats)
-            st.rerun()
+    df = pd.DataFrame({"유입경로": cats})
+    edited = st.data_editor(
+        df, num_rows="dynamic", use_container_width=True,
+        hide_index=True, key="source_cat_editor",
+        column_config={"유입경로": st.column_config.TextColumn("유입경로", width="large")},
+    )
 
-    # 새 카테고리 추가
-    with st.form("add_category_form"):
-        new_cat = st.text_input("새 카테고리 추가", placeholder="예: 온라인DB, 법인, 세미나")
-        if st.form_submit_button("추가"):
-            stripped = new_cat.strip()
-            if stripped and stripped not in cats:
-                _save_categories(sb, user_id, cats + [stripped])
-                st.rerun()
-            elif stripped in cats:
-                st.warning("이미 존재하는 카테고리입니다.")
-
-    # 기본값 복원
-    if st.button("기본값으로 초기화"):
-        _save_categories(sb, user_id, _DEFAULT_CATEGORIES)
+    col1, col2 = st.columns(2)
+    if col1.button("저장", type="primary", use_container_width=True):
+        new_cats = [v for v in edited["유입경로"].tolist() if v and str(v).strip()]
+        _save_categories(sb, user_id, new_cats)
+    if col2.button("기본값 초기화", use_container_width=True):
+        _save_categories(sb, user_id, list(_DEFAULT_CATEGORIES))
         st.rerun()
 
 
