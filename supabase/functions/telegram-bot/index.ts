@@ -80,6 +80,68 @@ function extractCreateParams(text: string): Record<string, string> {
   return params;
 }
 
+// ── 나이 파싱 유틸 ──────────────────────────────────
+
+interface AgeInfo {
+  age_group: string;   // "20대", "20대 (26세)" 등
+  age: number | null;  // 정수 나이 (계산 가능 시)
+  birth_year: number | null; // 출생년도
+}
+
+function parseAge(input: string): AgeInfo {
+  const t = input.trim();
+  const currentYear = new Date().getFullYear();
+
+  // "00년생", "2000년생"
+  const birthMatch = t.match(/(\d{2,4})\s*년생/);
+  if (birthMatch) {
+    let year = parseInt(birthMatch[1]);
+    if (year < 100) year += year <= (currentYear % 100) ? 2000 : 1900;
+    const exactAge = currentYear - year;
+    const decade = Math.floor(exactAge / 10) * 10;
+    return {
+      age_group: `${decade}대 (${exactAge}세)`,
+      age: exactAge,
+      birth_year: year,
+    };
+  }
+
+  // "26살", "26세"
+  const exactMatch = t.match(/(\d{1,3})\s*(살|세)/);
+  if (exactMatch) {
+    const exactAge = parseInt(exactMatch[1]);
+    const decade = Math.floor(exactAge / 10) * 10;
+    return {
+      age_group: `${decade}대 (${exactAge}세)`,
+      age: exactAge,
+      birth_year: currentYear - exactAge,
+    };
+  }
+
+  // "20대", "30대"
+  const decadeMatch = t.match(/(\d{1,2})0?\s*대/);
+  if (decadeMatch) {
+    const decade = parseInt(decadeMatch[1]) * 10;
+    return { age_group: `${decade}대`, age: decade, birth_year: null };
+  }
+
+  // 숫자만 ("25")
+  const numMatch = t.match(/^(\d{1,3})$/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1]);
+    if (n >= 10 && n <= 99) {
+      const decade = Math.floor(n / 10) * 10;
+      return {
+        age_group: `${decade}대 (${n}세)`,
+        age: n,
+        birth_year: currentYear - n,
+      };
+    }
+  }
+
+  return { age_group: t, age: null, birth_year: null };
+}
+
 const UPDATE_KEYWORDS = [
   "변경", "수정", "바꿔", "바꿔줘", "변경해", "변경해줘", "수정해", "수정해줘",
   "으로 해", "으로 해줘",
@@ -99,11 +161,12 @@ const FIELD_PATTERNS: Array<{
     },
   },
   {
-    keywords: ["나이"],
+    keywords: ["나이", "살", "세", "년생", "대"],
     field: "나이",
     valueExtractor: (t) => {
-      const m = t.match(/나이\s*(\d{1,3})\s*(대|세|살)?/) || t.match(/(\d{1,3})\s*(대|세|살)/);
-      return m ? m[1] : null;
+      const m = t.match(/나이\s*(.+?)(?:\s*(?:으?로|변경|수정|바꿔|하고|$))/) ||
+        t.match(/(\d{1,4}\s*(?:대|세|살|년생))/);
+      return m ? m[1].trim() : null;
     },
   },
   {
@@ -298,7 +361,7 @@ async function resolveIntent(text: string): Promise<Intent> {
 async function searchCustomer(name: string): Promise<string> {
   const { data, error } = await supabase
     .from("clients")
-    .select("name, prospect_grade, age, gender, occupation, address, memo")
+    .select("name, prospect_grade, age, age_group, birth_year, gender, occupation, address, memo")
     .ilike("name", `%${name}%`)
     .limit(5);
 
@@ -307,8 +370,21 @@ async function searchCustomer(name: string): Promise<string> {
 
   return data
     .map((c) => {
+      // 나이 표시: age_group 우선, birth_year 있으면 년생 추가
+      let ageDisplay = "";
+      if (c.age_group) {
+        ageDisplay = c.age_group;
+        if (c.birth_year) {
+          const shortYear = String(c.birth_year).slice(-2);
+          // age_group에 이미 세 정보가 있으면 년생만 추가
+          if (!ageDisplay.includes("년생")) ageDisplay += ` (${shortYear}년생)`;
+        }
+      } else if (c.age) {
+        ageDisplay = `${c.age}세`;
+      }
+
       const info = [
-        c.age ? `${c.age}세` : "",
+        ageDisplay,
         c.gender === "M" ? "남" : c.gender === "F" ? "여" : "",
         c.occupation,
         c.address,
@@ -324,17 +400,26 @@ async function searchCustomer(name: string): Promise<string> {
 async function createCustomer(p: Record<string, string>, fcId: string): Promise<string> {
   if (!p.name) return "❌ 고객 이름이 필요합니다.";
 
-  const { error } = await supabase.from("clients").insert({
+  const insertData: Record<string, unknown> = {
     fc_id: fcId,
     name: p.name,
-    age: p.age ? parseInt(p.age) : null,
     address: p.address || "",
     memo: p.memo || "",
     prospect_grade: "C",
-  });
+  };
+
+  if (p.age) {
+    const info = parseAge(p.age);
+    insertData.age_group = info.age_group;
+    if (info.age !== null) insertData.age = info.age;
+    if (info.birth_year !== null) insertData.birth_year = info.birth_year;
+  }
+
+  const { error } = await supabase.from("clients").insert(insertData);
 
   if (error) return `❌ 등록 실패: ${error.message}`;
-  return `✅ *${p.name}* 고객 등록 완료 (C등급)`;
+  const ageDisplay = insertData.age_group ? ` / ${insertData.age_group}` : "";
+  return `✅ *${p.name}* 고객 등록 완료 (C등급${ageDisplay})`;
 }
 
 async function updateCustomer(p: Record<string, string>): Promise<string> {
@@ -374,10 +459,17 @@ async function updateCustomer(p: Record<string, string>): Promise<string> {
   const changeLog: string[] = [];
 
   for (const u of updates) {
-    const dbField = fieldMap[u.field] || u.field;
-    const val = dbField === "age" ? parseInt(u.value) : u.value;
-    updateData[dbField] = val;
-    changeLog.push(`${u.field} → "${u.value}"`);
+    if (u.field === "나이") {
+      const info = parseAge(u.value);
+      updateData.age_group = info.age_group;
+      if (info.age !== null) updateData.age = info.age;
+      if (info.birth_year !== null) updateData.birth_year = info.birth_year;
+      changeLog.push(`나이 → "${info.age_group}"`);
+    } else {
+      const dbField = fieldMap[u.field] || u.field;
+      updateData[dbField] = u.value;
+      changeLog.push(`${u.field} → "${u.value}"`);
+    }
   }
 
   const { error } = await supabase
