@@ -1,7 +1,7 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 7 완료 — 텔레그램 봇 v5 NLP 전면 업그레이드**
+- Phase: **Sprint 8B 완료 — 버그픽스 + 마이그레이션**
 - 마지막 세션: 2026-03-31 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 
@@ -28,22 +28,38 @@
 
 ---
 
+## Sprint 8 완료 내역
+
+### Phase 1: 엑셀 마이그레이션 — 완료
+- [x] `신한라이프 tool의 사본.xlsx` → clients 99명 + contact_logs 34건 이관
+- [x] `scripts/migrate_excel.py` 작성 (dry-run/run 모드)
+- [x] `services/contact_log_parser.py` — 날짜별 상담 내용 파싱
+- [x] 전화번호 float→int 정규화 (38건 DB 직접 보정)
+- [x] FC_ID: `ee41ae34-feef-4689-b005-f144cab4e4a6` (김영민fc)
+
+### Phase 2: Sprint 8B 버그픽스 — 완료 (commit: 56bd463)
+- [x] BUG-01: `source` → `db_source` 컬럼명 수정
+- [x] BUG-02: `contact_type`/`content` → `touch_method`/`memo`
+- [x] BUG-04: 전화번호 표시 형식 수정
+- [x] BUG-05: OCR 프롬프트 개선 + 업종 드롭다운
+- [x] BUG-06: EXIF GPS → Naver Reverse Geocoding 주소 자동 추출
+- [x] BUG-07: 매장 클릭 → 지도 center 이동 (session_state 기반)
+- [x] BUG-08: `fp_pioneer_shops` → `pioneer_shops` 조인 수정 + 팔로업 개선
+- [x] UX-01: 출처 → 유입경로 라벨
+- [x] UX-02: 고객 목록 필터 (나이대/지역/상담유무/정렬)
+- [x] UX-04: 영업 모드별 탭 순서 변경
+- [x] UX-05: CSV 가져오기 → 설정 탭으로 이동
+
+### 미완료 (P2 — 다음 Sprint)
+- [ ] UX-06: 약관분석 AI 대화창 (page_analysis.py)
+- [ ] BUG-03: 뒤로가기 로그아웃 (Streamlit 제한 — 해결 어려움)
+
 ## 알려진 이슈
 - Gemini 무료 tier: 분당 2회 제한 → 429 시 재시도 대응
 - 200줄 초과 파일 7개: 향후 Sprint에서 분리 예정
 - Streamlit Cloud 배포 미완료 (영민 수동 작업 필요)
 
-## 다음 Sprint (Sprint 8)
-
-**시작 조건**: 영민이 구글시트 CSV + 컬럼 샘플 공유 후 시작
-
-### Phase 순서
-1. CSV 마이그레이션 (fp_clients 이관)
-2. 로컬 통합 테스트 (전체 기능 플로우)
-3. Streamlit Cloud 배포 (영민 수동)
-4. 실사용 + 피드백 수집 (1~2주)
-
-## 영민 선행 작업 (Sprint 8 전)
-- [ ] 구글시트 CSV 다운로드 + 컬럼 샘플 Claude Code에 공유
-- [ ] Admin 권한 부여 — Supabase SQL: `UPDATE users_settings SET role = 'admin' WHERE id = '본인_id';`
-- [ ] Daily Reminder cron — Supabase Dashboard → pg_cron + pg_net 활성화
+## 다음 Sprint (Sprint 8 Phase 3+)
+1. Streamlit Cloud 배포 (영민 수동)
+2. 실사용 + 피드백 수집 (1~2주)
+3. UX-06 약관분석 AI 대화창

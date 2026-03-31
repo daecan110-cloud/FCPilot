@@ -51,22 +51,18 @@
 
 ---
 
-## Sprint 8 — 진행 예정 (CSV 마이그레이션 + 배포 + 실사용)
+## Sprint 8 — 진행 중 (CSV 마이그레이션 + 배포 + 실사용)
 
-### Phase 1: CSV 마이그레이션
-- [ ] 영민: 구글시트 CSV 다운로드 + 컬럼 샘플 공유
-- [ ] CSV 컬럼 매핑 확인 및 migration.py 수정
-- [ ] dry-run 실행 → 로그 확인
-- [ ] 본 실행 → fp_clients 건수 검증 (텔레그램 "고객 몇명이야?")
+### Phase 1: 엑셀 마이그레이션 — 완료
+- [x] 신한라이프 tool.xlsx → clients 99명 이관
+- [x] contact_logs 34건 날짜별 파싱 저장
+- [x] 전화번호 정규화 (38건 보정)
+- [x] services/contact_log_parser.py 작성
 
-### Phase 2: 로컬 통합 테스트
-- [ ] 보장분석 플로우 (PDF → 엑셀, 약관 K열 반영, 8개 이상 분리)
-- [ ] 고객관리 플로우 (목록 조회, 상담 기록, 등급 변경, 검색)
-- [ ] 개척 플로우 (간판OCR → 지도 마커 → 팔로업)
-- [ ] 동선 플로우 (방문 기록 → 경로선)
-- [ ] 텔레그램 플로우 (자연어 CRM, 리마인드, 상담 기록)
-- [ ] 설정/Admin (영업 모드, 역할 관리)
-- [ ] 크리티컬 버그 0건 확인
+### Phase 2: 버그픽스 (Sprint 8B) — 완료
+- [x] BUG-01~08 수정 (db_source, touch_method, OCR, 지도, 팔로업)
+- [x] UX-01~05 개선 (유입경로, 필터, 탭 순서, CSV 이동)
+- [ ] UX-06: 약관분석 AI 대화창 (P2 — 다음 Sprint)
 
 ### Phase 3: Streamlit Cloud 배포 (영민 수동)
 - [ ] share.streamlit.io → daecan110@gmail.com-cloud 로그인
@@ -81,10 +77,10 @@
 
 ---
 
-## 영민 선행 작업 (Sprint 8 시작 전)
+## 영민 선행 작업 (Phase 3 전)
 
-- [ ] 구글시트 CSV 다운로드 + 컬럼 샘플 Claude Code에 공유
-- [ ] Admin 권한 부여 — Supabase SQL: `UPDATE users_settings SET role = 'admin' WHERE id = '본인_id';`
+- [x] 엑셀 데이터 이관 완료
+- [ ] Streamlit Cloud 배포 (share.streamlit.io 수동)
 - [ ] Daily Reminder cron — Supabase Dashboard → pg_cron + pg_net 활성화
 
 ---
