@@ -46,6 +46,26 @@ templates/          → 엑셀 템플릿 등 정적 파일.
 1. handoff.md 업데이트 (완료/미완료/이슈)
 2. plan.md에 완료 체크
 3. `git add -A` → `git commit` → `git push origin main`
+4. 텔레그램 Sprint 완료 알림 발송
+
+## 텔레그램 자동 알림 규칙 (절대 누락 금지)
+
+매 작업에서 아래 상황 발생 시 **즉시** 텔레그램 알림을 발송한다:
+
+| 상황 | 함수 | 예시 |
+|------|------|------|
+| git commit 완료 | `send_message("✅ 커밋: {메시지}")` | 파일 수정 후 커밋할 때마다 |
+| Sprint 완료 | `notify_sprint_complete(sprint, summary)` | Sprint 종료 시 |
+| 영민 확인 필요 | `notify_action_needed(message)` | DB 수동 작업, 키 입력 등 |
+| 에러/경고 | `notify_warning(message)` | 빌드 실패, 연결 오류 등 |
+
+**실행 방법:** Python -c로 직접 호출 (Streamlit 컨텍스트 불필요)
+```bash
+python -c "
+from utils.telegram import send_message
+send_message('✅ 커밋: 메시지 내용')
+"
+```
 
 ## DB 테이블
 
