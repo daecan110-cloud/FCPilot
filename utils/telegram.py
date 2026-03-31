@@ -47,15 +47,32 @@ def _api_url():
 
 def send_message(text: str) -> bool:
     """텔레그램 메시지 전송"""
-    _, chat_id = _get_config()
+    token, chat_id = _get_config()
+    if not token or not chat_id:
+        print("[TELEGRAM] FAIL: token or chat_id missing")
+        return False
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
     try:
         res = requests.post(
-            f"{_api_url()}/sendMessage",
+            url,
             json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
             timeout=10,
         )
-        return res.status_code == 200
-    except Exception:
+        if res.status_code == 200:
+            print(f"[TELEGRAM] OK: {res.status_code}")
+            return True
+        # Markdown 파싱 오류 시 plain text 재시도
+        if res.status_code == 400:
+            res2 = requests.post(url, json={"chat_id": chat_id, "text": text}, timeout=10)
+            if res2.status_code == 200:
+                print(f"[TELEGRAM] OK (plain text): {res2.status_code}")
+                return True
+            print(f"[TELEGRAM] FAIL: {res2.status_code} {res2.text[:200]}")
+            return False
+        print(f"[TELEGRAM] FAIL: {res.status_code} {res.text[:200]}")
+        return False
+    except Exception as e:
+        print(f"[TELEGRAM] FAIL: {e}")
         return False
 
 
