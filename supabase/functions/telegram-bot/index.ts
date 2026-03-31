@@ -221,10 +221,9 @@ async function searchCustomer(name: string): Promise<string> {
     .join("\n\n");
 }
 
-async function createCustomer(p: Record<string, string>): Promise<string> {
+async function createCustomer(p: Record<string, string>, fcId: string): Promise<string> {
   if (!p.name) return "❌ 고객 이름이 필요합니다.";
 
-  const fcId = await getFirstUserId();
   const { error } = await supabase.from("clients").insert({
     fc_id: fcId,
     name: p.name,
@@ -298,8 +297,7 @@ async function listReminders(): Promise<string> {
   return lines.join("\n");
 }
 
-async function queueCommand(command: string): Promise<string> {
-  const fcId = await getFirstUserId();
+async function queueCommand(command: string, fcId: string): Promise<string> {
   const { error } = await supabase.from("command_queue").insert({
     fc_id: fcId,
     command,
@@ -310,12 +308,58 @@ async function queueCommand(command: string): Promise<string> {
   return `📩 *명령 접수*\n\n"${command}"\n\nPC 켜져있으면 곧 실행됩니다.`;
 }
 
-async function getFirstUserId(): Promise<string> {
-  const { data } = await supabase
+async function resolveFcId(chatId: string): Promise<string> {
+  // 1. telegram_chat_id로 기존 사용자 조회
+  const { data: existing } = await supabase
+    .from("users_settings")
+    .select("id")
+    .eq("telegram_chat_id", chatId)
+    .limit(1);
+
+  if (existing?.length) return existing[0].id;
+
+  // 2. 없으면 — users_settings에 행이 있는지 확인 (Streamlit 가입자)
+  const { data: anyUser } = await supabase
     .from("users_settings")
     .select("id")
     .limit(1);
-  return data?.[0]?.id || "";
+
+  if (anyUser?.length) {
+    // 기존 사용자에 chat_id 연결
+    await supabase
+      .from("users_settings")
+      .update({ telegram_chat_id: chatId })
+      .eq("id", anyUser[0].id);
+    return anyUser[0].id;
+  }
+
+  // 3. 아예 없으면 — 서비스 역할로 auth 사용자 + settings 생성
+  const email = `fc_${chatId}@fcpilot.local`;
+  const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+    email,
+    password: crypto.randomUUID(),
+    email_confirm: true,
+    user_metadata: { display_name: "FC영민", telegram_chat_id: chatId },
+  });
+
+  if (authErr || !authData?.user) {
+    console.error("Auto-create user failed:", authErr);
+    return "";
+  }
+
+  const userId = authData.user.id;
+
+  // handle_new_user 트리거가 users_settings 자동 생성하지만
+  // telegram_chat_id는 수동 업데이트 필요
+  // 트리거 실행 대기
+  await new Promise((r) => setTimeout(r, 500));
+
+  await supabase
+    .from("users_settings")
+    .update({ telegram_chat_id: chatId })
+    .eq("id", userId);
+
+  return userId;
 }
 
 // ── 메인 ────────────────────────────────────────────
@@ -331,6 +375,13 @@ Deno.serve(async (req) => {
     const chatId = String(msg.chat.id);
     if (chatId !== CHAT_ID) return new Response("OK");
 
+    // fc_id 확보 (없으면 자동 생성)
+    const fcId = await resolveFcId(chatId);
+    if (!fcId) {
+      await reply(chatId, "❌ 사용자 설정 초기화 실패. 다시 시도해주세요.");
+      return new Response("OK");
+    }
+
     const text = msg.text.trim();
     const { intent, params } = await resolveIntent(text);
 
@@ -340,7 +391,7 @@ Deno.serve(async (req) => {
         response = await searchCustomer(params.name || text);
         break;
       case "customer_create":
-        response = await createCustomer(params);
+        response = await createCustomer(params, fcId);
         break;
       case "customer_update":
         response = await updateCustomer(params);
@@ -352,7 +403,7 @@ Deno.serve(async (req) => {
         response = `✅ "${params.name}" 리마인드 완료 처리`;
         break;
       case "command":
-        response = await queueCommand(params.command || text);
+        response = await queueCommand(params.command || text, fcId);
         break;
       default:
         response = `🤖 이해하지 못했습니다.\n\n사용 예시:\n• "김철수" → 고객 조회\n• "할일" → 오늘 할 일\n• "새 고객: 이영희, 30대" → 등록\n• "테스트해줘" → PC 명령`;
