@@ -3,7 +3,6 @@ import streamlit as st
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from services.crypto import encrypt_phone, decrypt_phone, hash_phone_last4
-from utils.helpers import mask_phone
 
 TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
 DB_SOURCE_OPTIONS = ["DB고객", "개인(지인)", "개척", "소개", "기타"]
@@ -38,7 +37,6 @@ def _render_list():
     with col3:
         source_filter = st.selectbox("유입경로", ["전체"] + DB_SOURCE_OPTIONS, label_visibility="collapsed")
 
-    # 추가 필터 (UX-02)
     with st.expander("상세 필터"):
         col_a, col_b, col_c = st.columns(3)
         with col_a:
@@ -53,7 +51,6 @@ def _render_list():
         st.session_state.clients_view = "new"
         st.rerun()
 
-    # 데이터 조회
     query = sb.table("clients").select("*").eq("fc_id", fc_id)
     if search:
         query = query.ilike("name", f"%{search}%")
@@ -80,7 +77,6 @@ def _render_list():
         st.error(f"조회 실패: {e}")
         return
 
-    # 상담 기록 유무 필터 (클라이언트 사이드)
     if contact_filter != "전체":
         try:
             logs_res = sb.table("contact_logs").select("client_id").eq("fc_id", fc_id).execute()
@@ -101,7 +97,7 @@ def _render_list():
     for c in clients:
         grade = c.get("prospect_grade", "C")
         grade_color = {"A": "red", "B": "orange", "C": "blue", "D": "gray"}.get(grade, "blue")
-        col_name, col_info, col_btn = st.columns([3, 4, 1])
+        col_name, col_info, col_detail, col_del = st.columns([3, 4, 1, 1])
         with col_name:
             st.markdown(f"**{c['name']}** :{grade_color}[{grade}]")
         with col_info:
@@ -113,11 +109,26 @@ def _render_list():
             if c.get("address"):
                 info += f" | {c['address']}"
             st.caption(info)
-        with col_btn:
+        with col_detail:
             if st.button("상세", key=f"detail_{c['id']}"):
                 st.session_state.clients_view = "detail"
                 st.session_state.selected_client_id = c["id"]
                 st.rerun()
+        with col_del:
+            confirm_key = f"confirm_del_list_{c['id']}"
+            if st.session_state.get(confirm_key):
+                if st.button("확인", key=f"del_confirm_{c['id']}", type="primary"):
+                    try:
+                        sb.table("contact_logs").delete().eq("client_id", c["id"]).execute()
+                        sb.table("clients").delete().eq("id", c["id"]).execute()
+                        st.session_state.pop(confirm_key, None)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"삭제 실패: {e}")
+            else:
+                if st.button("삭제", key=f"del_{c['id']}"):
+                    st.session_state[confirm_key] = True
+                    st.rerun()
 
 
 # ── 고객 상세 ──
@@ -154,7 +165,7 @@ def _render_detail():
             phone = decrypt_phone(client["phone_encrypted"])
         except Exception:
             phone = "(복호화 실패)"
-    st.text(f"연락처: {mask_phone(phone) if phone else '미등록'}")
+    st.text(f"연락처: {phone if phone else '미등록'}")
     st.text(f"직업: {client.get('occupation', '-')}")
     st.text(f"주소: {client.get('address', '-')}")
     st.text(f"유입경로: {client.get('db_source', '-')}")
@@ -169,6 +180,33 @@ def _render_detail():
     st.divider()
     _render_contact_logs(sb, client_id)
     _render_new_contact(sb, client_id)
+
+    st.divider()
+    _render_client_delete(sb, client_id)
+
+
+def _render_client_delete(sb, client_id: str):
+    """고객 삭제 (확인 후 contact_logs CASCADE 삭제)"""
+    confirm_key = f"confirm_del_client_{client_id}"
+    if st.session_state.get(confirm_key):
+        st.warning("고객 정보와 모든 상담 이력이 삭제됩니다. 계속하시겠습니까?")
+        col_y, col_n = st.columns(2)
+        if col_y.button("삭제 확인", type="primary", use_container_width=True):
+            try:
+                sb.table("contact_logs").delete().eq("client_id", client_id).execute()
+                sb.table("clients").delete().eq("id", client_id).execute()
+                st.session_state.pop(confirm_key, None)
+                st.session_state.clients_view = "list"
+                st.rerun()
+            except Exception as e:
+                st.error(f"삭제 실패: {e}")
+        if col_n.button("취소", use_container_width=True):
+            st.session_state.pop(confirm_key, None)
+            st.rerun()
+    else:
+        if st.button("고객 삭제", use_container_width=True):
+            st.session_state[confirm_key] = True
+            st.rerun()
 
 
 def _render_contact_logs(sb, client_id: str):
@@ -194,6 +232,25 @@ def _render_contact_logs(sb, client_id: str):
                 st.caption(f"다음 할 일: {log['next_action']}")
             if log.get("next_date"):
                 st.caption(f"예정일: {log['next_date']}")
+
+            confirm_key = f"confirm_del_log_{log['id']}"
+            if st.session_state.get(confirm_key):
+                st.warning("이 상담 기록을 삭제하시겠습니까?")
+                col_y, col_n = st.columns(2)
+                if col_y.button("삭제 확인", key=f"log_del_yes_{log['id']}", type="primary"):
+                    try:
+                        sb.table("contact_logs").delete().eq("id", log["id"]).execute()
+                        st.session_state.pop(confirm_key, None)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"삭제 실패: {e}")
+                if col_n.button("취소", key=f"log_del_no_{log['id']}"):
+                    st.session_state.pop(confirm_key, None)
+                    st.rerun()
+            else:
+                if st.button("삭제", key=f"del_log_{log['id']}"):
+                    st.session_state[confirm_key] = True
+                    st.rerun()
 
 
 def _render_new_contact(sb, client_id: str):

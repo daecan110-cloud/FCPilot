@@ -130,21 +130,21 @@ def _render_analysis_stats(sb, fc_id: str, since: str | None):
     st.subheader("보장분석")
 
     try:
-        q = sb.table("analysis_records").select("id").eq("fc_id", fc_id)
+        q = sb.table("analysis_records").select("id", count="exact").eq("fc_id", fc_id)
         if since:
             q = q.gte("created_at", since)
-        analyses = q.execute().data or []
+        analysis_count = q.execute().count or 0
     except Exception:
-        analyses = []
+        analysis_count = 0
 
     try:
-        q = sb.table("yakwan_records").select("id").eq("fc_id", fc_id)
+        q = sb.table("yakwan_records").select("id", count="exact").eq("fc_id", fc_id)
         if since:
             q = q.gte("created_at", since)
-        yakwans = q.execute().data or []
+        yakwan_count = q.execute().count or 0
     except Exception:
-        yakwans = []
+        yakwan_count = 0
 
     c1, c2 = st.columns(2)
-    c1.metric("보장분석 실행", f"{len(analyses)}건")
-    c2.metric("약관분석 실행", f"{len(yakwans)}건")
+    c1.metric("보장분석 실행", f"{analysis_count}건")
+    c2.metric("약관분석 실행", f"{yakwan_count}건")

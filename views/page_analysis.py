@@ -63,6 +63,9 @@ def render():
         st.session_state.include_review = include_review
         st.session_state.pop("yakwan_results", None)
 
+        # 자동 저장 (버튼 클릭 불필요)
+        _save_to_db(data, silent=True)
+
     data = st.session_state.get("analysis_data")
     if data is None:
         return
@@ -85,9 +88,6 @@ def render():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
-
-    if st.button("분석 기록 저장", use_container_width=True):
-        _save_to_db(data)
 
     st.divider()
     _render_yakwan_section(data)
@@ -114,7 +114,7 @@ def _show_result(data: dict):
             )
 
 
-def _save_to_db(data: dict):
+def _save_to_db(data: dict, silent: bool = False):
     save_data = {
         "고객명": data.get("고객명", ""),
         "성별": data.get("성별", ""),
@@ -129,9 +129,11 @@ def _save_to_db(data: dict):
             "analysis_result": save_data,
             "pdf_filename": "",
         }).execute()
-        st.success("분석 기록이 저장되었습니다.")
+        if not silent:
+            st.success("분석 기록이 저장되었습니다.")
     except Exception as e:
-        st.error(f"저장 실패: {e}")
+        if not silent:
+            st.error(f"저장 실패: {e}")
 
 
 # ── 약관 분석 섹션 ──
