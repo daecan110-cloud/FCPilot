@@ -17,7 +17,7 @@ def render():
         help=f"최대 {MAX_FILE_SIZE_MB}MB",
     )
 
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([3, 1, 1])
     with col1:
         client_name = st.text_input(
             "고객명 (선택 - 엑셀에만 표시)",
@@ -26,6 +26,16 @@ def render():
     with col2:
         include_review = st.toggle("상세 보장내역 포함", value=False,
                                     help="갱신구분/보험료변화/리뷰 섹션 포함")
+    with col3:
+        include_yakwan = st.toggle("약관 함께 분석", value=False,
+                                    help="약관 PDF를 함께 업로드하면 K열 자동 반영")
+
+    yakwan_inline_file = None
+    if include_yakwan:
+        yakwan_inline_file = st.file_uploader(
+            "약관 PDF (K열 자동 반영)", type=["pdf"], key="yakwan_inline",
+            help="보장분석과 동시에 약관 분석 → 엑셀 K열 자동 완성",
+        )
 
     if uploaded_file is None:
         st.info("PDF 파일을 업로드해주세요.")
@@ -57,11 +67,41 @@ def render():
                 st.error(f"엑셀 재생성 실패: {e}")
                 return
 
+        # 약관 동시 분석 (토글 ON + 파일 있을 때)
+        if include_yakwan and yakwan_inline_file:
+            yakwan_bytes = yakwan_inline_file.read()
+            contracts = data.get("_all_contracts", data.get("계약", []))
+            k_column_data = {}
+            yakwan_results = {}
+            with st.spinner(f"약관 분석 중... (계약 {len(contracts)}건)"):
+                for i, contract in enumerate(contracts):
+                    try:
+                        result = analyze_yakwan(
+                            yakwan_bytes,
+                            contract.get("보험사", ""),
+                            contract.get("상품명", ""),
+                        )
+                        yakwan_results[i] = result
+                        if result.get("k_column"):
+                            k_column_data[i] = result["k_column"]
+                        _save_yakwan_to_db(i, contract, result)
+                    except Exception:
+                        pass
+            if k_column_data:
+                try:
+                    _, excel_files = analyze_and_generate(
+                        pdf_bytes, include_review=include_review, k_column_data=k_column_data,
+                    )
+                except Exception:
+                    pass
+            st.session_state.yakwan_results = yakwan_results
+        else:
+            st.session_state.pop("yakwan_results", None)
+
         st.session_state.analysis_data = data
         st.session_state.excel_files = excel_files
         st.session_state.pdf_bytes = pdf_bytes
         st.session_state.include_review = include_review
-        st.session_state.pop("yakwan_results", None)
 
         # 자동 저장 (버튼 클릭 불필요)
         _save_to_db(data, silent=True)

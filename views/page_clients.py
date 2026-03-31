@@ -45,7 +45,7 @@ def _render_list():
             region_filter = st.text_input("지역", placeholder="예: 수원")
         with col_c:
             contact_filter = st.selectbox("상담 기록", ["전체", "있음", "없음"])
-        sort_by = st.selectbox("정렬", ["등록일 최신순", "이름순", "등급순"])
+        sort_by = st.selectbox("정렬", ["등록일 최신순", "이름순", "등급순", "최근 상담순"])
 
     if st.button("고객 등록", use_container_width=True, type="primary"):
         st.session_state.clients_view = "new"
@@ -77,14 +77,24 @@ def _render_list():
         st.error(f"조회 실패: {e}")
         return
 
-    if contact_filter != "전체":
+    if contact_filter != "전체" or sort_by == "최근 상담순":
         try:
-            logs_res = sb.table("contact_logs").select("client_id").eq("fc_id", fc_id).execute()
-            has_logs = {r["client_id"] for r in (logs_res.data or [])}
+            logs_res = sb.table("contact_logs").select("client_id, created_at").eq("fc_id", fc_id).order("created_at", desc=True).execute()
+            logs_data = logs_res.data or []
+            has_logs = {r["client_id"] for r in logs_data}
+
             if contact_filter == "있음":
                 clients = [c for c in clients if c["id"] in has_logs]
-            else:
+            elif contact_filter == "없음":
                 clients = [c for c in clients if c["id"] not in has_logs]
+
+            if sort_by == "최근 상담순":
+                latest_contact = {}
+                for log in logs_data:
+                    cid = log["client_id"]
+                    if cid not in latest_contact:
+                        latest_contact[cid] = log["created_at"]
+                clients.sort(key=lambda c: latest_contact.get(c["id"], ""), reverse=True)
         except Exception:
             pass
 
@@ -298,6 +308,12 @@ def _render_form(edit=False):
             phone_display = decrypt_phone(client["phone_encrypted"])
         except Exception:
             pass
+
+    with st.expander("💡 등급 기준 보기"):
+        st.caption("**A**: 보험 니즈 확인 + 상담 의향 있음 (계약 가능성 높음)")
+        st.caption("**B**: 관심은 있으나 구체적 니즈 미확인")
+        st.caption("**C**: 접촉만 됨, 니즈/의향 미파악")
+        st.caption("**D**: 거절 또는 연락 두절")
 
     with st.form("client_form"):
         name = st.text_input("이름 *", value=client.get("name", ""))
