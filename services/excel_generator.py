@@ -433,7 +433,10 @@ def _fill_tax_values(ws, full_data, offset):
     r92 = 92 + offset
     r93 = 93 + offset
 
-    for i, c in enumerate(all_contracts[:7]):
+    # D~H열(5개)까지만 개별 표시. I:K는 병합 셀(합계용)이므로 6~7번째 제외.
+    max_individual = min(len(all_contracts), 5)
+    for i in range(max_individual):
+        c = all_contracts[i]
         col = COL_IDX[COL_LTRS[i]]
         monthly = c.get("월보험료", 0)
         annual = monthly * 12
