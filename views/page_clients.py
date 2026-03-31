@@ -41,11 +41,36 @@ def render():
 
 # ── 고객 목록 ──
 
+_SORT_OPTIONS = ["등록일 최신순", "이름순", "등급순", "최근 상담순"]
+
+
+def _load_sort_pref(sb, fc_id: str) -> str:
+    """DB에서 정렬 설정 로드 (세션에 없을 때만)"""
+    if "clients_sort_by" in st.session_state:
+        return st.session_state.clients_sort_by
+    try:
+        res = sb.table("users_settings").select("clients_sort").eq("id", fc_id).execute()
+        saved = (res.data[0].get("clients_sort") or _SORT_OPTIONS[0]) if res.data else _SORT_OPTIONS[0]
+    except Exception:
+        saved = _SORT_OPTIONS[0]
+    st.session_state.clients_sort_by = saved
+    return saved
+
+
+def _save_sort_pref(sb, fc_id: str, sort_val: str):
+    """정렬 설정 DB 저장"""
+    try:
+        sb.table("users_settings").upsert({"id": fc_id, "clients_sort": sort_val}).execute()
+    except Exception:
+        pass
+
+
 def _render_list():
     sb = get_supabase_client()
     fc_id = get_current_user_id()
 
     source_options = _get_source_categories(sb, fc_id)
+    _load_sort_pref(sb, fc_id)  # session_state.clients_sort_by 초기화
 
     col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
     with col1:
@@ -56,10 +81,15 @@ def _render_list():
         source_filter = st.selectbox("유입경로", ["전체"] + source_options, label_visibility="collapsed")
     with col4:
         sort_by = st.selectbox(
-            "정렬", ["등록일 최신순", "이름순", "등급순", "최근 상담순"],
+            "정렬", _SORT_OPTIONS,
             label_visibility="collapsed",
             key="clients_sort_by",
         )
+
+    # 변경 시 DB에 즉시 저장
+    if sort_by != st.session_state.get("_sort_pref_saved"):
+        _save_sort_pref(sb, fc_id, sort_by)
+        st.session_state._sort_pref_saved = sort_by
 
     with st.expander("상세 필터"):
         col_a, col_b, col_c = st.columns(3)
