@@ -1,35 +1,35 @@
 """FCPilot 통계 대시보드"""
 from datetime import date, timedelta
-
 import streamlit as st
-
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
+
+_GRADE_ORDER = ["VIP", "S", "A", "B", "C", "D"]
+_GRADE_ICON = {"VIP": "🟣", "S": "🟢", "A": "🔴", "B": "🟠", "C": "🔵", "D": "⚫"}
 
 
 def render():
     st.header("통계 대시보드")
-
     fc_id = get_current_user_id()
     if not fc_id:
         st.warning("로그인이 필요합니다.")
         return
 
-    period = st.radio(
-        "기간", ["최근 7일", "최근 30일", "전체"],
-        horizontal=True, label_visibility="collapsed",
-    )
-    since = _period_to_date(period)
+    period = st.radio("기간", ["최근 7일", "최근 30일", "전체"], horizontal=True, label_visibility="collapsed")
+    since = _since(period)
+    days = {"최근 7일": 7, "최근 30일": 30}.get(period)
 
     sb = get_supabase_client()
-    _render_crm_stats(sb, fc_id, since)
+    _render_crm(sb, fc_id, since, days, period)
     st.divider()
-    _render_pioneer_stats(sb, fc_id, since)
+    _render_distribution(sb, fc_id, since)
     st.divider()
-    _render_analysis_stats(sb, fc_id, since)
+    _render_pioneer(sb, fc_id, since)
+    st.divider()
+    _render_analysis(sb, fc_id, since)
 
 
-def _period_to_date(period: str) -> str | None:
+def _since(period: str) -> str | None:
     if period == "최근 7일":
         return str(date.today() - timedelta(days=7))
     if period == "최근 30일":
@@ -37,114 +37,153 @@ def _period_to_date(period: str) -> str | None:
     return None
 
 
-def _render_crm_stats(sb, fc_id: str, since: str | None):
-    """고객/상담 통계"""
+def _q(sb, table: str, fields: str, fc_id: str, since: str | None):
+    q = sb.table(table).select(fields).eq("fc_id", fc_id)
+    return (q.gte("created_at", since) if since else q)
+
+
+def _render_crm(sb, fc_id: str, since, days, period: str):
     st.subheader("고객 관리")
-
     try:
-        q = sb.table("clients").select("id, prospect_grade").eq("fc_id", fc_id)
-        if since:
-            q = q.gte("created_at", since)
-        clients = q.execute().data or []
+        all_clients = sb.table("clients").select("prospect_grade").eq("fc_id", fc_id).execute().data or []
     except Exception:
-        clients = []
-
+        all_clients = []
     try:
-        q = sb.table("contact_logs").select("id, touch_method").eq("fc_id", fc_id)
-        if since:
-            q = q.gte("created_at", since)
-        logs = q.execute().data or []
+        new_cnt = len(_q(sb, "clients", "id", fc_id, since).execute().data or [])
+    except Exception:
+        new_cnt = 0
+    try:
+        logs = _q(sb, "contact_logs", "touch_method", fc_id, since).execute().data or []
     except Exception:
         logs = []
 
+    total_logs = len(logs)
+    if days:
+        contact_str = f"{period}: 총 {total_logs}건 (일 평균 {round(total_logs/days,1)}건)"
+    else:
+        contact_str = f"전체: 총 {total_logs}건"
+
     c1, c2, c3 = st.columns(3)
-    c1.metric("등록 고객", f"{len(clients)}명")
-    c2.metric("상담 기록", f"{len(logs)}건")
-    avg = round(len(logs) / max(len(clients), 1), 1)
-    c3.metric("인당 평균 상담", f"{avg}회")
+    c1.metric("전체 고객", f"{len(all_clients)}명")
+    c2.metric("신규 등록", f"{period} {new_cnt}명" if days else f"전체 {new_cnt}명")
+    c3.metric("상담 기록", contact_str)
 
-    # 등급별 분포
-    if clients:
-        grades = {}
-        for c in clients:
-            g = c.get("prospect_grade", "미지정") or "미지정"
-            grades[g] = grades.get(g, 0) + 1
-        cols = st.columns(len(grades))
-        for i, (grade, count) in enumerate(sorted(grades.items())):
-            cols[i % len(cols)].metric(f"{grade}등급", f"{count}명")
+    # 등급 카드 6개 (전체 기준)
+    grades = {g: 0 for g in _GRADE_ORDER}
+    for c in all_clients:
+        g = c.get("prospect_grade") or "C"
+        if g in grades:
+            grades[g] += 1
+    st.caption("등급 분포 (전체 기준)")
+    cols = st.columns(6)
+    for i, g in enumerate(_GRADE_ORDER):
+        cols[i].metric(f"{_GRADE_ICON.get(g,'')} {g}등급", f"{grades[g]}명")
 
-    # 터치방식별 분포
     if logs:
-        methods = {}
+        methods: dict = {}
         for log in logs:
-            m = log.get("touch_method", "기타") or "기타"
+            m = log.get("touch_method") or "기타"
             methods[m] = methods.get(m, 0) + 1
-        st.caption("터치방식 분포: " + " | ".join(
-            f"{m}: {cnt}건" for m, cnt in sorted(methods.items(), key=lambda x: -x[1])
-        ))
+        st.caption("터치방식: " + " | ".join(f"{m}: {v}건" for m, v in sorted(methods.items(), key=lambda x: -x[1])))
 
 
-def _render_pioneer_stats(sb, fc_id: str, since: str | None):
-    """개척 통계"""
-    st.subheader("개척 영업")
-
+def _render_distribution(sb, fc_id: str, since):
+    st.subheader("고객 분포")
+    view_by = st.selectbox("보기 기준", ["등급별", "유입경로별", "나이대별", "지역별"],
+                           key="stats_dist_by", label_visibility="collapsed")
     try:
-        shops = sb.table("pioneer_shops").select(
-            "id, status"
-        ).eq("fc_id", fc_id).execute().data or []
+        clients = _q(sb, "clients", "prospect_grade,db_source,age_group,address", fc_id, since).execute().data or []
+    except Exception:
+        clients = []
+    if not clients:
+        st.caption("해당 기간 고객 데이터가 없습니다.")
+        return
+
+    if view_by == "등급별":
+        dist = {g: 0 for g in _GRADE_ORDER}
+        for c in clients:
+            g = c.get("prospect_grade") or "C"
+            if g in dist:
+                dist[g] += 1
+        _dist_cards(dist, _GRADE_ORDER, lambda k: f"{_GRADE_ICON.get(k,'')} {k}등급")
+
+    elif view_by == "유입경로별":
+        dist: dict = {}
+        for c in clients:
+            k = c.get("db_source") or "미지정"
+            dist[k] = dist.get(k, 0) + 1
+        _dist_cards(dist, sorted(dist, key=lambda k: -dist[k]), lambda k: k)
+
+    elif view_by == "나이대별":
+        _AGE_ORDER = ["10대", "20대", "30대", "40대", "50대", "60대 이상", "기타"]
+        dist: dict = {}
+        for c in clients:
+            ag = c.get("age_group") or "기타"
+            if ag.startswith("60"):
+                ag = "60대 이상"
+            dist[ag] = dist.get(ag, 0) + 1
+        keys = [k for k in _AGE_ORDER if k in dist] + [k for k in dist if k not in _AGE_ORDER]
+        _dist_cards(dist, keys, lambda k: k)
+
+    elif view_by == "지역별":
+        dist: dict = {}
+        for c in clients:
+            addr = (c.get("address") or "").strip()
+            token = addr.split()[0] if addr else ""
+            region = token if (len(token) >= 2 and token[-1] in "시군구동") else "기타"
+            dist[region] = dist.get(region, 0) + 1
+        _dist_cards(dist, sorted(dist, key=lambda k: -dist[k]), lambda k: k)
+
+
+def _dist_cards(dist: dict, keys: list, label_fn):
+    total = sum(dist.values())
+    items = [(k, dist[k]) for k in keys if k in dist]
+    for row_start in range(0, len(items), 4):
+        row = items[row_start: row_start + 4]
+        cols = st.columns(4)
+        for i, (k, cnt) in enumerate(row):
+            cols[i].metric(label_fn(k), f"{cnt}명", f"{round(cnt/total*100,1)}%" if total else "0%")
+
+
+def _render_pioneer(sb, fc_id: str, since):
+    st.subheader("개척 영업")
+    try:
+        shops = sb.table("pioneer_shops").select("status").eq("fc_id", fc_id).execute().data or []
     except Exception:
         shops = []
-
     try:
-        q = sb.table("pioneer_visits").select("id, result").eq("fc_id", fc_id)
-        if since:
-            q = q.gte("created_at", since)
-        visits = q.execute().data or []
+        visits = _q(sb, "pioneer_visits", "result", fc_id, since).execute().data or []
     except Exception:
         visits = []
 
+    contracted = sum(1 for s in shops if s.get("status") == "contracted")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("등록 매장", f"{len(shops)}곳")
     c2.metric("방문 기록", f"{len(visits)}건")
-
-    contracted = sum(1 for s in shops if s.get("status") == "contracted")
     c3.metric("계약 성사", f"{contracted}곳")
+    c4.metric("계약 전환율", f"{round(contracted/max(len(shops),1)*100,1)}%")
 
-    rate = round(contracted / max(len(shops), 1) * 100, 1)
-    c4.metric("계약 전환율", f"{rate}%")
-
-    # 매장 상태별 분포
     if shops:
-        statuses = {}
         labels = {"active": "등록", "visited": "방문", "contracted": "계약", "rejected": "거절"}
+        statuses: dict = {}
         for s in shops:
-            status = s.get("status", "active")
-            statuses[status] = statuses.get(status, 0) + 1
-        st.caption("매장 현황: " + " | ".join(
-            f"{labels.get(k, k)}: {v}곳" for k, v in statuses.items()
-        ))
+            k = s.get("status", "active")
+            statuses[k] = statuses.get(k, 0) + 1
+        st.caption("매장 현황: " + " | ".join(f"{labels.get(k,k)}: {v}곳" for k, v in statuses.items()))
 
 
-def _render_analysis_stats(sb, fc_id: str, since: str | None):
-    """보장분석 통계"""
+def _render_analysis(sb, fc_id: str, since):
     st.subheader("보장분석")
-
     try:
-        q = sb.table("analysis_records").select("id", count="exact").eq("fc_id", fc_id)
-        if since:
-            q = q.gte("created_at", since)
-        analysis_count = q.execute().count or 0
+        aq = sb.table("analysis_records").select("id", count="exact").eq("fc_id", fc_id)
+        a_cnt = (aq.gte("created_at", since) if since else aq).execute().count or 0
     except Exception:
-        analysis_count = 0
-
+        a_cnt = 0
     try:
-        q = sb.table("yakwan_records").select("id", count="exact").eq("fc_id", fc_id)
-        if since:
-            q = q.gte("created_at", since)
-        yakwan_count = q.execute().count or 0
+        yq = sb.table("yakwan_records").select("id", count="exact").eq("fc_id", fc_id)
+        y_cnt = (yq.gte("created_at", since) if since else yq).execute().count or 0
     except Exception:
-        yakwan_count = 0
-
+        y_cnt = 0
     c1, c2 = st.columns(2)
-    c1.metric("보장분석 실행", f"{analysis_count}건")
-    c2.metric("약관분석 실행", f"{yakwan_count}건")
+    c1.metric("보장분석 실행", f"{a_cnt}건")
+    c2.metric("약관분석 실행", f"{y_cnt}건")
