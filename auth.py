@@ -9,13 +9,11 @@ _COOKIE_REFRESH = "fp_refresh"
 _COOKIE_MAX_AGE = 30 * 24 * 3600  # 30일
 
 
-# ── 쿠키 매니저 ──────────────────────────────────────────
-
-def _get_cm():
-    """CookieManager 싱글턴 (컴포넌트 key 고정)"""
+def _ctrl():
+    """CookieController 인스턴스 (key 고정으로 동일 컴포넌트 재사용)"""
     try:
-        from extra_streamlit_components import CookieManager
-        return CookieManager(key="fcpilot_auth_v1")
+        from streamlit_cookies_controller import CookieController
+        return CookieController(key="fcpilot_cookies")
     except Exception:
         return None
 
@@ -23,18 +21,31 @@ def _get_cm():
 # ── 세션 초기화 ──────────────────────────────────────────
 
 def init_auth():
-    """앱 최상단에서 호출 — 세션 없으면 쿠키에서 복원 시도"""
+    """앱 최상단 호출:
+    1. 로그인 직후 pending 쿠키 저장
+    2. 새로고침 시 쿠키에서 Supabase 세션 복원
+    """
+    # 1. 이미 로그인됨 — pending 쿠키가 있으면 이번 렌더에서 저장
     if st.session_state.get("user"):
-        return  # 이미 로그인됨
+        pending = st.session_state.pop("_pending_cookies", None)
+        if pending:
+            ctrl = _ctrl()
+            if ctrl:
+                try:
+                    ctrl.set(_COOKIE_ACCESS, pending["access"], max_age=_COOKIE_MAX_AGE)
+                    ctrl.set(_COOKIE_REFRESH, pending["refresh"], max_age=_COOKIE_MAX_AGE)
+                except Exception:
+                    pass
+        return
 
-    cm = _get_cm()
-    if cm is None:
+    # 2. 세션 없음 — 쿠키에서 복원 시도
+    ctrl = _ctrl()
+    if ctrl is None:
         return
 
     try:
-        cookies = cm.get_all()
-        access = cookies.get(_COOKIE_ACCESS, "")
-        refresh = cookies.get(_COOKIE_REFRESH, "")
+        access = ctrl.get(_COOKIE_ACCESS)
+        refresh = ctrl.get(_COOKIE_REFRESH)
     except Exception:
         return
 
@@ -48,9 +59,14 @@ def init_auth():
             st.session_state.user = res.user
             st.session_state.session = res.session
             st.session_state.last_activity = time.time()
+            st.rerun()
     except Exception:
         # 토큰 만료 — 쿠키 삭제
-        _clear_cookies(cm)
+        try:
+            ctrl.remove(_COOKIE_ACCESS)
+            ctrl.remove(_COOKIE_REFRESH)
+        except Exception:
+            pass
 
 
 # ── 상태 확인 ─────────────────────────────────────────────
@@ -83,7 +99,6 @@ def check_session_timeout():
     if "last_activity" not in st.session_state:
         st.session_state.last_activity = time.time()
         return
-
     elapsed = time.time() - st.session_state.last_activity
     if elapsed > SESSION_TIMEOUT:
         logout()
@@ -106,7 +121,6 @@ def show_login_page():
             email = st.text_input("이메일")
             password = st.text_input("비밀번호", type="password")
             submitted = st.form_submit_button("로그인", use_container_width=True)
-
             if submitted:
                 if not email or not password:
                     st.error("이메일과 비밀번호를 입력해주세요.")
@@ -120,7 +134,6 @@ def show_login_page():
             new_password_confirm = st.text_input("비밀번호 확인", type="password")
             display_name = st.text_input("이름 (표시용)")
             submitted = st.form_submit_button("회원가입", use_container_width=True)
-
             if submitted:
                 if not new_email or not new_password:
                     st.error("이메일과 비밀번호를 입력해주세요.")
@@ -144,15 +157,13 @@ def _do_login(email: str, password: str):
         st.session_state.session = res.session
         st.session_state.last_activity = time.time()
 
-        # 쿠키에 토큰 저장 (새로고침 후 복원용)
+        # 쿠키를 지금 바로 set()하면 st.rerun() 때문에 JS가 실행 안 됨.
+        # 대신 pending 플래그로 저장 → 다음 렌더(init_auth)에서 설정.
         if res.session:
-            cm = _get_cm()
-            if cm:
-                try:
-                    cm.set(_COOKIE_ACCESS, res.session.access_token, max_age=_COOKIE_MAX_AGE)
-                    cm.set(_COOKIE_REFRESH, res.session.refresh_token, max_age=_COOKIE_MAX_AGE)
-                except Exception:
-                    pass
+            st.session_state._pending_cookies = {
+                "access": res.session.access_token,
+                "refresh": res.session.refresh_token,
+            }
 
         st.rerun()
     except Exception as e:
@@ -190,16 +201,12 @@ def logout():
         sb.auth.sign_out()
     except Exception:
         pass
-    cm = _get_cm()
-    if cm:
-        _clear_cookies(cm)
+    ctrl = _ctrl()
+    if ctrl:
+        try:
+            ctrl.remove(_COOKIE_ACCESS)
+            ctrl.remove(_COOKIE_REFRESH)
+        except Exception:
+            pass
     st.session_state.clear()
     st.rerun()
-
-
-def _clear_cookies(cm):
-    try:
-        cm.delete(_COOKIE_ACCESS)
-        cm.delete(_COOKIE_REFRESH)
-    except Exception:
-        pass
