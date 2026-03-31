@@ -80,6 +80,96 @@ function extractCreateParams(text: string): Record<string, string> {
   return params;
 }
 
+const UPDATE_KEYWORDS = [
+  "변경", "수정", "바꿔", "바꿔줘", "변경해", "변경해줘", "수정해", "수정해줘",
+  "으로 해", "으로 해줘",
+];
+
+const FIELD_PATTERNS: Array<{
+  keywords: string[];
+  field: string;
+  valueExtractor: (text: string) => string | null;
+}> = [
+  {
+    keywords: ["등급"],
+    field: "등급",
+    valueExtractor: (t) => {
+      const m = t.match(/등급\s*([A-Da-d])/i);
+      return m ? m[1].toUpperCase() : null;
+    },
+  },
+  {
+    keywords: ["나이"],
+    field: "나이",
+    valueExtractor: (t) => {
+      const m = t.match(/나이\s*(\d{1,3})\s*(대|세|살)?/) || t.match(/(\d{1,3})\s*(대|세|살)/);
+      return m ? m[1] : null;
+    },
+  },
+  {
+    keywords: ["지역", "주소", "사는곳", "사는 곳"],
+    field: "주소",
+    valueExtractor: (t) => {
+      const m = t.match(/(?:지역|주소|사는\s*곳?)\s*([가-힣]{2,10})/) ||
+        t.match(/([가-힣]{2,10})(?:으?로\s*(?:변경|수정|바꿔))/);
+      return m ? m[1] : null;
+    },
+  },
+  {
+    keywords: ["메모"],
+    field: "메모",
+    valueExtractor: (t) => {
+      const m = t.match(/메모\s*[:：]?\s*(.+?)(?:\s*(?:으?로|변경|수정|바꿔|$))/);
+      return m ? m[1].trim() : null;
+    },
+  },
+  {
+    keywords: ["직업"],
+    field: "직업",
+    valueExtractor: (t) => {
+      const m = t.match(/직업\s*[:：]?\s*([가-힣a-zA-Z]+)/);
+      return m ? m[1] : null;
+    },
+  },
+];
+
+function extractUpdateParams(text: string): Record<string, string> | null {
+  const t = text.replace(/\s+/g, " ").trim();
+
+  // 수정 의도 감지: 키워드 또는 "등급 A" 같은 필드+값 패턴
+  const hasUpdateKeyword = UPDATE_KEYWORDS.some((k) => t.includes(k));
+  const hasFieldValue = FIELD_PATTERNS.some((fp) =>
+    fp.keywords.some((k) => t.includes(k)) && fp.valueExtractor(t) !== null
+  );
+
+  if (!hasUpdateKeyword && !hasFieldValue) return null;
+
+  // 이름 추출 (첫 번째 한글 2~4글자, 필드 키워드가 아닌 것)
+  const fieldKeywords = FIELD_PATTERNS.flatMap((fp) => fp.keywords).concat(UPDATE_KEYWORDS);
+  const nameMatch = t.match(/([가-힣]{2,4})/);
+  if (!nameMatch) return null;
+
+  const name = nameMatch[1];
+  if (fieldKeywords.includes(name)) return null;
+
+  // 필드+값 추출 (복수 필드 지원 → JSON 문자열로 전달)
+  const updates: Array<{ field: string; value: string }> = [];
+  for (const fp of FIELD_PATTERNS) {
+    if (!fp.keywords.some((k) => t.includes(k))) continue;
+    const val = fp.valueExtractor(t);
+    if (val) updates.push({ field: fp.field, value: val });
+  }
+
+  if (updates.length === 0) return null;
+
+  if (updates.length === 1) {
+    return { name, field: updates[0].field, value: updates[0].value };
+  }
+
+  // 복수 필드: updates_json으로 전달
+  return { name, updates_json: JSON.stringify(updates) };
+}
+
 function localMatch(text: string): Intent | null {
   const t = text.replace(/\s+/g, " ").trim();
   const tNoSpace = t.replace(/\s/g, "");
@@ -88,6 +178,13 @@ function localMatch(text: string): Intent | null {
   // 리마인드 — "할일", "오늘 할 일", "오늘할일", "뭐해" 등
   if (REMINDER_KEYWORDS.some((k) => tNoSpace.includes(k.replace(/\s/g, "")))) {
     return { intent: "reminder_list", params: {} };
+  }
+
+  // 고객 수정 — "김영민 등급 B", "김영민 나이 20대로 변경" 등
+  // 등록보다 먼저 체크 (등록 키워드와 겹치지 않는 패턴)
+  const updateMatch = extractUpdateParams(t);
+  if (updateMatch) {
+    return { intent: "customer_update", params: updateMatch };
   }
 
   // 고객 등록 — 로컬에서 직접 파라미터 추출
@@ -143,9 +240,12 @@ customer_create (새 고객 등록):
   "새 고객 홍길동 40대 서울" → {"intent":"customer_create","params":{"name":"홍길동","age":"40","address":"서울"}}
   "이영희 등록해줘 수원 사는 30대" → {"intent":"customer_create","params":{"name":"이영희","age":"30","address":"수원"}}
 
-customer_update (고객 정보 수정):
+customer_update (고객 정보 수정 — 단일 또는 복수 필드):
   "김철수 등급 A로" → {"intent":"customer_update","params":{"name":"김철수","field":"등급","value":"A"}}
+  "김철수 나이 30대" → {"intent":"customer_update","params":{"name":"김철수","field":"나이","value":"30"}}
+  "김철수 지역 수원" → {"intent":"customer_update","params":{"name":"김철수","field":"주소","value":"수원"}}
   "박영수 메모: VIP 고객" → {"intent":"customer_update","params":{"name":"박영수","field":"메모","value":"VIP 고객"}}
+  복수 수정: "김철수 등급 B로 변경하고 나이 20대로 수정" → {"intent":"customer_update","params":{"name":"김철수","updates_json":"[{\"field\":\"등급\",\"value\":\"B\"},{\"field\":\"나이\",\"value\":\"20\"}]"}}
 
 reminder_list (오늘 할 일 조회):
   "오늘 뭐해", "할일", "할 일", "일정", "스케줄", "리마인드" → {"intent":"reminder_list","params":{}}
@@ -238,33 +338,55 @@ async function createCustomer(p: Record<string, string>, fcId: string): Promise<
 }
 
 async function updateCustomer(p: Record<string, string>): Promise<string> {
-  if (!p.name || !p.field || !p.value) return "❌ 이름, 항목, 값이 필요합니다.";
+  if (!p.name) return "❌ 고객 이름이 필요합니다.";
 
   const fieldMap: Record<string, string> = {
     등급: "prospect_grade",
     메모: "memo",
     주소: "address",
+    지역: "address",
     나이: "age",
     직업: "occupation",
   };
-  const dbField = fieldMap[p.field] || p.field;
 
   const { data: clients } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, name")
     .ilike("name", `%${p.name}%`)
     .limit(1);
 
   if (!clients?.length) return `🔍 "${p.name}" 고객을 찾을 수 없습니다.`;
 
-  const val = dbField === "age" ? parseInt(p.value) : p.value;
+  const clientName = clients[0].name;
+  const clientId = clients[0].id;
+
+  // 복수 필드 수정
+  let updates: Array<{ field: string; value: string }>;
+  if (p.updates_json) {
+    updates = JSON.parse(p.updates_json);
+  } else if (p.field && p.value) {
+    updates = [{ field: p.field, value: p.value }];
+  } else {
+    return "❌ 수정할 항목과 값이 필요합니다.";
+  }
+
+  const updateData: Record<string, unknown> = {};
+  const changeLog: string[] = [];
+
+  for (const u of updates) {
+    const dbField = fieldMap[u.field] || u.field;
+    const val = dbField === "age" ? parseInt(u.value) : u.value;
+    updateData[dbField] = val;
+    changeLog.push(`${u.field} → "${u.value}"`);
+  }
+
   const { error } = await supabase
     .from("clients")
-    .update({ [dbField]: val })
-    .eq("id", clients[0].id);
+    .update(updateData)
+    .eq("id", clientId);
 
   if (error) return `❌ 수정 실패: ${error.message}`;
-  return `✅ *${p.name}*의 ${p.field} → "${p.value}" 변경 완료`;
+  return `✅ *${clientName}* 수정 완료\n${changeLog.map((c) => `  • ${c}`).join("\n")}`;
 }
 
 async function listReminders(): Promise<string> {
