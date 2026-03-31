@@ -29,13 +29,15 @@ def _render_list():
     sb = get_supabase_client()
     fc_id = get_current_user_id()
 
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
     with col1:
         search = st.text_input("검색 (이름)", placeholder="이름으로 검색", label_visibility="collapsed")
     with col2:
         grade_filter = st.selectbox("등급", ["전체", "VIP", "S", "A", "B", "C", "D"], label_visibility="collapsed")
     with col3:
         source_filter = st.selectbox("유입경로", ["전체"] + DB_SOURCE_OPTIONS, label_visibility="collapsed")
+    with col4:
+        sort_by = st.selectbox("정렬", ["등록일 최신순", "이름순", "등급순", "최근 상담순"], label_visibility="collapsed")
 
     with st.expander("상세 필터"):
         col_a, col_b, col_c = st.columns(3)
@@ -45,7 +47,6 @@ def _render_list():
             region_filter = st.text_input("지역", placeholder="예: 수원")
         with col_c:
             contact_filter = st.selectbox("상담 기록", ["전체", "있음", "없음"])
-        sort_by = st.selectbox("정렬", ["등록일 최신순", "이름순", "등급순", "최근 상담순"])
 
     if st.button("고객 등록", use_container_width=True, type="primary"):
         st.session_state.clients_view = "new"
