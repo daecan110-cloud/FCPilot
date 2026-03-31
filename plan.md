@@ -100,9 +100,33 @@
 
 ---
 
-# Sprint 5 계획 (Phase 5: 배포 + QA)
+# Sprint 5 (Phase 5: 텔레그램 AI 어시스턴트) — 진행 중
 
 ## 목표
-- Streamlit Cloud 배포
-- 전체 QA + 보안 체크리스트
-- 텔레그램 양방향 통합 테스트
+텔레그램으로 FCPilot 주요 기능을 24시간 사용 가능하게 만든다.
+
+## 아키텍처
+```
+영민 텔레그램 → Webhook → Supabase Edge Function
+  ├── 고객 조회/등록 → Supabase DB + Gemini
+  ├── 리마인드 응답 → Supabase DB
+  └── Claude Code 제어 → command_queue → 로컬 폴링
+```
+
+## 작업 순서
+- [ ] 1. command_queue 테이블 생성
+- [ ] 2. Supabase CLI + Edge Function 프로젝트 초기화
+- [ ] 3. telegram-bot Edge Function (webhook + Gemini 연동)
+  - [ ] customer.ts — 고객 조회/등록
+  - [ ] reminder.ts — 리마인드 응답
+  - [ ] command.ts — Claude Code 제어 큐
+- [ ] 4. 텔레그램 webhook 설정
+- [ ] 5. daily-reminder Edge Function (cron 매일 9시)
+- [ ] 6. scripts/command_poller.py (로컬 폴링)
+- [ ] 7. 전체 테스트 + 텔레그램 보고
+
+## 완료 기준
+- "김철수 고객 정보" → 고객 정보 반환
+- "오늘 할 일" → 리마인드 목록 반환
+- 매일 아침 9시 자동 리마인드 수신
+- "테스트해줘" → Claude Code 실행 → 결과 보고

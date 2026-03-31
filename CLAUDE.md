@@ -8,6 +8,7 @@ FCPilot = 보험 FC 업무 통합 플랫폼 (보장분석 + CRM + 개척영업 +
 - Frontend: Streamlit
 - Backend: Supabase (project: ghglnszzjuuvrrwpvhhb) — FCPilot 전용
 - AI: Claude API (Sonnet) — 보장분석, 약관, OCR, 어시스턴트
+- AI: Gemini API — 텔레그램 봇 자연어 처리
 - 지도: folium + Naver Maps API (Search Local + Geocoding)
 - 엑셀: openpyxl
 - 알림: Telegram Bot API
@@ -32,6 +33,9 @@ pages/              → 각 탭 UI. 비즈니스 로직은 services/로 분리.
 services/           → 핵심 로직. 각 파일 200줄 이내.
 utils/              → 공통 유틸.
 templates/          → 엑셀 템플릿 등 정적 파일.
+tests/              → 자동 테스트 스크립트.
+scripts/            → 로컬 실행 스크립트 (command_poller 등).
+supabase/functions/ → Edge Function (TypeScript/Deno).
 ```
 
 ## 세션 시작 시
@@ -91,6 +95,7 @@ send_message('✅ 커밋: 메시지 내용')
 | pioneer_visits | 개척 방문 기록 (동선) |
 | analysis_records | 보장분석 기록 |
 | yakwan_records | 약관 분석 기록 |
+| command_queue | 텔레그램 명령 큐 (Claude Code 제어) |
 
 ## 보안 규칙 (절대 위반 금지 — SECURITY.md 참조)
 
