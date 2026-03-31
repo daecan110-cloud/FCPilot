@@ -115,7 +115,7 @@ def _render_today():
                 _regeocode_missing(sb, fc_id)
 
         m = create_route_map(visits_for_map)
-        st_folium(m, width=700, height=400)
+        st_folium(m, width=700, height=400, key="route_map_today")
 
         for v in visits_for_map:
             result_text = VISIT_RESULT_LABELS.get(v["result"], "")
@@ -173,7 +173,7 @@ def _render_history():
                 _regeocode_missing(sb, fc_id)
 
     m = create_route_map(visits_for_map)
-    st_folium(m, width=700, height=400)
+    st_folium(m, width=700, height=400, key="route_map_hist")
 
     for v in visits_for_map:
         result_text = VISIT_RESULT_LABELS.get(v["result"], "")

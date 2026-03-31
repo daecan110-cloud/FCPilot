@@ -53,7 +53,7 @@ def _render_map():
     center_shop = next((s for s in filtered if s["id"] == selected_id), None)
 
     m = create_map(filtered, center_shop=center_shop)
-    st_folium(m, width=700, height=500)
+    st_folium(m, width=700, height=500, key="pioneer_map")
 
     # 매장 목록 — 클릭 시 지도 포커스
     for s in filtered:
