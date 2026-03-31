@@ -6,9 +6,10 @@ CLAUDE.md 규칙: 정확히 3가지만 알림
 - ⚠️ Opus 전환 필요
 """
 import requests
+import streamlit as st
 
-BOT_TOKEN = "8415171186:AAFks4TDdB4MSRapeMnE5CnXm6QC26r6BXs"
-CHAT_ID = "8201988543"
+BOT_TOKEN = st.secrets["telegram"]["bot_token"]
+CHAT_ID = st.secrets["telegram"]["chat_id"]
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 
