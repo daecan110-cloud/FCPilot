@@ -5,7 +5,23 @@ from utils.supabase_client import get_supabase_client
 from services.crypto import encrypt_phone, decrypt_phone, hash_phone_last4
 
 TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
-DB_SOURCE_OPTIONS = ["DB고객", "개인(지인)", "개척", "소개", "기타"]
+DEFAULT_SOURCE_OPTIONS = ["DB고객", "개인(지인)", "개척", "소개", "기타"]
+
+
+def _get_source_categories(sb, fc_id: str) -> list:
+    """유입경로 카테고리 — DB 설정 우선, 없으면 기본값"""
+    cache_key = f"source_cats_{fc_id}"
+    if cache_key in st.session_state:
+        return st.session_state[cache_key]
+    try:
+        res = sb.table("users_settings").select("source_categories").eq("id", fc_id).execute()
+        if res.data and res.data[0].get("source_categories"):
+            cats = res.data[0]["source_categories"]
+            st.session_state[cache_key] = cats
+            return cats
+    except Exception:
+        pass
+    return DEFAULT_SOURCE_OPTIONS
 
 
 def render():
@@ -29,15 +45,21 @@ def _render_list():
     sb = get_supabase_client()
     fc_id = get_current_user_id()
 
+    source_options = _get_source_categories(sb, fc_id)
+
     col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
     with col1:
         search = st.text_input("검색 (이름)", placeholder="이름으로 검색", label_visibility="collapsed")
     with col2:
         grade_filter = st.selectbox("등급", ["전체", "VIP", "S", "A", "B", "C", "D"], label_visibility="collapsed")
     with col3:
-        source_filter = st.selectbox("유입경로", ["전체"] + DB_SOURCE_OPTIONS, label_visibility="collapsed")
+        source_filter = st.selectbox("유입경로", ["전체"] + source_options, label_visibility="collapsed")
     with col4:
-        sort_by = st.selectbox("정렬", ["등록일 최신순", "이름순", "등급순", "최근 상담순"], label_visibility="collapsed")
+        sort_by = st.selectbox(
+            "정렬", ["등록일 최신순", "이름순", "등급순", "최근 상담순"],
+            label_visibility="collapsed",
+            key="clients_sort_by",
+        )
 
     with st.expander("상세 필터"):
         col_a, col_b, col_c = st.columns(3)
@@ -295,6 +317,8 @@ def _render_new_contact(sb, client_id: str):
 
 def _render_form(edit=False):
     sb = get_supabase_client()
+    fc_id = get_current_user_id()
+    source_options = _get_source_categories(sb, fc_id)
 
     if st.button("← 목록으로"):
         st.session_state.clients_view = "list"
@@ -339,8 +363,8 @@ def _render_form(edit=False):
                 ),
             )
             current_source = client.get("db_source", "")
-            source_idx = DB_SOURCE_OPTIONS.index(current_source) if current_source in DB_SOURCE_OPTIONS else 0
-            db_source = st.selectbox("유입경로", DB_SOURCE_OPTIONS, index=source_idx)
+            source_idx = source_options.index(current_source) if current_source in source_options else 0
+            db_source = st.selectbox("유입경로", source_options, index=source_idx)
         occupation = st.text_input("직업", value=client.get("occupation", ""))
         address = st.text_input("주소", value=client.get("address", ""))
         memo = st.text_area("메모", value=client.get("memo", ""))

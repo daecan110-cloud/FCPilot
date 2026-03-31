@@ -34,6 +34,11 @@ def render():
 
     st.divider()
 
+    # 유입경로 카테고리 관리
+    _render_source_categories(sb, user_id)
+
+    st.divider()
+
     # 데이터 관리 (UX-05: CSV 가져오기/내보내기)
     with st.expander("데이터 관리"):
         st.caption("고객 데이터를 CSV로 가져오거나 내보낼 수 있습니다.")
@@ -97,6 +102,58 @@ def _render_admin_section(sb):
                 st.text(f"{t}: {res.count}건")
         except Exception as e:
             st.error(f"통계 조회 실패: {e}")
+
+
+_DEFAULT_CATEGORIES = ["DB고객", "개인(지인)", "개척", "소개", "기타"]
+
+
+def _render_source_categories(sb, user_id: str):
+    """유입경로 카테고리 관리"""
+    st.subheader("유입경로 카테고리")
+    st.caption("고객 등록·수정 시 표시되는 유입경로 항목을 관리합니다.")
+
+    try:
+        res = sb.table("users_settings").select("source_categories").eq("id", user_id).execute()
+        cats = (res.data[0].get("source_categories") if res.data else None) or _DEFAULT_CATEGORIES
+    except Exception:
+        cats = _DEFAULT_CATEGORIES
+
+    # 현재 목록 + 삭제 버튼
+    for i, cat in enumerate(cats):
+        col1, col2 = st.columns([5, 1])
+        col1.text(cat)
+        if col2.button("삭제", key=f"del_cat_{i}"):
+            new_cats = [c for j, c in enumerate(cats) if j != i]
+            _save_categories(sb, user_id, new_cats)
+            st.rerun()
+
+    # 새 카테고리 추가
+    with st.form("add_category_form"):
+        new_cat = st.text_input("새 카테고리 추가", placeholder="예: 온라인DB, 법인, 세미나")
+        if st.form_submit_button("추가"):
+            stripped = new_cat.strip()
+            if stripped and stripped not in cats:
+                _save_categories(sb, user_id, cats + [stripped])
+                st.rerun()
+            elif stripped in cats:
+                st.warning("이미 존재하는 카테고리입니다.")
+
+    # 기본값 복원
+    if st.button("기본값으로 초기화"):
+        _save_categories(sb, user_id, _DEFAULT_CATEGORIES)
+        st.rerun()
+
+
+def _save_categories(sb, user_id: str, categories: list):
+    try:
+        sb.table("users_settings").upsert({
+            "id": user_id,
+            "source_categories": categories,
+        }).execute()
+        st.session_state.pop(f"source_cats_{user_id}", None)  # 캐시 무효화
+        st.success("저장됨")
+    except Exception as e:
+        st.error(f"저장 실패: {e}")
 
 
 def _load_settings(sb, user_id: str) -> dict:
