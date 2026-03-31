@@ -71,28 +71,38 @@ _DEFAULT_CATEGORIES = ["DB고객", "개인(지인)", "개척", "소개", "기타
 
 
 def _render_source_categories(sb, user_id: str):
-    """유입경로 카테고리 관리"""
+    """유입경로 카테고리 관리 — 순서 변경 가능, 고객관리 필터 자동 연동"""
     import pandas as pd
     st.subheader("유입경로 카테고리")
-    st.caption("셀 직접 수정 · + 버튼으로 추가 · 행 선택 후 Delete로 삭제 → 저장 버튼 필수")
+    st.caption("순서 숫자를 바꾸면 필터 순서도 변경 · 저장하면 고객관리 필터에 즉시 반영")
 
     try:
         res = sb.table("users_settings").select("source_categories").eq("id", user_id).execute()
-        cats = (res.data[0].get("source_categories") if res.data else None) or _DEFAULT_CATEGORIES
+        cats = (res.data[0].get("source_categories") if res.data else None) or list(_DEFAULT_CATEGORIES)
     except Exception:
         cats = list(_DEFAULT_CATEGORIES)
 
-    df = pd.DataFrame({"유입경로": cats})
+    df = pd.DataFrame({
+        "순서": list(range(1, len(cats) + 1)),
+        "유입경로": cats,
+    })
     edited = st.data_editor(
         df, num_rows="dynamic", use_container_width=True,
         hide_index=True, key="source_cat_editor",
-        column_config={"유입경로": st.column_config.TextColumn("유입경로", width="large")},
+        column_config={
+            "순서": st.column_config.NumberColumn("순서", min_value=1, step=1, width="small"),
+            "유입경로": st.column_config.TextColumn("유입경로", width="large"),
+        },
     )
 
     col1, col2 = st.columns(2)
     if col1.button("저장", type="primary", use_container_width=True):
-        new_cats = [v for v in edited["유입경로"].tolist() if v and str(v).strip()]
-        _save_categories(sb, user_id, new_cats)
+        # 순서 기준 정렬 후 저장
+        valid = edited.dropna(subset=["유입경로"])
+        valid = valid[valid["유입경로"].str.strip() != ""]
+        sorted_cats = valid.sort_values("순서")["유입경로"].str.strip().tolist()
+        _save_categories(sb, user_id, sorted_cats)
+        st.rerun()
     if col2.button("기본값 초기화", use_container_width=True):
         _save_categories(sb, user_id, list(_DEFAULT_CATEGORIES))
         st.rerun()
@@ -104,8 +114,8 @@ def _save_categories(sb, user_id: str, categories: list):
             "id": user_id,
             "source_categories": categories,
         }).execute()
-        st.session_state.pop(f"source_cats_{user_id}", None)  # 캐시 무효화
-        st.success("저장됨")
+        st.session_state.pop(f"source_cats_{user_id}", None)  # 고객관리 필터 캐시 무효화
+        st.success("저장됨 — 고객관리 필터에 즉시 반영됩니다.")
     except Exception as e:
         st.error(f"저장 실패: {e}")
 
