@@ -321,10 +321,11 @@ def _render_form(edit=False):
         col1, col2 = st.columns(2)
         with col1:
             age_group = st.text_input("나이대", value=client.get("age_group", ""), placeholder="예: 30대, 40대")
+            gender_val = client.get("gender") or None
             gender = st.selectbox(
                 "성별", [None, "M", "F"],
                 format_func=lambda x: {"M": "남", "F": "여", None: "선택"}[x],
-                index=[None, "M", "F"].index(client.get("gender")),
+                index=[None, "M", "F"].index(gender_val if gender_val in ("M", "F") else None),
             )
         with col2:
             grade = st.selectbox(
