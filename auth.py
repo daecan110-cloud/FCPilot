@@ -1,40 +1,70 @@
-"""FCPilot 인증 모듈 — Supabase Auth"""
+"""FCPilot 인증 모듈 — Supabase Auth + 쿠키 기반 세션 유지"""
 import time
 import streamlit as st
 from utils.supabase_client import get_supabase_client
 from config import SESSION_TIMEOUT
 
+_COOKIE_ACCESS = "fp_access"
+_COOKIE_REFRESH = "fp_refresh"
+_COOKIE_MAX_AGE = 30 * 24 * 3600  # 30일
 
-def check_session_timeout():
-    """60분 무활동 시 자동 로그아웃"""
-    if "last_activity" not in st.session_state:
-        st.session_state.last_activity = time.time()
+
+# ── 쿠키 매니저 ──────────────────────────────────────────
+
+def _get_cm():
+    """CookieManager 싱글턴 (컴포넌트 key 고정)"""
+    try:
+        from extra_streamlit_components import CookieManager
+        return CookieManager(key="fcpilot_auth_v1")
+    except Exception:
+        return None
+
+
+# ── 세션 초기화 ──────────────────────────────────────────
+
+def init_auth():
+    """앱 최상단에서 호출 — 세션 없으면 쿠키에서 복원 시도"""
+    if st.session_state.get("user"):
+        return  # 이미 로그인됨
+
+    cm = _get_cm()
+    if cm is None:
         return
 
-    elapsed = time.time() - st.session_state.last_activity
-    if elapsed > SESSION_TIMEOUT:
-        st.session_state.clear()
-        st.warning("60분 동안 활동이 없어 자동 로그아웃되었습니다.")
-        st.rerun()
-    else:
-        st.session_state.last_activity = time.time()
+    try:
+        cookies = cm.get_all()
+        access = cookies.get(_COOKIE_ACCESS, "")
+        refresh = cookies.get(_COOKIE_REFRESH, "")
+    except Exception:
+        return
 
+    if not access or not refresh:
+        return
+
+    try:
+        sb = get_supabase_client()
+        res = sb.auth.set_session(access, refresh)
+        if res and res.user:
+            st.session_state.user = res.user
+            st.session_state.session = res.session
+            st.session_state.last_activity = time.time()
+    except Exception:
+        # 토큰 만료 — 쿠키 삭제
+        _clear_cookies(cm)
+
+
+# ── 상태 확인 ─────────────────────────────────────────────
 
 def is_logged_in() -> bool:
-    """로그인 상태 확인"""
     return st.session_state.get("user") is not None
 
 
 def get_current_user_id() -> str:
-    """현재 로그인 사용자 ID"""
     user = st.session_state.get("user")
-    if user:
-        return user.id
-    return ""
+    return user.id if user else ""
 
 
 def is_admin() -> bool:
-    """현재 사용자가 admin 역할인지 확인"""
     user_id = get_current_user_id()
     if not user_id:
         return False
@@ -48,8 +78,24 @@ def is_admin() -> bool:
     return False
 
 
+def check_session_timeout():
+    """60분 무활동 시 자동 로그아웃"""
+    if "last_activity" not in st.session_state:
+        st.session_state.last_activity = time.time()
+        return
+
+    elapsed = time.time() - st.session_state.last_activity
+    if elapsed > SESSION_TIMEOUT:
+        logout()
+        st.warning("60분 동안 활동이 없어 자동 로그아웃되었습니다.")
+        st.rerun()
+    else:
+        st.session_state.last_activity = time.time()
+
+
+# ── 로그인 UI ─────────────────────────────────────────────
+
 def show_login_page():
-    """로그인/회원가입 UI"""
     st.title("🛡️ FCPilot")
     st.caption("보험 FC 업무 통합 플랫폼")
 
@@ -88,17 +134,26 @@ def show_login_page():
                 _do_signup(new_email, new_password, display_name)
 
 
+# ── 로그인 / 로그아웃 처리 ────────────────────────────────
+
 def _do_login(email: str, password: str):
-    """로그인 처리"""
     try:
         sb = get_supabase_client()
-        res = sb.auth.sign_in_with_password({
-            "email": email,
-            "password": password,
-        })
+        res = sb.auth.sign_in_with_password({"email": email, "password": password})
         st.session_state.user = res.user
         st.session_state.session = res.session
         st.session_state.last_activity = time.time()
+
+        # 쿠키에 토큰 저장 (새로고침 후 복원용)
+        if res.session:
+            cm = _get_cm()
+            if cm:
+                try:
+                    cm.set(_COOKIE_ACCESS, res.session.access_token, max_age=_COOKIE_MAX_AGE)
+                    cm.set(_COOKIE_REFRESH, res.session.refresh_token, max_age=_COOKIE_MAX_AGE)
+                except Exception:
+                    pass
+
         st.rerun()
     except Exception as e:
         msg = str(e)
@@ -109,7 +164,6 @@ def _do_login(email: str, password: str):
 
 
 def _do_signup(email: str, password: str, display_name: str):
-    """회원가입 처리"""
     try:
         sb = get_supabase_client()
         res = sb.auth.sign_up({
@@ -118,7 +172,6 @@ def _do_signup(email: str, password: str, display_name: str):
             "options": {"data": {"display_name": display_name}},
         })
         if res.user:
-            # fp_users_settings는 DB 트리거가 자동 생성
             st.success("회원가입 완료! 이메일 인증 후 로그인해주세요.")
         else:
             st.warning("회원가입 요청이 전송되었습니다. 이메일을 확인해주세요.")
@@ -131,11 +184,22 @@ def _do_signup(email: str, password: str, display_name: str):
 
 
 def logout():
-    """로그아웃"""
+    """로그아웃 — Supabase 세션 + 쿠키 삭제"""
     try:
         sb = get_supabase_client()
         sb.auth.sign_out()
     except Exception:
         pass
+    cm = _get_cm()
+    if cm:
+        _clear_cookies(cm)
     st.session_state.clear()
     st.rerun()
+
+
+def _clear_cookies(cm):
+    try:
+        cm.delete(_COOKIE_ACCESS)
+        cm.delete(_COOKIE_REFRESH)
+    except Exception:
+        pass

@@ -1,7 +1,7 @@
 """FCPilot — 메인 라우터 (로직 넣지 말 것)"""
 import streamlit as st
 from config import PAGE_CONFIG
-from auth import is_logged_in, show_login_page, logout, check_session_timeout
+from auth import init_auth, is_logged_in, show_login_page, logout, check_session_timeout
 
 st.set_page_config(**PAGE_CONFIG)
 
@@ -15,6 +15,8 @@ footer {visibility: hidden;}
 
 
 def main():
+    init_auth()  # 새로고침 시 쿠키에서 세션 복원
+
     if not is_logged_in():
         show_login_page()
         return
