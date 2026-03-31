@@ -33,7 +33,17 @@
 - 200줄 초과 파일 7개: 향후 Sprint에서 분리 예정
 - Streamlit Cloud 배포 미완료 (영민 수동 작업 필요)
 
-## 영민 수동 작업 대기
-- [ ] Streamlit Cloud 배포 — share.streamlit.io (daecan110@gmail.com-cloud)
+## 다음 Sprint (Sprint 8)
+
+**시작 조건**: 영민이 구글시트 CSV + 컬럼 샘플 공유 후 시작
+
+### Phase 순서
+1. CSV 마이그레이션 (fp_clients 이관)
+2. 로컬 통합 테스트 (전체 기능 플로우)
+3. Streamlit Cloud 배포 (영민 수동)
+4. 실사용 + 피드백 수집 (1~2주)
+
+## 영민 선행 작업 (Sprint 8 전)
+- [ ] 구글시트 CSV 다운로드 + 컬럼 샘플 Claude Code에 공유
 - [ ] Admin 권한 부여 — Supabase SQL: `UPDATE users_settings SET role = 'admin' WHERE id = '본인_id';`
 - [ ] Daily Reminder cron — Supabase Dashboard → pg_cron + pg_net 활성화
