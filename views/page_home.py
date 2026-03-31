@@ -141,7 +141,8 @@ def _render_add_reminder_form(fc_id: str):
         if st.form_submit_button("등록", type="primary", use_container_width=True):
             pids = [prod_map[n] for n in sel_prods if n in prod_map] or None
             if create_reminder(fc_id, client_id, str(r_date), r_purpose, pids, r_memo):
-                st.success(f"{client_label} 리마인드 등록 완료")
+                st.session_state.pop("home_remind_search", None)
+                st.session_state.pop("home_remind_client", None)
                 st.rerun()
             else:
                 st.error("등록 실패")
