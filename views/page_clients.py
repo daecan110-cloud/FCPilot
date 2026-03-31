@@ -341,7 +341,7 @@ def _render_new_contact(sb, client_id: str):
     prod_map = {p["name"]: p["id"] for p in products}
 
     with st.form("new_contact"):
-        touch_method = st.selectbox("방식", TOUCH_OPTIONS)
+        touch_method = st.selectbox("연락 방식", TOUCH_OPTIONS)
         memo = st.text_area("상담 내용", placeholder="상담 내용을 입력하세요")
         if products:
             selected_prods = st.multiselect("제안 상품 (복수 선택 가능)", list(prod_map.keys()))

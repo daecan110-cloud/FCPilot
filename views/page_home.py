@@ -7,6 +7,7 @@ from auth import get_current_user_id
 from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes, create_reminder
 from services.remind_trigger import check_and_send_daily_reminder
 from utils.supabase_client import get_supabase_client
+from utils.calendar_render import render_monthly_calendar
 
 
 def render():
@@ -21,9 +22,7 @@ def render():
     check_and_send_daily_reminder()
 
     buckets = get_bucketed(fc_id)
-    overdue = buckets["overdue"]
-    today = buckets["today"]
-    this_week = buckets["this_week"]
+    overdue, today, this_week = buckets["overdue"], buckets["today"], buckets["this_week"]
 
     # 요약 메트릭
     c1, c2, c3, c4 = st.columns(4)
@@ -31,6 +30,9 @@ def render():
     c2.metric("지연", f"{len(overdue)}건", delta=f"-{len(overdue)}" if overdue else None, delta_color="inverse")
     c3.metric("이번 주", f"{len(this_week)}건")
     c4.metric("전체 대기", f"{len(overdue)+len(today)+len(this_week)}건")
+
+    with st.expander("📅 이번달 일정"):
+        render_monthly_calendar(fc_id)
 
     # 리마인드 추가
     with st.expander("➕ 리마인드 추가"):
@@ -48,7 +50,7 @@ def render():
     for r in today:
         _render_reminder_card(r, "today")
     if not today:
-        st.success("오늘 예정된 리마인드가 없습니다.")
+        st.info("오늘 예정된 리마인드가 없습니다.")
 
     st.divider()
     st.subheader(f"🔵 이번 주 ({len(this_week)}건)")
