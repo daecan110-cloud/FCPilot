@@ -4,7 +4,6 @@ from datetime import date
 import streamlit as st
 
 from auth import get_current_user_id
-from services.reminder import get_all_reminders
 from utils.telegram import notify_reminder
 
 
@@ -21,25 +20,18 @@ def check_and_send_daily_reminder():
     if not fc_id:
         return
 
-    reminders = get_all_reminders(fc_id)
-    if reminders["total"] == 0:
+    # fp_reminders: 지연 + 오늘 예정
+    from services.fp_reminder_service import get_bucketed
+    buckets = get_bucketed(fc_id)
+    due_reminders = buckets["overdue"] + buckets["today"]
+
+    # 개척 팔로업: 기한 초과 매장
+    from services.followup import get_followup_list
+    pioneers = [f for f in get_followup_list(fc_id) if f.get("overdue")]
+
+    if not due_reminders and not pioneers:
         st.session_state.remind_sent_date = today
         return
 
-    # 텔레그램 알림 구성
-    items = []
-    for c in reminders["contacts"]:
-        items.append({
-            "client_name": c.get("client_name", ""),
-            "action": c.get("next_action", "상담 예정"),
-            "overdue": c.get("overdue", False),
-        })
-    for p in reminders["pioneers"]:
-        items.append({
-            "shop_name": p.get("shop_name", ""),
-            "action": p.get("action", "팔로업"),
-            "overdue": p.get("overdue", False),
-        })
-
-    notify_reminder(items)
+    notify_reminder(due_reminders, pioneers)
     st.session_state.remind_sent_date = today
