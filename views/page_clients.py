@@ -291,6 +291,15 @@ def _render_contact_logs(sb, client_id: str):
         label = f"{date_str} | {method}"
         with st.expander(label, expanded=(i == 0)):
             st.write(log.get("memo", ""))
+            if log.get("proposed_product_ids"):
+                try:
+                    from views.page_settings_products import get_active_products
+                    fc_id = get_current_user_id()
+                    all_prods = {p["id"]: p["name"] for p in get_active_products(sb, fc_id)}
+                    names = [all_prods.get(pid, pid[:8]) for pid in log["proposed_product_ids"]]
+                    st.caption(f"제안 상품: {', '.join(names)}")
+                except Exception:
+                    pass
             if log.get("next_action"):
                 st.caption(f"다음 할 일: {log['next_action']}")
             if log.get("next_date"):
@@ -318,9 +327,24 @@ def _render_contact_logs(sb, client_id: str):
 
 def _render_new_contact(sb, client_id: str):
     st.subheader("상담 기록 추가")
+    fc_id = get_current_user_id()
+
+    # 제안 상품 목록 로드
+    try:
+        from views.page_settings_products import get_active_products
+        products = get_active_products(sb, fc_id)
+    except Exception:
+        products = []
+    prod_map = {p["name"]: p["id"] for p in products}
+
     with st.form("new_contact"):
         touch_method = st.selectbox("방식", TOUCH_OPTIONS)
         memo = st.text_area("상담 내용", placeholder="상담 내용을 입력하세요")
+        if products:
+            selected_prods = st.multiselect("제안 상품 (복수 선택 가능)", list(prod_map.keys()))
+        else:
+            selected_prods = []
+            st.caption("등록된 상품이 없습니다. 설정 > 상품 관리에서 추가하세요.")
         next_action = st.text_input("다음 할 일", placeholder="선택 사항")
         next_date = st.date_input("예정일", value=None)
 
@@ -329,11 +353,13 @@ def _render_new_contact(sb, client_id: str):
                 st.error("상담 내용을 입력해주세요.")
             else:
                 try:
+                    prod_ids = [prod_map[n] for n in selected_prods if n in prod_map] or None
                     sb.table("contact_logs").insert({
-                        "fc_id": get_current_user_id(),
+                        "fc_id": fc_id,
                         "client_id": client_id,
                         "touch_method": touch_method,
                         "memo": memo,
+                        "proposed_product_ids": prod_ids,
                         "next_action": next_action,
                         "next_date": str(next_date) if next_date else None,
                     }).execute()

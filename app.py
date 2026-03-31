@@ -1,7 +1,7 @@
 """FCPilot — 메인 라우터 (로직 넣지 말 것)"""
 import streamlit as st
 from config import PAGE_CONFIG
-from auth import init_auth, is_logged_in, show_login_page, logout, check_session_timeout
+from auth import init_auth, is_logged_in, show_login_page, logout, check_session_timeout, get_user_status
 
 st.set_page_config(**PAGE_CONFIG)
 
@@ -19,6 +19,19 @@ def main():
 
     if not is_logged_in():
         show_login_page()
+        return
+
+    # 승인 상태 체크
+    status = get_user_status()
+    if status == "pending":
+        st.warning("회원가입 승인 대기 중입니다. 관리자 승인 후 이용 가능합니다.")
+        if st.button("로그아웃"):
+            logout()
+        return
+    if status == "rejected":
+        st.error("회원가입이 거절되었습니다. 관리자에게 문의해주세요.")
+        if st.button("로그아웃"):
+            logout()
         return
 
     check_session_timeout()

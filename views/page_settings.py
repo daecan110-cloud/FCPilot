@@ -63,51 +63,8 @@ def render():
 
     # Admin 전용 섹션
     if is_admin():
-        _render_admin_section(sb)
-
-
-def _render_admin_section(sb):
-    """Admin 전용 — DB 관리 / 시스템 설정"""
-    st.divider()
-    st.subheader("🔧 Admin 관리")
-
-    with st.expander("사용자 역할 관리"):
-        try:
-            res = sb.table("users_settings").select("id, display_name, role").execute()
-            users = res.data or []
-            for u in users:
-                col1, col2, col3 = st.columns([3, 2, 2])
-                with col1:
-                    st.text(u.get("display_name") or u["id"][:8])
-                with col2:
-                    st.text(u.get("role", "user"))
-                with col3:
-                    new_role = st.selectbox(
-                        "역할",
-                        ["user", "admin"],
-                        index=0 if u.get("role") != "admin" else 1,
-                        key=f"role_{u['id']}",
-                        label_visibility="collapsed",
-                    )
-                if st.button("변경", key=f"btn_{u['id']}"):
-                    try:
-                        sb.table("users_settings").update({"role": new_role}).eq("id", u["id"]).execute()
-                        st.success("역할 변경 완료")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"변경 실패: {e}")
-        except Exception as e:
-            st.error(f"사용자 조회 실패: {e}")
-
-    with st.expander("DB 통계"):
-        try:
-            tables = ["clients", "contact_logs", "pioneer_shops", "pioneer_visits",
-                      "analysis_records", "yakwan_records", "command_queue"]
-            for t in tables:
-                res = sb.table(t).select("id", count="exact").execute()
-                st.text(f"{t}: {res.count}건")
-        except Exception as e:
-            st.error(f"통계 조회 실패: {e}")
+        from views.page_settings_admin import render_admin_section
+        render_admin_section(sb)
 
 
 _DEFAULT_CATEGORIES = ["DB고객", "개인(지인)", "개척", "소개", "기타"]

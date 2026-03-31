@@ -80,6 +80,21 @@ def get_current_user_id() -> str:
     return user.id if user else ""
 
 
+def get_user_status() -> str:
+    """users_settings.status 반환 — 없으면 'approved' (기존 사용자 호환)"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return "anonymous"
+    try:
+        sb = get_supabase_client()
+        res = sb.table("users_settings").select("status").eq("id", user_id).execute()
+        if res.data:
+            return res.data[0].get("status") or "approved"
+    except Exception:
+        pass
+    return "approved"
+
+
 def is_admin() -> bool:
     user_id = get_current_user_id()
     if not user_id:
@@ -183,7 +198,27 @@ def _do_signup(email: str, password: str, display_name: str):
             "options": {"data": {"display_name": display_name}},
         })
         if res.user:
-            st.success("회원가입 완료! 이메일 인증 후 로그인해주세요.")
+            # 승인 대기 상태로 users_settings 등록
+            try:
+                sb.table("users_settings").upsert({
+                    "id": res.user.id,
+                    "display_name": display_name,
+                    "status": "pending",
+                }).execute()
+            except Exception:
+                pass
+            # 관리자에게 텔레그램 알림
+            try:
+                from utils.telegram import send_message
+                send_message(
+                    f"🔔 회원가입 승인 요청\n\n"
+                    f"이름: {display_name or '(미입력)'}\n"
+                    f"이메일: {email}\n\n"
+                    f"설정 > Admin 관리에서 승인해주세요."
+                )
+            except Exception:
+                pass
+            st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 이용 가능합니다.")
         else:
             st.warning("회원가입 요청이 전송되었습니다. 이메일을 확인해주세요.")
     except Exception as e:
