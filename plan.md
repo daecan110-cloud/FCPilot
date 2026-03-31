@@ -64,12 +64,9 @@
 - [x] UX-01~05 개선 (유입경로, 필터, 탭 순서, CSV 이동)
 - [ ] UX-06: 약관분석 AI 대화창 (P2 — 다음 Sprint)
 
-### Phase 3: Streamlit Cloud 배포 (영민 수동)
-- [ ] share.streamlit.io → daecan110@gmail.com-cloud 로그인
-- [ ] New app → daecan110-cloud/FCPilot, main, app.py
-- [ ] Custom subdomain: fcpilot-kr
-- [ ] Secrets: .streamlit/secrets.toml 내용 붙여넣기
-- [ ] 스모크 테스트: 5개 탭 로딩 + 보장분석 + 텔레그램 응답 확인
+### Phase 3: Streamlit Cloud 배포 — 자동 완료
+- [x] fcpilot-kr.streamlit.app 배포 중 (git push → 자동 재빌드)
+- [ ] 스모크 테스트: fcpilot-kr.streamlit.app 접속 → 5개 탭 + 보장분석 + 텔레그램 확인
 
 ### Phase 4: 실사용 + 피드백 수집
 - [ ] 영민: 1~2주 현장 실사용
@@ -77,10 +74,10 @@
 
 ---
 
-## 영민 선행 작업 (Phase 3 전)
+## 영민 확인 사항
 
 - [x] 엑셀 데이터 이관 완료
-- [ ] Streamlit Cloud 배포 (share.streamlit.io 수동)
+- [x] Streamlit Cloud 자동 배포 (fcpilot-kr.streamlit.app)
 - [ ] Daily Reminder cron — Supabase Dashboard → pg_cron + pg_net 활성화
 
 ---

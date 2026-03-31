@@ -57,9 +57,12 @@
 ## 알려진 이슈
 - Gemini 무료 tier: 분당 2회 제한 → 429 시 재시도 대응
 - 200줄 초과 파일 7개: 향후 Sprint에서 분리 예정
-- Streamlit Cloud 배포 미완료 (영민 수동 작업 필요)
 
-## 다음 Sprint (Sprint 8 Phase 3+)
-1. Streamlit Cloud 배포 (영민 수동)
+## 배포 상태
+- **fcpilot-kr.streamlit.app** — 자동 배포 (git push → 자동 반영)
+- main 브랜치 push 시 Streamlit Cloud가 자동 재빌드
+
+## 다음 Sprint
+1. fcpilot-kr.streamlit.app 접속 → 최신 변경사항 스모크 테스트
 2. 실사용 + 피드백 수집 (1~2주)
 3. UX-06 약관분석 AI 대화창

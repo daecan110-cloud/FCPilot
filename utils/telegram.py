@@ -16,9 +16,25 @@ def _get_config():
     try:
         token = st.secrets["telegram"]["bot_token"]
         chat_id = st.secrets["telegram"]["chat_id"]
+        return token, chat_id
     except Exception:
-        token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-        chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+        pass
+
+    # CLI 환경: secrets.toml 직접 파싱
+    try:
+        import tomllib
+        from pathlib import Path
+        secrets_path = Path(__file__).parent.parent / ".streamlit" / "secrets.toml"
+        with open(secrets_path, "rb") as f:
+            data = tomllib.load(f)
+        token = data["telegram"]["bot_token"]
+        chat_id = data["telegram"]["chat_id"]
+        return token, chat_id
+    except Exception:
+        pass
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
     return token, chat_id
 
 
