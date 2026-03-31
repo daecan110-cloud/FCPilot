@@ -51,7 +51,7 @@ def main():
         else:
             menu = ["홈", "보장분석", "고객관리", "개척지도", "동선기록", "통계", "설정"]
 
-        tab = st.radio("메뉴", menu, label_visibility="collapsed")
+        tab = st.radio("메뉴", menu, label_visibility="collapsed", key="main_nav")
 
         st.divider()
         if st.button("로그아웃", use_container_width=True):

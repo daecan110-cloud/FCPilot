@@ -245,6 +245,9 @@ def _render_detail():
     _render_new_contact(sb, client_id)
 
     st.divider()
+    _render_reminder_section(sb, fc_id=get_current_user_id(), client_id=client_id)
+
+    st.divider()
     _render_client_delete(sb, client_id)
 
 
@@ -452,3 +455,43 @@ def _render_form(edit=False):
                     st.rerun()
                 except Exception as e:
                     st.error(f"저장 실패: {e}")
+
+def _render_reminder_section(sb, fc_id: str, client_id: str):
+    """리마인드 등록 + 목록"""
+    from services.fp_reminder_service import get_client_reminders, create_reminder, complete_reminder, cancel_reminder, purposes
+    from views.page_settings_products import get_active_products
+
+    st.subheader("리마인드")
+
+    # 기존 리마인드 목록
+    reminders = get_client_reminders(fc_id, client_id)
+    pending = [r for r in reminders if r.get("status") == "pending"]
+    if pending:
+        for r in pending:
+            icon = "🔴" if r["reminder_date"] < str(__import__("datetime").date.today()) else "🟡"
+            col_r, col_done, col_cancel = st.columns([5, 1, 1])
+            col_r.caption(f"{icon} {r['reminder_date']} | {r.get('purpose','')} | {r.get('memo','')[:30]}")
+            if col_done.button("완료", key=f"r_done_{r['id']}", use_container_width=True):
+                complete_reminder(r["id"])
+                st.rerun()
+            if col_cancel.button("취소", key=f"r_cancel_{r['id']}", use_container_width=True):
+                cancel_reminder(r["id"])
+                st.rerun()
+
+    # 등록 폼
+    with st.expander("➕ 리마인드 등록"):
+        with st.form("reminder_form"):
+            r_date = st.date_input("예정일")
+            r_purpose = st.selectbox("상담 목적", purposes())
+            products = get_active_products(sb, fc_id)
+            prod_map = {p["name"]: p["id"] for p in products}
+            selected = st.multiselect("제안 상품", list(prod_map.keys())) if products else []
+            r_memo = st.text_input("메모", placeholder="선택 사항")
+            if st.form_submit_button("등록", type="primary", use_container_width=True):
+                pid_list = [prod_map[n] for n in selected if n in prod_map] or None
+                ok = create_reminder(fc_id, client_id, str(r_date), r_purpose, pid_list, r_memo)
+                if ok:
+                    st.success("리마인드가 등록되었습니다.")
+                    st.rerun()
+                else:
+                    st.error("등록 실패")
