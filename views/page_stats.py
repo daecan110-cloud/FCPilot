@@ -22,7 +22,7 @@ def render():
     sb = get_supabase_client()
     _render_crm(sb, fc_id, since, days, period)
     st.divider()
-    _render_distribution(sb, fc_id, since)
+    _render_distribution(sb, fc_id)
     st.divider()
     _render_pioneer(sb, fc_id, since)
     st.divider()
@@ -45,13 +45,13 @@ def _q(sb, table: str, fields: str, fc_id: str, since: str | None):
 def _render_crm(sb, fc_id: str, since, days, period: str):
     st.subheader("고객 관리")
     try:
-        all_clients = sb.table("clients").select("prospect_grade").eq("fc_id", fc_id).execute().data or []
+        total_cnt = sb.table("clients").select("id", count="exact").eq("fc_id", fc_id).execute().count or 0
     except Exception:
-        all_clients = []
+        total_cnt = 0
     try:
-        new_cnt = len(_q(sb, "clients", "id", fc_id, since).execute().data or [])
+        new_clients = _q(sb, "clients", "prospect_grade", fc_id, since).execute().data or []
     except Exception:
-        new_cnt = 0
+        new_clients = []
     try:
         logs = _q(sb, "contact_logs", "touch_method", fc_id, since).execute().data or []
     except Exception:
@@ -64,17 +64,18 @@ def _render_crm(sb, fc_id: str, since, days, period: str):
         contact_str = f"전체: 총 {total_logs}건"
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("전체 고객", f"{len(all_clients)}명")
-    c2.metric("신규 등록", f"{period} {new_cnt}명" if days else f"전체 {new_cnt}명")
+    c1.metric("전체 고객", f"{total_cnt}명")
+    c2.metric("신규 등록", f"{period} {len(new_clients)}명" if days else f"전체 {len(new_clients)}명")
     c3.metric("상담 기록", contact_str)
 
-    # 등급 카드 6개 (전체 기준)
+    # 등급 카드 6개 — 기간 내 신규 등록 고객 기준
     grades = {g: 0 for g in _GRADE_ORDER}
-    for c in all_clients:
+    for c in new_clients:
         g = c.get("prospect_grade") or "C"
         if g in grades:
             grades[g] += 1
-    st.caption("등급 분포 (전체 기준)")
+    period_label = period if days else "전체"
+    st.caption(f"신규 등록 등급 분포 ({period_label} 기준)")
     cols = st.columns(6)
     for i, g in enumerate(_GRADE_ORDER):
         cols[i].metric(f"{_GRADE_ICON.get(g,'')} {g}등급", f"{grades[g]}명")
@@ -87,12 +88,14 @@ def _render_crm(sb, fc_id: str, since, days, period: str):
         st.caption("터치방식: " + " | ".join(f"{m}: {v}건" for m, v in sorted(methods.items(), key=lambda x: -x[1])))
 
 
-def _render_distribution(sb, fc_id: str, since):
-    st.subheader("고객 분포")
+def _render_distribution(sb, fc_id: str):
+    st.subheader("고객 분포 (전체)")
     view_by = st.selectbox("보기 기준", ["등급별", "유입경로별", "나이대별", "지역별"],
                            key="stats_dist_by", label_visibility="collapsed")
     try:
-        clients = _q(sb, "clients", "prospect_grade,db_source,age_group,address", fc_id, since).execute().data or []
+        clients = (sb.table("clients")
+                   .select("prospect_grade,db_source,age_group,address")
+                   .eq("fc_id", fc_id).execute().data or [])
     except Exception:
         clients = []
     if not clients:
