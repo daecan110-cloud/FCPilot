@@ -1,7 +1,8 @@
 /**
  * FCPilot 텔레그램 봇 — Supabase Edge Function
  *
- * Webhook으로 메시지 수신 → Gemini 의도 파악 → DB 조회/등록/명령큐
+ * 1단계: 로컬 키워드 매칭 (빠름, Gemini 호출 없음)
+ * 2단계: Gemini 자연어 파싱 (애매한 경우만)
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -23,27 +24,107 @@ async function reply(chatId: string, text: string) {
   });
 }
 
-// ── Gemini 의도 파악 ────────────────────────────────
+// ── 1단계: 로컬 키워드 매칭 ─────────────────────────
 
 interface Intent {
   intent: string;
   params: Record<string, string>;
 }
 
-async function parseIntent(text: string): Promise<Intent> {
-  const prompt = `당신은 보험 FC 업무 어시스턴트입니다.
-사용자 메시지의 의도를 JSON으로 반환하세요.
+const REMINDER_KEYWORDS = [
+  "할일", "할 일", "오늘", "리마인드", "일정", "예정", "뭐해", "뭐하지",
+  "스케줄", "todo", "할거", "할 거",
+];
 
-intent 종류:
-- customer_search: 고객 정보 조회 (params: {name})
-- customer_create: 새 고객 등록 (params: {name, age?, address?, memo?})
-- customer_update: 고객 수정 (params: {name, field, value})
-- reminder_list: 오늘 할 일 조회
-- reminder_done: 리마인드 완료 (params: {name})
-- command: 개발 명령 (params: {command}) — 테스트, git, handoff 등
-- unknown: 판별 불가
+const COMMAND_KEYWORDS = [
+  "테스트", "git ", "push", "pull", "commit", "handoff", "배포", "빌드",
+  "상태", "status",
+];
 
-JSON만 반환. 설명 없이.
+const CREATE_KEYWORDS = [
+  "새 고객", "새고객", "고객 등록", "고객등록", "신규 고객", "신규고객",
+  "등록해", "추가해",
+];
+
+function localMatch(text: string): Intent | null {
+  const t = text.replace(/\s+/g, " ").trim();
+  const tNoSpace = t.replace(/\s/g, "");
+  const tLower = t.toLowerCase();
+
+  // 리마인드 — "할일", "오늘 할 일", "오늘할일", "뭐해" 등
+  if (REMINDER_KEYWORDS.some((k) => tNoSpace.includes(k.replace(/\s/g, "")))) {
+    return { intent: "reminder_list", params: {} };
+  }
+
+  // 고객 등록 — "새 고객: 홍길동, ..." 또는 "홍길동 등록해"
+  if (CREATE_KEYWORDS.some((k) => tNoSpace.includes(k.replace(/\s/g, "")))) {
+    return null; // Gemini에 위임 (파라미터 추출 필요)
+  }
+
+  // 개발 명령 — "테스트해줘", "git push", "handoff 업데이트"
+  if (COMMAND_KEYWORDS.some((k) => tLower.includes(k))) {
+    return { intent: "command", params: { command: t } };
+  }
+
+  // 고객 조회 — "김철수 고객정보", "김철수 정보", "김철수 조회"
+  // 또는 한글 이름만 (2~4글자, 고객 조회로 간주)
+  const searchPatterns = [
+    /^(.{2,10})\s*(고객|정보|조회|검색|보여|찾아|알려)/,
+    /^(고객|정보|조회)\s+(.{2,10})$/,
+  ];
+  for (const pat of searchPatterns) {
+    const m = t.match(pat);
+    if (m) {
+      const name = (m[1] || m[2]).replace(/(고객|정보|조회|검색|보여|찾아|알려)/g, "").trim();
+      if (name.length >= 2) return { intent: "customer_search", params: { name } };
+    }
+  }
+
+  // 순수 한글 이름 2~4글자만 입력 → 고객 검색
+  if (/^[가-힣]{2,4}$/.test(t)) {
+    return { intent: "customer_search", params: { name: t } };
+  }
+
+  return null; // 매칭 안 됨 → Gemini에 위임
+}
+
+// ── 2단계: Gemini 자연어 파싱 ───────────────────────
+
+async function geminiParse(text: string): Promise<Intent> {
+  const prompt = `당신은 보험 FC(재무설계사) 업무 어시스턴트입니다.
+사용자의 자연어 메시지를 분석하여 의도를 JSON으로 반환하세요.
+
+## intent 종류와 예시
+
+customer_search (고객 정보 조회):
+  "김철수" → {"intent":"customer_search","params":{"name":"김철수"}}
+  "김철수 고객" → 같음
+  "김철수 정보 알려줘" → 같음
+  "철수씨 보험 뭐 들었어?" → {"intent":"customer_search","params":{"name":"철수"}}
+
+customer_create (새 고객 등록):
+  "새 고객 홍길동 40대 서울" → {"intent":"customer_create","params":{"name":"홍길동","age":"40","address":"서울"}}
+  "이영희 등록해줘 수원 사는 30대" → {"intent":"customer_create","params":{"name":"이영희","age":"30","address":"수원"}}
+
+customer_update (고객 정보 수정):
+  "김철수 등급 A로" → {"intent":"customer_update","params":{"name":"김철수","field":"등급","value":"A"}}
+  "박영수 메모: VIP 고객" → {"intent":"customer_update","params":{"name":"박영수","field":"메모","value":"VIP 고객"}}
+
+reminder_list (오늘 할 일 조회):
+  "오늘 뭐해", "할일", "할 일", "일정", "스케줄", "리마인드" → {"intent":"reminder_list","params":{}}
+
+reminder_done (리마인드 완료):
+  "김철수 완료" → {"intent":"reminder_done","params":{"name":"김철수"}}
+
+command (개발/PC 명령):
+  "테스트해줘", "git push", "handoff 업데이트해" → {"intent":"command","params":{"command":"원문 그대로"}}
+
+unknown: 위 어디에도 해당 안 되면
+
+## 규칙
+- 한국어 자연어를 유연하게 해석하세요
+- 맞춤법 틀려도, 띄어쓰기 없어도, 줄임말이어도 최선을 다해 파악하세요
+- JSON만 반환. 설명 없이. 코드 블록 없이.
 
 메시지: "${text}"`;
 
@@ -65,6 +146,14 @@ JSON만 반환. 설명 없이.
   } catch {
     return { intent: "unknown", params: {} };
   }
+}
+
+// ── 의도 파악 (로컬 → Gemini 폴백) ─────────────────
+
+async function resolveIntent(text: string): Promise<Intent> {
+  const local = localMatch(text);
+  if (local) return local;
+  return await geminiParse(text);
 }
 
 // ── 핸들러 ──────────────────────────────────────────
@@ -206,7 +295,7 @@ Deno.serve(async (req) => {
     if (chatId !== CHAT_ID) return new Response("OK");
 
     const text = msg.text.trim();
-    const { intent, params } = await parseIntent(text);
+    const { intent, params } = await resolveIntent(text);
 
     let response: string;
     switch (intent) {
@@ -229,7 +318,7 @@ Deno.serve(async (req) => {
         response = await queueCommand(params.command || text);
         break;
       default:
-        response = `🤖 이해하지 못했습니다.\n\n사용 예시:\n• "김철수 고객 정보"\n• "오늘 할 일"\n• "새 고객: 이영희, 30대, 수원"\n• "테스트해줘"`;
+        response = `🤖 이해하지 못했습니다.\n\n사용 예시:\n• "김철수" → 고객 조회\n• "할일" → 오늘 할 일\n• "새 고객: 이영희, 30대" → 등록\n• "테스트해줘" → PC 명령`;
     }
 
     await reply(chatId, response);
