@@ -249,7 +249,39 @@ def _render_detail():
     _render_reminder_section(sb, fc_id=get_current_user_id(), client_id=client_id)
 
     st.divider()
+    _render_analysis_history(sb, fc_id, client["name"])
+
+    st.divider()
     _render_client_delete(sb, client_id)
+
+
+def _render_analysis_history(sb, fc_id: str, client_name: str):
+    st.subheader("보장분석 이력")
+    try:
+        records = (sb.table("analysis_records").select("*")
+                   .eq("fc_id", fc_id).ilike("client_name", client_name)
+                   .order("created_at", desc=True).limit(10).execute().data or [])
+    except Exception:
+        records = []
+    if not records:
+        col_info, col_btn = st.columns([3, 1])
+        col_info.caption("보장분석 이력이 없습니다.")
+        if col_btn.button("보장분석 하기", use_container_width=True):
+            st.session_state._nav_to = "보장분석"
+            st.rerun()
+        return
+    for r in records:
+        created = r.get("created_at", "")[:10]
+        result = r.get("analysis_result") or {}
+        contracts = result.get("계약수", 0)
+        gender = result.get("성별", "")
+        age = result.get("나이", "")
+        with st.expander(f"📊 {created} | 계약 {contracts}건 {('| '+gender) if gender else ''} {(str(age)+'세') if age else ''}"):
+            st.caption(f"고객명: {r.get('client_name','')}")
+            st.caption(f"분석일: {created}")
+            if st.button("보장분석 다시 실행", key=f"rerun_analysis_{r['id']}", use_container_width=True):
+                st.session_state._nav_to = "보장분석"
+                st.rerun()
 
 
 def _render_client_delete(sb, client_id: str):
@@ -309,8 +341,28 @@ def _render_contact_logs(sb, client_id: str):
             if log.get("next_date"):
                 st.caption(f"예정일: {log['next_date']}")
 
+            edit_log_key = f"edit_log_{log['id']}"
             confirm_key = f"confirm_del_log_{log['id']}"
-            if st.session_state.get(confirm_key):
+            if st.session_state.get(edit_log_key):
+                with st.form(f"edit_log_form_{log['id']}"):
+                    cur_method = log.get("touch_method", "") or "기타"
+                    idx = TOUCH_OPTIONS.index(cur_method) if cur_method in TOUCH_OPTIONS else 0
+                    new_method = st.selectbox("연락 방식", TOUCH_OPTIONS, index=idx)
+                    new_memo = st.text_area("상담 내용", value=log.get("memo") or "")
+                    ec1, ec2 = st.columns(2)
+                    if ec1.form_submit_button("저장", type="primary", use_container_width=True):
+                        try:
+                            sb.table("contact_logs").update({
+                                "touch_method": new_method, "memo": new_memo,
+                            }).eq("id", log["id"]).eq("fc_id", fc_id).execute()
+                            st.session_state.pop(edit_log_key, None)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"저장 실패: {e}")
+                    if ec2.form_submit_button("취소", use_container_width=True):
+                        st.session_state.pop(edit_log_key, None)
+                        st.rerun()
+            elif st.session_state.get(confirm_key):
                 st.warning("이 상담 기록을 삭제하시겠습니까?")
                 col_y, col_n = st.columns(2)
                 if col_y.button("삭제 확인", key=f"log_del_yes_{log['id']}", type="primary"):
@@ -324,7 +376,11 @@ def _render_contact_logs(sb, client_id: str):
                     st.session_state.pop(confirm_key, None)
                     st.rerun()
             else:
-                if st.button("삭제", key=f"del_log_{log['id']}"):
+                bc1, bc2 = st.columns(2)
+                if bc1.button("수정", key=f"edit_log_btn_{log['id']}", use_container_width=True):
+                    st.session_state[edit_log_key] = True
+                    st.rerun()
+                if bc2.button("삭제", key=f"del_log_{log['id']}", use_container_width=True):
                     st.session_state[confirm_key] = True
                     st.rerun()
 

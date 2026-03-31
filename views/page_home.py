@@ -9,6 +9,8 @@ from services.remind_trigger import check_and_send_daily_reminder
 from utils.supabase_client import get_supabase_client
 from utils.calendar_render import render_monthly_calendar
 
+_TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
+
 
 def render():
     st.header("오늘의 할 일")
@@ -186,18 +188,61 @@ def _render_edit_form(r: dict, edit_key: str):
 
 
 def _render_recent_activity(fc_id: str):
-    st.subheader("최근 활동")
     sb = get_supabase_client()
+    col_title, col_new, col_act = st.columns([3, 1, 1])
+    col_title.subheader("최근 활동")
+    if col_new.button("👤 고객 추가", use_container_width=True):
+        st.session_state._nav_to = "고객관리"
+        st.session_state.clients_view = "new"
+        st.rerun()
+    if col_act.button("📝 활동 추가", use_container_width=True):
+        st.session_state.home_act_open = not st.session_state.get("home_act_open", False)
+        st.rerun()
+
+    if st.session_state.get("home_act_open"):
+        _render_quick_activity(fc_id, sb)
+
     try:
         logs = (sb.table("contact_logs").select("*, clients(name)")
                 .eq("fc_id", fc_id).order("created_at", desc=True)
                 .limit(5).execute().data or [])
     except Exception:
         logs = []
-
     if not logs:
         st.info("최근 활동 기록이 없습니다.")
         return
     for log in logs:
         c = log.get("clients") or {}
         st.caption(f"{log.get('created_at','')[:10]} | {c.get('name','')} | {log.get('touch_method','')} | {(log.get('memo') or '')[:30]}")
+
+
+def _render_quick_activity(fc_id: str, sb):
+    search = st.text_input("고객 검색", key="home_act_search", placeholder="이름 입력")
+    client_id = None
+    if search.strip():
+        try:
+            results = (sb.table("clients").select("id, name").eq("fc_id", fc_id)
+                       .ilike("name", f"%{search.strip()}%").limit(5).execute().data or [])
+        except Exception:
+            results = []
+        if results:
+            opts = {r["name"]: r["id"] for r in results}
+            sel = st.selectbox("고객 선택", list(opts.keys()), key="home_act_client")
+            client_id = opts[sel]
+        else:
+            st.caption("검색 결과 없음")
+    if client_id:
+        with st.form("home_quick_act"):
+            method = st.selectbox("연락 방식", _TOUCH_OPTIONS)
+            memo = st.text_input("내용")
+            if st.form_submit_button("등록", type="primary", use_container_width=True):
+                try:
+                    sb.table("contact_logs").insert({
+                        "fc_id": fc_id, "client_id": client_id,
+                        "touch_method": method, "memo": memo,
+                    }).execute()
+                    for k in ("home_act_open", "home_act_search", "home_act_client"):
+                        st.session_state.pop(k, None)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"등록 실패: {e}")

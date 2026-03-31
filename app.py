@@ -45,11 +45,11 @@ def main():
         # UX-04: 영업 모드에 따라 탭 순서 변경
         mode = _get_sales_mode()
         if mode == "pioneer":
-            menu = ["홈", "개척지도", "동선기록", "고객관리", "보장분석", "통계", "설정"]
+            menu = ["오늘의 할일", "개척지도", "동선기록", "고객관리", "보장분석", "통계", "설정"]
         elif mode == "referral":
-            menu = ["홈", "고객관리", "보장분석", "통계", "개척지도", "동선기록", "설정"]
+            menu = ["오늘의 할일", "고객관리", "보장분석", "통계", "개척지도", "동선기록", "설정"]
         else:
-            menu = ["홈", "보장분석", "고객관리", "개척지도", "동선기록", "통계", "설정"]
+            menu = ["오늘의 할일", "보장분석", "고객관리", "개척지도", "동선기록", "통계", "설정"]
 
         if "_nav_to" in st.session_state:
             nav_target = st.session_state.pop("_nav_to")
@@ -61,7 +61,7 @@ def main():
         if st.button("로그아웃", use_container_width=True):
             logout()
 
-    if tab == "홈":
+    if tab == "오늘의 할일":
         from views.page_home import render
         render()
     elif tab == "보장분석":

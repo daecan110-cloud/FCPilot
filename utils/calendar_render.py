@@ -112,3 +112,22 @@ def render_monthly_calendar(fc_id: str):
         pending_total = sum(d.get("pending", 0) for d in date_map.values())
         done_total = sum(d.get("completed", 0) for d in date_map.values())
         st.caption(f"{year}년 {month}월: 대기 {pending_total}건 · 완료 {done_total}건")
+
+    # 날짜별 상세 보기
+    import datetime as _dt
+    default_sel = today if (today.year == year and today.month == month) else _dt.date(year, month, 1)
+    try:
+        default_sel = _dt.date.fromisoformat(default_sel if isinstance(default_sel, str) else str(default_sel))
+    except Exception:
+        default_sel = today
+    sel = st.date_input("날짜 선택하여 상세 보기", value=default_sel, key=f"cal_detail_{year}_{month}")
+    sel_str = str(sel)
+    day_rows = [r for r in rows if r.get("reminder_date") == sel_str]
+    if day_rows:
+        for r in day_rows:
+            client = r.get("clients") or {}
+            name = client.get("name", "")
+            status_icon = {"pending": "🟡", "completed": "✅", "cancelled": "❌"}.get(r.get("status", ""), "")
+            st.markdown(f"{status_icon} **{name}** — {r.get('purpose','')} {('| ' + (r.get('memo') or '')[:20]) if r.get('memo') else ''}")
+    else:
+        st.caption(f"{sel} 일정 없음")

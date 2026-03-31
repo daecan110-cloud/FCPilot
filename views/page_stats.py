@@ -15,9 +15,10 @@ def render():
         st.warning("로그인이 필요합니다.")
         return
 
-    period = st.radio("기간", ["최근 7일", "최근 30일", "전체"], horizontal=True, label_visibility="collapsed")
+    period = st.radio("기간", ["오늘", "최근 3일", "최근 7일", "최근 30일", "최근 3개월", "전체"],
+                      horizontal=True, label_visibility="collapsed")
     since = _since(period)
-    days = {"최근 7일": 7, "최근 30일": 30}.get(period)
+    days = {"오늘": 1, "최근 3일": 3, "최근 7일": 7, "최근 30일": 30, "최근 3개월": 90}.get(period)
 
     sb = get_supabase_client()
     _render_crm(sb, fc_id, since, days, period)
@@ -29,12 +30,12 @@ def render():
     _render_analysis(sb, fc_id, since)
 
 
+_PERIOD_DAYS = {"오늘": 1, "최근 3일": 3, "최근 7일": 7, "최근 30일": 30, "최근 3개월": 90}
+
+
 def _since(period: str) -> str | None:
-    if period == "최근 7일":
-        return str(date.today() - timedelta(days=7))
-    if period == "최근 30일":
-        return str(date.today() - timedelta(days=30))
-    return None
+    d = _PERIOD_DAYS.get(period)
+    return str(date.today() - timedelta(days=d)) if d else None
 
 
 def _q(sb, table: str, fields: str, fc_id: str, since: str | None):
@@ -58,8 +59,10 @@ def _render_crm(sb, fc_id: str, since, days, period: str):
         logs = []
 
     total_logs = len(logs)
-    if days:
+    if days and days > 1:
         contact_str = f"{period}: 총 {total_logs}건 (일 평균 {round(total_logs/days,1)}건)"
+    elif days == 1:
+        contact_str = f"오늘: 총 {total_logs}건"
     else:
         contact_str = f"전체: 총 {total_logs}건"
 
