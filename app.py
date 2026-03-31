@@ -5,6 +5,14 @@ from auth import is_logged_in, show_login_page, logout, check_session_timeout
 
 st.set_page_config(**PAGE_CONFIG)
 
+# 풋터 + 불필요한 UI 숨기기
+st.markdown("""
+<style>
+footer {visibility: hidden;}
+#MainMenu {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
 
 def main():
     if not is_logged_in():
@@ -30,25 +38,25 @@ def main():
             logout()
 
     if tab == "홈":
-        from pages.page_home import render
+        from views.page_home import render
         render()
     elif tab == "보장분석":
-        from pages.page_analysis import render
+        from views.page_analysis import render
         render()
     elif tab == "고객관리":
-        from pages.page_clients import render
+        from views.page_clients import render
         render()
     elif tab == "개척지도":
-        from pages.page_pioneer_map import render
+        from views.page_pioneer_map import render
         render()
     elif tab == "동선기록":
-        from pages.page_pioneer_route import render
+        from views.page_pioneer_route import render
         render()
     elif tab == "통계":
-        from pages.page_stats import render
+        from views.page_stats import render
         render()
     elif tab == "설정":
-        from pages.page_settings import render
+        from views.page_settings import render
         render()
 
 

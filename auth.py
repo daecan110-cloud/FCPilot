@@ -33,6 +33,21 @@ def get_current_user_id() -> str:
     return ""
 
 
+def is_admin() -> bool:
+    """현재 사용자가 admin 역할인지 확인"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return False
+    try:
+        sb = get_supabase_client()
+        res = sb.table("users_settings").select("role").eq("id", user_id).execute()
+        if res.data:
+            return res.data[0].get("role") == "admin"
+    except Exception:
+        pass
+    return False
+
+
 def show_login_page():
     """로그인/회원가입 UI"""
     st.title("🛡️ FCPilot")
