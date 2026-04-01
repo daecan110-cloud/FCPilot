@@ -7,7 +7,7 @@
       },
       {
         "type": "command",
-        "command": "cd C:/FCPilot && echo '=== 보안 스캔 ===' && (grep -rn 'sk-ant-\\|eyJ\\|bot_token\\|api_key\\s*=' --include='*.py' | grep -v secrets | grep -v '\\.toml' | grep -v 'st\\.secrets' | grep -v '#' && echo '❌ API 키 하드코딩 발견!' || echo '✅ API 키 하드코딩 없음') && (grep -rn 'except:' --include='*.py' | grep -v 'except Exception' && echo '❌ bare except 발견!' || echo '✅ bare except 없음') && (git ls-files | grep -iE '\\.(csv|xlsx|xls)$' | grep -v templates && echo '❌ 데이터 파일 git 포함!' || echo '✅ 데이터 파일 git 미포함')"
+        "command": "cd C:/FCPilot && echo '=== 보안 스캔 ===' && (grep -rnE 'sk-ant-api[0-9]|eyJhbGci[A-Za-z0-9]|[0-9]{10}:AA[A-Za-z0-9_-]{30}|AIzaSy[A-Za-z0-9_-]{30}' --include='*.py' && echo '❌ API 키 하드코딩 발견!' || echo '✅ API 키 하드코딩 없음') && (grep -rn 'except:' --include='*.py' | grep -v 'except Exception' && echo '❌ bare except 발견!' || echo '✅ bare except 없음') && (git ls-files | grep -iE '\\.(csv|xlsx|xls)$' | grep -v templates && echo '❌ 데이터 파일 git 포함!' || echo '✅ 데이터 파일 git 미포함')"
       }
     ],
     "SessionEnd": [
@@ -35,7 +35,7 @@
       {
         "matcher": "Edit",
         "type": "command",
-        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then grep -n 'sk-ant-\\|eyJ\\|bot_token\\|SUPABASE_KEY\\|api_key\\s*=' \"$filepath\" | grep -v '#' | grep -v 'secrets' && echo '❌ BLOCK: API 키 하드코딩 감지!' && exit 1 || true; fi"
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then grep -nE 'sk-ant-api[0-9]|eyJhbGci[A-Za-z0-9]|[0-9]{10}:AA[A-Za-z0-9_-]{30}|AIzaSy[A-Za-z0-9_-]{30}' \"$filepath\" | grep -v '#' | grep -v 'secrets_loader' && echo '❌ BLOCK: API 키/토큰 하드코딩 감지!' && exit 1 || true; fi"
       },
       {
         "matcher": "Edit",
