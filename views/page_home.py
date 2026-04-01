@@ -4,7 +4,7 @@ from datetime import date
 import streamlit as st
 
 from auth import get_current_user_id
-from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes, create_reminder, get_this_month_count
+from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes, create_reminder
 from services.remind_trigger import check_and_send_daily_reminder
 from utils.calendar_render import render_monthly_calendar
 from utils.supabase_client import get_supabase_client
@@ -25,17 +25,19 @@ def render():
     check_and_send_daily_reminder()
 
     buckets = get_bucketed(fc_id)
-    overdue, today, this_week = buckets["overdue"], buckets["today"], buckets["this_week"]
-    this_month = get_this_month_count(fc_id)
+    today, this_week, this_month, no_date = (
+        buckets["today"], buckets["this_week"],
+        buckets["this_month"], buckets["no_date"],
+    )
 
     # 요약 메트릭
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("오늘 예정", f"{len(today)}건")
-    c2.metric("이번달", f"{this_month}건")
-    c3.metric("이번 주", f"{len(this_week)}건")
-    c4.metric("전체 대기", f"{len(overdue)+len(today)+len(this_week)}건")
+    c2.metric("이번 주", f"{len(this_week)}건")
+    c3.metric("이번달", f"{len(this_month)}건")
+    c4.metric("기간 없음", f"{len(no_date)}건")
 
-    # 상품 맵 한 번만 로드 (카드 N개 × 쿼리 1번 → 쿼리 1번으로 통합)
+    # 상품 맵 한 번만 로드 (N+1 방지)
     _sb = get_supabase_client()
     from views.page_settings_products import get_active_products
     _products_map = {p["id"]: p["name"] for p in get_active_products(_sb, fc_id)}
@@ -49,24 +51,32 @@ def render():
 
     st.divider()
 
-    if overdue:
-        section_header(f"🔴 지연", f"{len(overdue)}건")
-        for r in overdue:
-            _render_reminder_card(r, "overdue", _products_map)
-        st.divider()
-
-    section_header(f"🟡 오늘 예정", f"{len(today)}건")
+    section_header("🟡 오늘 예정", f"{len(today)}건")
     for r in today:
         _render_reminder_card(r, "today", _products_map)
     if not today:
         empty_state("📋", "오늘 예정된 리마인드가 없습니다")
 
     st.divider()
-    section_header(f"🔵 이번 주", f"{len(this_week)}건")
+    section_header("🔵 이번 주", f"{len(this_week)}건")
     for r in this_week:
         _render_reminder_card(r, "week", _products_map)
     if not this_week:
         empty_state("📅", "이번 주 예정된 리마인드가 없습니다")
+
+    st.divider()
+    section_header("📅 이번달", f"{len(this_month)}건")
+    for r in this_month:
+        _render_reminder_card(r, "month", _products_map)
+    if not this_month:
+        empty_state("📅", "이번달 추가 예정이 없습니다")
+
+    st.divider()
+    section_header("📌 기간 없음", f"{len(no_date)}건")
+    for r in no_date:
+        _render_reminder_card(r, "nodate", _products_map)
+    if not no_date:
+        empty_state("📌", "기간 없는 리마인드가 없습니다")
 
     st.divider()
     _render_recent_activity(fc_id)
@@ -97,7 +107,7 @@ def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):
             st.markdown(f"**{name}** {grade_html} — {purpose}{prod_label}", unsafe_allow_html=True)
             if memo:
                 st.caption(memo)
-            st.caption(f"예정일: {d}")
+            st.caption(f"예정일: {d}" if d else "예정일: 미정")
         with col_btn:
             fc_id = r.get("fc_id", "")
             if st.button("완료", key=f"done_{rid}_{bucket}", type="primary", use_container_width=True):
@@ -142,13 +152,15 @@ def _render_add_reminder_form(fc_id: str):
     products = get_active_products(sb, fc_id)
     prod_map = {p["name"]: p["id"] for p in products}
     with st.form("home_add_reminder"):
-        r_date = st.date_input("예정일", value=date.today())
+        no_date = st.checkbox("날짜 없음 (언제 연락할지 미정)")
+        r_date = None if no_date else st.date_input("예정일", value=date.today())
         r_purpose = st.selectbox("상담 목적", purposes())
         sel_prods = st.multiselect("제안 상품", list(prod_map.keys())) if products else []
         r_memo = st.text_input("메모", placeholder="선택 사항")
         if st.form_submit_button("등록", type="primary", use_container_width=True):
             pids = [prod_map[n] for n in sel_prods if n in prod_map] or None
-            if create_reminder(fc_id, client_id, str(r_date), r_purpose, pids, r_memo):
+            r_date_str = str(r_date) if r_date else None
+            if create_reminder(fc_id, client_id, r_date_str, r_purpose, pids, r_memo):
                 st.session_state.pop("home_remind_search", None)
                 st.session_state.pop("home_remind_client", None)
                 st.rerun()
@@ -167,11 +179,16 @@ def _render_edit_form(r: dict, edit_key: str):
     id_to_name = {p["id"]: p["name"] for p in products}
     current_names = [id_to_name[pid] for pid in (r.get("product_ids") or []) if pid in id_to_name]
     with st.form(f"edit_form_{rid}"):
-        try:
-            default_date = _date.fromisoformat(r.get("reminder_date", str(_date.today())))
-        except Exception:
-            default_date = _date.today()
-        new_date = st.date_input("예정일", value=default_date)
+        has_date = bool(r.get("reminder_date"))
+        no_date = st.checkbox("날짜 없음", value=not has_date)
+        if not no_date:
+            try:
+                default_date = _date.fromisoformat(r.get("reminder_date") or str(_date.today()))
+            except Exception:
+                default_date = _date.today()
+            new_date = st.date_input("예정일", value=default_date)
+        else:
+            new_date = None
         p_idx = purposes().index(r["purpose"]) if r.get("purpose") in purposes() else 0
         new_purpose = st.selectbox("상담 목적", purposes(), index=p_idx)
         new_prods = st.multiselect("제안 상품", list(prod_map.keys()), default=current_names) if products else []
@@ -180,7 +197,8 @@ def _render_edit_form(r: dict, edit_key: str):
         if c1.form_submit_button("저장", type="primary", use_container_width=True):
             pids = [prod_map[n] for n in new_prods if n in prod_map] or None
             fc_id = r.get("fc_id", "")
-            if update_reminder(fc_id, rid, str(new_date), new_purpose, pids, new_memo):
+            new_date_str = str(new_date) if new_date else None
+            if update_reminder(fc_id, rid, new_date_str, new_purpose, pids, new_memo):
                 st.session_state.pop(edit_key, None)
                 st.rerun()
             else:
