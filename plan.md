@@ -98,13 +98,25 @@
 - [x] 리마인드 텔레그램 중복 발송 수정 (DB 기반 하루 1회)
 - [x] remind_trigger KeyError 'overdue' 수정
 
+## 보안 Sprint — 완료 (2026-04-01)
+- [x] API 키/토큰/비밀번호 하드코딩 제거 (6파일) + secrets_loader 공용 모듈
+- [x] 전 API 키 재발급 (Supabase, Claude, Telegram x2, Gemini, DB PW)
+- [x] 텔레그램 봇 분리 — dev(claudeFC_bot) / user(FCPilot)
+- [x] command_poller 명령어 인젝션 차단 (shell=False + 화이트리스트)
+- [x] XSS 이스케이프 7건 (esc(), _e(), _safe_json, grade_badge)
+- [x] fc_id 누락 쿼리 9건 보강
+- [x] 에러 메시지 DB 스키마 노출 차단 38건 (safe_error)
+- [x] exec_sql RPC anon 차단
+- [x] 파일 업로드 magic bytes 검증
+- [x] Hook 자동 차단 6종 + CLAUDE.md 보안 규칙 6조
+
 ---
 
 ## 백로그 — 미처리 항목 (기존 Sprint에서 이월)
 
 | # | 항목 | 출처 | 상태 |
 |---|------|------|------|
-| 15 | 텔레그램 봇 분리 (고객관리 vs 개발알림) | MASTER 백로그 | 미착수 |
+| 15 | 텔레그램 봇 분리 (고객관리 vs 개발알림) | MASTER 백로그 | ✅ 완료 |
 | 16 | 약관분석 AI 대화창 (Gemini 무료 한계로 보류) | Sprint 8C | 보류 |
 | 17 | 200줄 초과 파일 리팩토링 | Sprint 6 이슈 | 미착수 |
 | 18 | 보장분석표 하단 셀 병합 검증 | Sprint 1 잔여 | 미착수 |

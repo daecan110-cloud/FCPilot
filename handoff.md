@@ -1,7 +1,7 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **보안 점검 완료 + Sprint 11-1 — 영민 테스트 대기 중**
+- Phase: **보안 Sprint 완료 — 영민 테스트 대기 중**
 - 마지막 세션: 2026-04-01 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
@@ -102,16 +102,16 @@
 - [x] Edge Function 환경변수명 변경 (TELEGRAM_USER_BOT_TOKEN)
 
 ### 영민 액션 필요
-- [ ] **Supabase service_role 키 재생성** (Dashboard → Settings → API)
-- [ ] **DB 비밀번호 변경** (Dashboard → Settings → Database)
-- [ ] **BotFather에서 봇 토큰 2개 재발급** → /revoke 후 새 토큰 발급
-  - claudeFC_bot 토큰 → secrets.toml `[telegram_dev].bot_token`
-  - FCPilot 봇 토큰 → secrets.toml `[telegram_user].bot_token`
-- [ ] **Supabase Edge Function 환경변수** 업데이트
-  - `TELEGRAM_USER_BOT_TOKEN` = FCPilot 봇 새 토큰
+- [x] Supabase service_role 키 재생성
+- [x] DB 비밀번호 변경
+- [x] BotFather 봇 토큰 2개 재발급
+- [x] secrets.toml 전체 업데이트
+- [x] exec_sql RPC role 제한 SQL 실행
+- [ ] **Supabase Edge Function 환경변수** 업데이트 (미완료)
+  - `TELEGRAM_USER_BOT_TOKEN` = FCPilot 봇 토큰
   - `TELEGRAM_USER_CHAT_ID` = 8201988543
-- [ ] **Streamlit Cloud secrets** 업데이트 (같은 구조)
-- [ ] 위 전부 완료 후 secrets.toml 저장
+  - 기존 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` 삭제
+- [ ] **Streamlit Cloud secrets** 업데이트 (telegram → telegram_dev/telegram_user 구조 변경)
 
 ### 근본 원인
 Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키 하드코딩으로 우회한 것 (Sprint 5~7 설계 실수)
