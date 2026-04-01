@@ -2,6 +2,11 @@
 import json
 import streamlit as st
 
+
+def _safe_json(data) -> str:
+    """JSON 직렬화 + HTML 특수문자 이스케이프 (script 태그 인젝션 방지)"""
+    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e")
+
 _STATUS_COLORS = {
     "active": "#2196F3",
     "visited": "#FF9800",
@@ -47,7 +52,7 @@ def route_map_html(visits: list, height: int = 420) -> str:
         }
         for v in visits
     ]
-    return _html(json.dumps(js_data, ensure_ascii=False), "route", height)
+    return _html(_safe_json(js_data), "route", height)
 
 
 def pioneer_map_html(shops: list, height: int = 500) -> str:
@@ -68,7 +73,7 @@ def pioneer_map_html(shops: list, height: int = 500) -> str:
         }
         for s in shops
     ]
-    return _html(json.dumps(js_data, ensure_ascii=False), "pioneer", height)
+    return _html(_safe_json(js_data), "pioneer", height)
 
 
 def _html(data_json: str, mode: str, height: int) -> str:

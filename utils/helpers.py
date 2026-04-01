@@ -1,4 +1,10 @@
 """공통 유틸리티"""
+import html as _html
+
+
+def esc(text: str) -> str:
+    """HTML 이스케이프 — unsafe_allow_html=True 컨텍스트에서 사용자 입력 보호"""
+    return _html.escape(str(text)) if text else ""
 
 
 def mask_name(name: str) -> str:
@@ -14,6 +20,16 @@ def mask_phone(phone: str) -> str:
         return "***"
     parts = phone.replace("-", "")
     return f"***-****-{parts[-4:]}"
+
+
+def safe_error(action: str, e: Exception) -> str:
+    """사용자에게 보여줄 안전한 에러 메시지 (DB 스키마/내부 정보 숨김)"""
+    err = str(e)
+    # 일반적인 사용자 실수 메시지는 그대로 표시
+    for keyword in ["already exists", "duplicate", "violates check", "null value"]:
+        if keyword in err.lower():
+            return f"{action}: 데이터 형식을 확인해주세요."
+    return f"{action}: 오류가 발생했습니다. 다시 시도해주세요."
 
 
 def validate_file(uploaded_file, allowed_types: list, max_mb: int) -> str | None:

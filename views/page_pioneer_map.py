@@ -7,6 +7,7 @@ from utils.map_utils import STATUS_LABELS
 from utils.naver_map import pioneer_map_html
 from services.geocoding import geocode
 from config import ALLOWED_FILE_TYPES, MAX_FILE_SIZE_MB
+from utils.helpers import safe_error
 
 CATEGORY_OPTIONS = ["음식점", "카페", "미용실/뷰티", "학원/교육", "병원/약국", "편의점/마트", "의류/패션", "사무실/오피스", "기타"]
 
@@ -33,7 +34,7 @@ def _render_map():
         res = sb.table("pioneer_shops").select("*").eq("fc_id", fc_id).order("created_at", desc=True).execute()
         shops = res.data or []
     except Exception as e:
-        st.error(f"매장 조회 실패: {e}")
+        st.error(safe_error("매장 조회", e))
         return
 
     if not shops:
@@ -74,7 +75,7 @@ def _render_map():
                             sb.table("pioneer_shops").update({"status": new_status}).eq("id", s["id"]).execute()
                             st.rerun()
                         except Exception as e:
-                            st.error(f"변경 실패: {e}")
+                            st.error(safe_error("변경", e))
 
 
 def _render_register():
@@ -109,7 +110,7 @@ def _render_register():
                     }).execute()
                     st.success(f"'{shop_name}' 등록 완료!")
                 except Exception as e:
-                    st.error(f"등록 실패: {e}")
+                    st.error(safe_error("등록", e))
 
 
 def _render_ocr():
@@ -168,7 +169,7 @@ def _render_ocr():
                 st.success(f"'{shop_name}' 등록 완료!")
                 st.session_state.pop("ocr_result", None)
             except Exception as e:
-                st.error(f"등록 실패: {e}")
+                st.error(safe_error("등록", e))
 
 
 def _extract_gps_address(image_bytes: bytes) -> str:
@@ -253,7 +254,7 @@ def _render_followup():
         shops_res = sb.table("pioneer_shops").select("*").eq("fc_id", fc_id).order("created_at", desc=True).execute()
         shops = shops_res.data or []
     except Exception as e:
-        st.error(f"매장 조회 실패: {e}")
+        st.error(safe_error("매장 조회", e))
         return
 
     if not shops:
@@ -306,7 +307,7 @@ def _render_followup():
                         st.success("저장됨")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"실패: {e}")
+                        st.error(safe_error("처리", e))
 
             st.divider()
             edit_key = f"edit_shop_{shop['id']}"
@@ -333,7 +334,7 @@ def _render_followup():
                             st.session_state.pop(edit_key, None)
                             st.rerun()
                         except Exception as e:
-                            st.error(f"수정 실패: {e}")
+                            st.error(safe_error("수정", e))
                     if sc2.form_submit_button("취소", use_container_width=True):
                         st.session_state.pop(edit_key, None)
                         st.rerun()
@@ -348,7 +349,7 @@ def _render_followup():
                         st.session_state.pop(del_key, None)
                         st.rerun()
                     except Exception as e:
-                        st.error(f"삭제 실패: {e}")
+                        st.error(safe_error("삭제", e))
                 if dc2.button("취소", key=f"del_cancel_{shop['id']}", use_container_width=True):
                     st.session_state.pop(del_key, None)
                     st.rerun()

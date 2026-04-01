@@ -69,32 +69,27 @@ def update_command(cmd_id: str, status: str, result: str = ""):
 
 # ── 명령 실행 ────────────────────────────────────────
 
-SAFE_COMMANDS = {
-    "테스트": f"python {os.path.join(ROOT, 'tests', 'test_all.py')} --quiet",
-    "테스트해줘": f"python {os.path.join(ROOT, 'tests', 'test_all.py')} --quiet",
-    "git status": "git status",
-    "git pull": "git pull origin main",
-    "git push": "git push origin main",
+SAFE_COMMANDS: dict[str, list[str]] = {
+    "테스트": ["python", os.path.join(ROOT, "tests", "test_all.py"), "--quiet"],
+    "테스트해줘": ["python", os.path.join(ROOT, "tests", "test_all.py"), "--quiet"],
+    "git status": ["git", "status"],
+    "git pull": ["git", "pull", "origin", "main"],
+    "git push": ["git", "push", "origin", "main"],
+    "git log": ["git", "log", "--oneline", "-10"],
 }
 
 
 def execute_command(command: str) -> tuple[bool, str]:
-    """명령어 실행 → (성공여부, 결과 텍스트)"""
+    """화이트리스트 명령어만 실행 (shell=False)"""
     cmd_lower = command.strip().lower()
+    cmd_list = SAFE_COMMANDS.get(cmd_lower)
 
-    # 안전한 명령어 매핑
-    shell_cmd = SAFE_COMMANDS.get(cmd_lower)
-
-    if not shell_cmd:
-        # git 명령어 허용
-        if cmd_lower.startswith("git "):
-            shell_cmd = command
-        else:
-            return False, f"미지원 명령: {command}"
+    if not cmd_list:
+        return False, f"미지원 명령: {command}"
 
     try:
         result = subprocess.run(
-            shell_cmd, shell=True, capture_output=True,
+            cmd_list, shell=False, capture_output=True,
             text=True, timeout=60, cwd=ROOT,
         )
         output = (result.stdout or "") + (result.stderr or "")

@@ -9,6 +9,7 @@ from utils.supabase_client import get_supabase_client
 from utils.map_utils import VISIT_RESULT_LABELS
 from utils.naver_map import route_map_html
 from services.geocoding import geocode
+from utils.helpers import safe_error
 
 
 def render():
@@ -35,7 +36,7 @@ def _render_today():
         ).eq("fc_id", fc_id).eq("visit_date", today).order("created_at").execute()
         today_visits = res.data or []
     except Exception as e:
-        st.error(f"조회 실패: {e}")
+        st.error(safe_error("조회", e))
         return
 
     # 매장 목록 (방문 기록 추가용)
@@ -43,7 +44,7 @@ def _render_today():
         shops_res = sb.table("pioneer_shops").select("id, shop_name").eq("fc_id", fc_id).order("shop_name").execute()
         shops = shops_res.data or []
     except Exception as e:
-        st.error(f"매장 조회 실패: {e}")
+        st.error(safe_error("매장 조회", e))
         return
 
     # 새 방문 기록 추가
@@ -85,7 +86,7 @@ def _render_today():
                 st.success("방문 기록이 추가되었습니다.")
                 st.rerun()
             except Exception as e:
-                st.error(f"저장 실패: {e}")
+                st.error(safe_error("저장", e))
 
     # 오늘 동선 표시
     if today_visits:
@@ -163,7 +164,7 @@ def _render_history():
         ).eq("fc_id", fc_id).eq("visit_date", str(target_date)).order("created_at").execute()
         visits = res.data or []
     except Exception as e:
-        st.error(f"조회 실패: {e}")
+        st.error(safe_error("조회", e))
         return
 
     if not visits:
@@ -215,7 +216,7 @@ def _regeocode_missing(sb, fc_id: str):
         shops = (sb.table("pioneer_shops").select("id, shop_name, address")
                  .eq("fc_id", fc_id).is_("lat", "null").execute().data or [])
     except Exception as e:
-        st.error(f"조회 실패: {e}")
+        st.error(safe_error("조회", e))
         return
     if not shops:
         st.info("좌표 없는 매장이 없습니다.")

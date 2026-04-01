@@ -7,6 +7,7 @@ from auth import get_current_user_id
 from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes, create_reminder
 from services.remind_trigger import check_and_send_daily_reminder
 from utils.calendar_render import render_monthly_calendar
+from utils.helpers import safe_error
 from utils.supabase_client import get_supabase_client
 from utils.ui_components import grade_badge as _grade_badge, empty_state, section_header
 
@@ -113,7 +114,8 @@ def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):
     with st.container(border=True):
         col_info, col_btn = st.columns([4, 1])
         with col_info:
-            st.markdown(f"**{name}** {grade_html} — {purpose}{prod_label}", unsafe_allow_html=True)
+            from utils.helpers import esc
+            st.markdown(f"**{esc(name)}** {grade_html} — {esc(purpose)}{esc(prod_label)}", unsafe_allow_html=True)
             if memo:
                 st.caption(memo)
             st.caption(f"예정일: {d}" if d else "예정일: 미정")
@@ -289,4 +291,4 @@ def _render_quick_activity(fc_id: str, sb):
                         st.session_state.pop(k, None)
                     st.rerun()
                 except Exception as e:
-                    st.error(f"등록 실패: {e}")
+                    st.error(safe_error("등록", e))

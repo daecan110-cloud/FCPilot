@@ -1,6 +1,7 @@
 """설정 페이지"""
 import streamlit as st
 from auth import get_current_user_id, is_admin
+from utils.helpers import safe_error
 from utils.supabase_client import get_supabase_client
 
 
@@ -115,7 +116,7 @@ def _save_categories(sb, user_id: str, categories: list):
         st.session_state.pop(f"source_cats_{user_id}", None)  # 고객관리 필터 캐시 무효화
         st.success("저장됨 — 고객관리 필터에 즉시 반영됩니다.")
     except Exception as e:
-        st.error(f"저장 실패: {e}")
+        st.error(safe_error("저장", e))
 
 
 def _load_settings(sb, user_id: str) -> dict:
@@ -141,4 +142,4 @@ def _save_settings(sb, user_id: str, display_name: str, company: str, mode: str)
         st.session_state.pop("cached_sales_mode", None)  # 영업 모드 캐시 무효화
         st.success("설정이 저장되었습니다.")
     except Exception as e:
-        st.error(f"저장 실패: {e}")
+        st.error(safe_error("저장", e))

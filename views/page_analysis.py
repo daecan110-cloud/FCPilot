@@ -5,6 +5,7 @@ from services.analysis_engine import analyze_and_generate
 from services.yakwan_engine import analyze_yakwan, format_display
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
+from utils.helpers import safe_error
 from utils.ui_components import section_header
 
 
@@ -47,7 +48,7 @@ def render():
                     pdf_bytes, include_review=include_review,
                 )
             except Exception as e:
-                st.error(f"분석 실패: {e}")
+                st.error(safe_error("분석", e))
                 return
 
         if client_name:
@@ -57,7 +58,7 @@ def render():
                     pdf_bytes, include_review=include_review,
                 )
             except Exception as e:
-                st.error(f"엑셀 재생성 실패: {e}")
+                st.error(safe_error("엑셀 재생성", e))
                 return
 
         st.session_state.analysis_data = data
@@ -153,7 +154,7 @@ def _save_to_db(data: dict, silent: bool = False):
             st.success("분석 기록이 저장되었습니다.")
     except Exception as e:
         if not silent:
-            st.error(f"저장 실패: {e}")
+            st.error(safe_error("저장", e))
 
 
 # ── 약관 분석 + AI 상담 ──
@@ -197,7 +198,7 @@ def _render_yakwan_section(data: dict):
                     contract.get("상품명", ""),
                 )
             except Exception as e:
-                st.error(f"약관 분석 실패: {e}")
+                st.error(safe_error("약관 분석", e))
                 return
 
         if "yakwan_results" not in st.session_state:
@@ -322,7 +323,7 @@ def _render_k_column_apply(data: dict, idx: int, result: dict):
                 st.session_state.excel_files = excel_files
                 st.success("엑셀 재생성 완료. '보장분석 결과' 탭에서 다운로드하세요.")
             except Exception as e:
-                st.error(f"재생성 실패: {e}")
+                st.error(safe_error("재생성", e))
 
 
 def _save_yakwan_to_db(idx: int, contract: dict, result: dict):

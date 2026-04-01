@@ -3,6 +3,7 @@ import streamlit as st
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from services.crypto import encrypt_phone, decrypt_phone, hash_phone_last4
+from utils.helpers import safe_error
 
 TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
 DEFAULT_SOURCE_OPTIONS = ["DB고객", "개인(지인)", "개척", "소개", "기타"]
@@ -127,7 +128,7 @@ def _render_list():
         res = query.limit(200).execute()
         clients = res.data or []
     except Exception as e:
-        st.error(f"조회 실패: {e}")
+        st.error(safe_error("조회", e))
         return
 
     if sort_by == "등급순":
@@ -171,9 +172,10 @@ def _render_list():
         with st.container(border=True):
             c_info, c_btn = st.columns([5, 1])
             with c_info:
+                from utils.helpers import esc
                 st.markdown(
-                    f'**{c["name"]}** {grade_html} &nbsp;'
-                    f'<span style="color:#787774; font-size:13px;">{meta}</span>',
+                    f'**{esc(c["name"])}** {grade_html} &nbsp;'
+                    f'<span style="color:#787774; font-size:13px;">{esc(meta)}</span>',
                     unsafe_allow_html=True,
                 )
             with c_btn:
@@ -198,7 +200,7 @@ def _render_detail():
         res = sb.table("clients").select("*").eq("id", client_id).eq("fc_id", fc_id).single().execute()
         client = res.data
     except Exception as e:
-        st.error(f"조회 실패: {e}")
+        st.error(safe_error("조회", e))
         return
 
     if not client:
@@ -301,7 +303,7 @@ def _render_client_delete(sb, client_id: str):
                 st.session_state.clients_view = "list"
                 st.rerun()
             except Exception as e:
-                st.error(f"삭제 실패: {e}")
+                st.error(safe_error("삭제", e))
         if col_n.button("취소", use_container_width=True):
             st.session_state.pop(confirm_key, None)
             st.rerun()
@@ -318,7 +320,7 @@ def _render_contact_logs(sb, client_id: str):
         res = sb.table("contact_logs").select("*").eq("client_id", client_id).order("created_at", desc=True).limit(50).execute()
         logs = res.data or []
     except Exception as e:
-        st.error(f"이력 조회 실패: {e}")
+        st.error(safe_error("이력 조회", e))
         return
 
     if not logs:
@@ -362,7 +364,7 @@ def _render_contact_logs(sb, client_id: str):
                             st.session_state.pop(edit_log_key, None)
                             st.rerun()
                         except Exception as e:
-                            st.error(f"저장 실패: {e}")
+                            st.error(safe_error("저장", e))
                     if ec2.form_submit_button("취소", use_container_width=True):
                         st.session_state.pop(edit_log_key, None)
                         st.rerun()
@@ -375,7 +377,7 @@ def _render_contact_logs(sb, client_id: str):
                         st.session_state.pop(confirm_key, None)
                         st.rerun()
                     except Exception as e:
-                        st.error(f"삭제 실패: {e}")
+                        st.error(safe_error("삭제", e))
                 if col_n.button("취소", key=f"log_del_no_{log['id']}"):
                     st.session_state.pop(confirm_key, None)
                     st.rerun()
@@ -430,7 +432,7 @@ def _render_new_contact(sb, client_id: str):
                     st.success("저장되었습니다.")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"저장 실패: {e}")
+                    st.error(safe_error("저장", e))
 
 
 # ── 고객 등록/수정 ──
@@ -507,7 +509,7 @@ def _render_form(edit=False):
                 }
                 try:
                     if edit:
-                        sb.table("clients").update(data).eq("id", client["id"]).execute()
+                        sb.table("clients").update(data).eq("id", client["id"]).eq("fc_id", get_current_user_id()).execute()
                     else:
                         data["fc_id"] = get_current_user_id()
                         sb.table("clients").insert(data).execute()
@@ -515,7 +517,7 @@ def _render_form(edit=False):
                     st.session_state.clients_view = "list"
                     st.rerun()
                 except Exception as e:
-                    st.error(f"저장 실패: {e}")
+                    st.error(safe_error("저장", e))
 
 def _render_reminder_section(sb, fc_id: str, client_id: str):
     """리마인드 등록 + 목록"""

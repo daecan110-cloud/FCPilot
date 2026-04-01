@@ -1,5 +1,6 @@
 """Admin 전용 섹션 — 회원 승인 + 역할 관리 + DB 통계"""
 import streamlit as st
+from utils.helpers import safe_error
 
 
 def render_admin_section(sb):
@@ -19,7 +20,7 @@ def _render_members(sb):
         try:
             users = sb.table("users_settings").select("id, display_name, status, role").execute().data or []
         except Exception as e:
-            st.error(f"사용자 조회 실패: {e}")
+            st.error(safe_error("사용자 조회", e))
             return
 
         pending  = [u for u in users if u.get("status") == "pending"]
@@ -39,13 +40,13 @@ def _render_members(sb):
                         st.success(f"{name} 승인 완료")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"승인 실패: {e}")
+                        st.error(safe_error("승인", e))
                 if c3.button("거절", key=f"rejt_{u['id']}", use_container_width=True):
                     try:
                         sb.table("users_settings").update({"status": "rejected"}).eq("id", u["id"]).execute()
                         st.rerun()
                     except Exception as e:
-                        st.error(f"거절 실패: {e}")
+                        st.error(safe_error("거절", e))
             st.divider()
         else:
             st.caption("승인 대기 없음")
@@ -84,13 +85,13 @@ def _render_members(sb):
                             st.success("변경됨")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"실패: {e}")
+                            st.error(safe_error("처리", e))
                     if c4.button("비활성화", key=f"deact_{u['id']}", use_container_width=True):
                         try:
                             sb.table("users_settings").update({"status": "rejected"}).eq("id", u["id"]).execute()
                             st.rerun()
                         except Exception as e:
-                            st.error(f"실패: {e}")
+                            st.error(safe_error("처리", e))
                     if c5.button("삭제", key=f"del_btn_{u['id']}", use_container_width=True):
                         st.session_state[del_key] = True
                         st.rerun()
@@ -121,7 +122,7 @@ def _render_members(sb):
                             sb.table("users_settings").update({"status": "approved", "role": "user"}).eq("id", u["id"]).execute()
                             st.rerun()
                         except Exception as e:
-                            st.error(f"실패: {e}")
+                            st.error(safe_error("처리", e))
                     if c3.button("삭제", key=f"del_btn_{u['id']}", use_container_width=True):
                         st.session_state[del_key] = True
                         st.rerun()
@@ -132,7 +133,7 @@ def _delete_user(sb, user_id: str):
     try:
         sb.table("users_settings").delete().eq("id", user_id).execute()
     except Exception as e:
-        st.error(f"설정 삭제 실패: {e}")
+        st.error(safe_error("설정 삭제", e))
         return
     try:
         sb.auth.admin.delete_user(user_id)
@@ -150,4 +151,4 @@ def _render_db_stats(sb):
                 res = sb.table(t).select("id", count="exact").execute()
                 st.text(f"{t}: {res.count}건")
         except Exception as e:
-            st.error(f"통계 조회 실패: {e}")
+            st.error(safe_error("통계 조회", e))

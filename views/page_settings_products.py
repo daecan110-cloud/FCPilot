@@ -2,6 +2,7 @@
 import pandas as pd
 import streamlit as st
 from auth import get_current_user_id
+from utils.helpers import safe_error
 from utils.supabase_client import get_supabase_client
 
 _CATEGORIES = ["종신보험", "건강보험", "연금보험", "저축보험", "변액보험", "기타"]
@@ -31,7 +32,7 @@ def render_product_section():
     try:
         rows = sb.table("fp_products").select("*").eq("fc_id", fc_id).order("name").execute().data or []
     except Exception as e:
-        st.error(f"조회 실패: {e}")
+        st.error(safe_error("조회", e))
         return
 
     # 상품 없고 초기화 미완료 → admin 상품 한 번만 복사
@@ -149,4 +150,4 @@ def _apply_changes(sb, fc_id: str, original_df: pd.DataFrame, edited_df: pd.Data
         st.success("저장되었습니다.")
         st.rerun()
     except Exception as e:
-        st.error(f"저장 실패: {e}")
+        st.error(safe_error("저장", e))
