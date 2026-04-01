@@ -162,6 +162,8 @@ def main():
 
 
 def _get_sales_mode() -> str:
+    if "cached_sales_mode" in st.session_state:
+        return st.session_state.cached_sales_mode
     try:
         from auth import get_current_user_id
         from utils.supabase_client import get_supabase_client
@@ -171,8 +173,10 @@ def _get_sales_mode() -> str:
         sb = get_supabase_client()
         res = sb.table("users_settings").select("mode").eq("id", user_id).execute()
         if res.data:
-            return res.data[0].get("mode", "both")
-    except Exception as e:
+            mode = res.data[0].get("mode", "both")
+            st.session_state.cached_sales_mode = mode
+            return mode
+    except Exception:
         pass
     return "both"
 

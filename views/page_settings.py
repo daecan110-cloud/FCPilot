@@ -138,6 +138,7 @@ def _save_settings(sb, user_id: str, display_name: str, company: str, mode: str)
             "company": company,
             "mode": mode,
         }).execute()
+        st.session_state.pop("cached_sales_mode", None)  # 영업 모드 캐시 무효화
         st.success("설정이 저장되었습니다.")
     except Exception as e:
         st.error(f"저장 실패: {e}")

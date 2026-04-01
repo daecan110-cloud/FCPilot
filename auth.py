@@ -81,38 +81,33 @@ def get_current_user_id() -> str:
 
 
 def get_user_status() -> str:
-    """users_settings.status 반환
-    - row 있고 status 명시: 그 값 반환
-    - row 있고 status null: 'approved' (기존 사용자 호환)
-    - row 없음: 'pending' (신규 가입 후 upsert 실패 케이스)
-    - DB 예외: 'approved' (오류 시 기존 사용자 차단 방지)
-    """
+    """users_settings.status 반환 — session_state 캐싱으로 매 렌더 DB 조회 방지"""
+    if "cached_user_status" in st.session_state:
+        return st.session_state.cached_user_status
     user_id = get_current_user_id()
     if not user_id:
         return "anonymous"
     try:
         sb = get_supabase_client()
-        res = sb.table("users_settings").select("status").eq("id", user_id).execute()
+        res = sb.table("users_settings").select("status, role").eq("id", user_id).execute()
         if res.data:
-            return res.data[0].get("status") or "approved"
-        return "pending"  # row 없음 = 신규 미승인
+            row = res.data[0]
+            status = row.get("status") or "approved"
+            # role도 함께 캐싱해서 is_admin() 추가 조회 방지
+            st.session_state.cached_user_status = status
+            st.session_state.cached_user_role = row.get("role", "user")
+            return status
+        st.session_state.cached_user_status = "pending"
+        return "pending"
     except Exception:
         pass
-    return "approved"  # DB 오류 시 기존 사용자 차단 방지
+    return "approved"
 
 
 def is_admin() -> bool:
-    user_id = get_current_user_id()
-    if not user_id:
-        return False
-    try:
-        sb = get_supabase_client()
-        res = sb.table("users_settings").select("role").eq("id", user_id).execute()
-        if res.data:
-            return res.data[0].get("role") == "admin"
-    except Exception:
-        pass
-    return False
+    if "cached_user_role" not in st.session_state:
+        get_user_status()  # 한 번 호출로 role까지 캐싱
+    return st.session_state.get("cached_user_role") == "admin"
 
 
 def check_session_timeout():

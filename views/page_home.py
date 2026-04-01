@@ -6,8 +6,8 @@ import streamlit as st
 from auth import get_current_user_id
 from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes, create_reminder, get_this_month_count
 from services.remind_trigger import check_and_send_daily_reminder
-from utils.supabase_client import get_supabase_client
 from utils.calendar_render import render_monthly_calendar
+from utils.supabase_client import get_supabase_client
 from utils.ui_components import grade_badge as _grade_badge, empty_state, section_header
 
 _TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
@@ -35,6 +35,11 @@ def render():
     c3.metric("이번 주", f"{len(this_week)}건")
     c4.metric("전체 대기", f"{len(overdue)+len(today)+len(this_week)}건")
 
+    # 상품 맵 한 번만 로드 (카드 N개 × 쿼리 1번 → 쿼리 1번으로 통합)
+    _sb = get_supabase_client()
+    from views.page_settings_products import get_active_products
+    _products_map = {p["id"]: p["name"] for p in get_active_products(_sb, fc_id)}
+
     with st.expander("📅 이번달 일정"):
         render_monthly_calendar(fc_id)
 
@@ -47,19 +52,19 @@ def render():
     if overdue:
         section_header(f"🔴 지연", f"{len(overdue)}건")
         for r in overdue:
-            _render_reminder_card(r, "overdue")
+            _render_reminder_card(r, "overdue", _products_map)
         st.divider()
 
     section_header(f"🟡 오늘 예정", f"{len(today)}건")
     for r in today:
-        _render_reminder_card(r, "today")
+        _render_reminder_card(r, "today", _products_map)
     if not today:
         empty_state("📋", "오늘 예정된 리마인드가 없습니다")
 
     st.divider()
     section_header(f"🔵 이번 주", f"{len(this_week)}건")
     for r in this_week:
-        _render_reminder_card(r, "week")
+        _render_reminder_card(r, "week", _products_map)
     if not this_week:
         empty_state("📅", "이번 주 예정된 리마인드가 없습니다")
 
@@ -67,7 +72,7 @@ def render():
     _render_recent_activity(fc_id)
 
 
-def _render_reminder_card(r: dict, bucket: str):
+def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):
     rid = r["id"]
     client = r.get("clients") or {}
     name = client.get("name", "이름 없음")
@@ -76,16 +81,12 @@ def _render_reminder_card(r: dict, bucket: str):
     memo = r.get("memo", "")
     d = r.get("reminder_date", "")
 
-    # 제안 상품 이름 조회
+    # 제안 상품 이름 — 미리 로드된 맵 사용 (쿼리 없음)
     prod_label = ""
-    if r.get("product_ids"):
-        try:
-            sb = get_supabase_client()
-            prods = (sb.table("fp_products").select("name")
-                     .in_("id", r["product_ids"]).execute().data or [])
-            prod_label = " | " + ", ".join(p["name"] for p in prods)
-        except Exception:
-            pass
+    if r.get("product_ids") and products_map:
+        names = [products_map[pid] for pid in r["product_ids"] if pid in products_map]
+        if names:
+            prod_label = " | " + ", ".join(names)
 
     grade_html = _grade_badge(grade) if grade else ""
     edit_key = f"edit_reminder_{rid}"
