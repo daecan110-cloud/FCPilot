@@ -8,6 +8,7 @@ from services.fp_reminder_service import get_bucketed, complete_reminder, cancel
 from services.remind_trigger import check_and_send_daily_reminder
 from utils.supabase_client import get_supabase_client
 from utils.calendar_render import render_monthly_calendar
+from utils.ui_components import grade_badge as _grade_badge, empty_state, section_header
 
 _TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
 
@@ -43,23 +44,23 @@ def render():
     st.divider()
 
     if overdue:
-        st.subheader(f"🔴 지연 ({len(overdue)}건)")
+        section_header(f"🔴 지연", f"{len(overdue)}건")
         for r in overdue:
             _render_reminder_card(r, "overdue")
         st.divider()
 
-    st.subheader(f"🟡 오늘 예정 ({len(today)}건)")
+    section_header(f"🟡 오늘 예정", f"{len(today)}건")
     for r in today:
         _render_reminder_card(r, "today")
     if not today:
-        st.info("오늘 예정된 리마인드가 없습니다.")
+        empty_state("📋", "오늘 예정된 리마인드가 없습니다")
 
     st.divider()
-    st.subheader(f"🔵 이번 주 ({len(this_week)}건)")
+    section_header(f"🔵 이번 주", f"{len(this_week)}건")
     for r in this_week:
         _render_reminder_card(r, "week")
     if not this_week:
-        st.info("이번 주 예정된 리마인드가 없습니다.")
+        empty_state("📅", "이번 주 예정된 리마인드가 없습니다")
 
     st.divider()
     _render_recent_activity(fc_id)
@@ -85,13 +86,13 @@ def _render_reminder_card(r: dict, bucket: str):
         except Exception:
             pass
 
-    grade_badge = f" [{grade}]" if grade else ""
+    grade_html = _grade_badge(grade) if grade else ""
     edit_key = f"edit_reminder_{rid}"
 
     with st.container(border=True):
         col_info, col_btn = st.columns([4, 1])
         with col_info:
-            st.markdown(f"**{name}**{grade_badge} — {purpose}{prod_label}")
+            st.markdown(f"**{name}** {grade_html} — {purpose}{prod_label}", unsafe_allow_html=True)
             if memo:
                 st.caption(memo)
             st.caption(f"예정일: {d}")
