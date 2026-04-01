@@ -1,6 +1,6 @@
 ---
 name: sprint-done
-description: Sprint 완료 처리 — 테스트 실행, 체크리스트 생성, 텔레그램 발송, handoff 업데이트, commit+push
+description: Sprint 완료 처리 — 테스트 실행, 문서 업데이트, commit+push, 텔레그램 발송
 ---
 
 Sprint 완료 자동화. 아래 순서대로 반드시 실행한다:
@@ -31,20 +31,21 @@ git diff --name-only $(git log --oneline | head -20 | tail -1 | cut -d' ' -f1)..
 ```
 각 항목에 **구체적 확인 방법**을 반드시 포함한다.
 
-## 3. 텔레그램 발송
-```python
-from utils.telegram import send_message
-send_message(체크리스트_내용)
-```
-
-## 4. handoff.md 업데이트
+## 3. handoff.md 업데이트
 - 완료 항목, 미완료 항목, 알려진 이슈 갱신
 - "영민 테스트 대기 중" 표시
 
-## 5. plan.md 업데이트
+## 4. plan.md 업데이트
 - 완료된 항목 체크
 
-## 6. commit + push
+## 5. commit + push
 ```bash
 git add -A && git commit -m "sprint: {요약}" && git push origin main
+```
+
+## 6. 텔레그램 발송 (마지막에 실행)
+모든 작업이 완료되고 push까지 끝난 후에 텔레그램을 보낸다.
+```python
+from utils.telegram import send_message
+send_message(체크리스트_내용)
 ```
