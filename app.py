@@ -53,9 +53,6 @@ st.markdown("""
         border-radius: 8px;
         padding: 10px;
     }
-    .stTabs [data-baseweb="tab-list"] {
-        border-bottom: 1px solid #E8E8E3;
-    }
     .stTabs [data-baseweb="tab"] {
         font-size: 14px;
         font-weight: 500;

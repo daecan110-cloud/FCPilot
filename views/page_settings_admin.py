@@ -3,10 +3,15 @@ import streamlit as st
 
 
 def render_admin_section(sb):
+    from utils.db_admin import get_admin_client
+    try:
+        admin_sb = get_admin_client()
+    except Exception:
+        admin_sb = sb  # fallback
     st.divider()
     st.subheader("🔧 Admin 관리")
-    _render_approval(sb)
-    _render_roles(sb)
+    _render_approval(admin_sb)
+    _render_roles(admin_sb)
     _render_db_stats(sb)
 
 
