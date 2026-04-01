@@ -16,9 +16,9 @@ st.markdown("""
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif !important;
         color: #37352F;
     }
-    /* 폼 요소는 브라우저 기본값에서 body 폰트 미상속 → 명시적 상속 */
-    input, button, textarea, select, label,
-    [data-baseweb], [data-baseweb] * {
+    /* 폼 요소는 브라우저 기본값에서 body 폰트 미상속 → 명시적 상속
+       [data-baseweb] * 는 Material Icons span 폰트까지 덮어써서 제거 */
+    input, button, textarea, select, label {
         font-family: inherit !important;
     }
 
