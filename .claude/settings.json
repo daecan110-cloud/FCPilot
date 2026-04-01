@@ -43,6 +43,21 @@
         "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then grep -n 'except:' \"$filepath\" | grep -v 'except Exception' && echo '⚠️ 경고: bare except 감지! except Exception as e: 로 변경 필요' || true; fi"
       },
       {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then grep -n 'shell=True' \"$filepath\" && echo '❌ BLOCK: shell=True 금지! shell=False + 리스트 사용' && exit 1 || true; fi"
+      },
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE 'views/.*\\.py$'; then grep -nE 'st\\.error\\(f\".*\\{e\\}' \"$filepath\" && echo '❌ BLOCK: st.error에 Exception 직접 노출 금지! safe_error() 사용' && exit 1 || true; fi"
+      },
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE 'views/.*\\.py$'; then grep -nP 'unsafe_allow_html=True' \"$filepath\" | while read -r line; do linenum=$(echo \"$line\" | cut -d: -f1); context=$(sed -n \"$((linenum-3)),$((linenum))p\" \"$filepath\"); if echo \"$context\" | grep -qE '\\{[a-z]' | grep -v 'esc('; then echo \"⚠️ 경고: $filepath:$linenum unsafe_allow_html에 이스케이프 안 된 변수 가능성\"; fi; done || true; fi"
+      },
+      {
         "matcher": "Bash",
         "type": "command",
         "command": "if echo \"$CLAUDE_TOOL_ARG_COMMAND\" | grep -qiE 'curl.*supabase|curl.*api\\.anthropic|wget.*secret|curl.*token'; then echo '❌ BLOCK: 외부로 민감 데이터 전송 시도 차단!' && exit 1; fi"
