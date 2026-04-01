@@ -54,18 +54,15 @@ st.markdown("""
         padding: 10px;
     }
     .stTabs [data-baseweb="tab-list"] {
-        gap: 0;
         border-bottom: 1px solid #E8E8E3;
     }
     .stTabs [data-baseweb="tab"] {
         font-size: 14px;
         font-weight: 500;
         color: #787774;
-        padding: 8px 16px;
     }
     .stTabs [aria-selected="true"] {
         color: #37352F;
-        border-bottom: 2px solid #37352F;
     }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }

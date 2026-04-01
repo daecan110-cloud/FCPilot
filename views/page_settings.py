@@ -51,9 +51,9 @@ def render():
                         st.caption(e)
 
     if is_admin():
-        with st.expander("🔧 Admin 관리"):
-            from views.page_settings_admin import render_admin_section
-            render_admin_section(sb)
+        st.markdown("---")
+        from views.page_settings_admin import render_admin_section
+        render_admin_section(sb)
 
     st.markdown("---")
     st.caption(f"FCPilot v1.0.0 · {user_id[:8]}... · 역할: {settings.get('role', 'user')}")
