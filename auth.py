@@ -81,7 +81,7 @@ def get_current_user_id() -> str:
 
 
 def get_user_status() -> str:
-    """users_settings.status 반환 — 없으면 'approved' (기존 사용자 호환)"""
+    """users_settings.status 반환 — 없으면 'pending' (미승인 안전 기본값)"""
     user_id = get_current_user_id()
     if not user_id:
         return "anonymous"
@@ -89,10 +89,10 @@ def get_user_status() -> str:
         sb = get_supabase_client()
         res = sb.table("users_settings").select("status").eq("id", user_id).execute()
         if res.data:
-            return res.data[0].get("status") or "approved"
+            return res.data[0].get("status") or "pending"
     except Exception:
         pass
-    return "approved"
+    return "pending"
 
 
 def is_admin() -> bool:
@@ -197,12 +197,14 @@ def _do_signup(email: str, password: str, display_name: str):
             "options": {"data": {"display_name": display_name}},
         })
         if res.user:
-            # 승인 대기 상태로 users_settings 등록
+            # 승인 대기 상태로 users_settings 등록 (admin client로 RLS 우회)
             try:
-                sb.table("users_settings").upsert({
+                from utils.db_admin import get_admin_client
+                get_admin_client().table("users_settings").upsert({
                     "id": res.user.id,
                     "display_name": display_name,
                     "status": "pending",
+                    "role": "user",
                 }).execute()
             except Exception:
                 pass

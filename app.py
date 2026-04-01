@@ -61,6 +61,9 @@ st.markdown("""
     .stTabs [aria-selected="true"] {
         color: #37352F;
     }
+    /* expander 기본 아이콘 숨김 — Material Icons 미로드 시 arrow_right 텍스트 방지 */
+    [data-testid="stExpanderToggleIcon"] { display: none !important; }
+
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
     header { visibility: hidden; }

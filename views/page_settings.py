@@ -30,14 +30,14 @@ def render():
             if st.form_submit_button("저장", use_container_width=True, type="primary"):
                 _save_settings(sb, user_id, display_name, company, mode)
 
-    with st.expander("상품 관리"):
+    with st.expander("📦 상품 관리"):
         from views.page_settings_products import render_product_section
         render_product_section()
 
     with st.expander("유입경로 관리"):
         _render_source_categories(sb, user_id)
 
-    with st.expander("데이터 관리"):
+    with st.expander("💾 데이터 관리"):
         st.caption("고객 데이터를 CSV로 가져오거나 내보낼 수 있습니다.")
         csv_file = st.file_uploader("CSV 가져오기", type=["csv"], key="settings_csv")
         if csv_file and st.button("가져오기 시작", type="primary"):
