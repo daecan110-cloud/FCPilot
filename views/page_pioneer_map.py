@@ -47,38 +47,31 @@ def _render_map():
         format_func=lambda x: STATUS_LABELS[x],
     )
     filtered = [s for s in shops if s.get("status") in status_filter]
-    st.caption(f"전체 {len(shops)}개 | 표시 {len(filtered)}개")
 
-    components.html(pioneer_map_html(filtered, height=500), height=500)
-
-    # 매장 목록 — 클릭 시 지도 포커스
-    for s in filtered:
-        status = STATUS_LABELS.get(s.get("status", ""), "등록")
-        with st.expander(f"{s.get('shop_name', '')} ({status})"):
-            st.text(f"주소: {s.get('address', '-')}")
-            st.text(f"업종: {s.get('category', '-')}")
-            if s.get("memo"):
-                st.text(f"메모: {s['memo']}")
-
-            col_focus, col_status = st.columns(2)
-            with col_focus:
-                if st.button("지도에서 보기", key=f"focus_{s['id']}"):
-                    st.session_state.map_focus_shop = s["id"]
-                    st.rerun()
-
-            with col_status:
+    map_col, list_col = st.columns([7, 3])
+    with map_col:
+        st.caption(f"전체 {len(shops)}개 | 표시 {len(filtered)}개")
+        components.html(pioneer_map_html(filtered, height=480), height=480)
+    with list_col:
+        st.caption(f"매장 {len(filtered)}곳")
+        STATUS_ICON = {"active": "🟡", "visited": "🔵", "contracted": "🟢", "rejected": "🔴"}
+        for s in filtered[:20]:
+            icon = STATUS_ICON.get(s.get("status", ""), "⚪")
+            with st.container(border=True):
+                st.markdown(f"{icon} **{s.get('shop_name', '')}**")
+                st.caption(s.get("address", ""))
                 new_status = st.selectbox(
                     "상태",
                     options=list(STATUS_LABELS.keys()),
                     index=list(STATUS_LABELS.keys()).index(s.get("status", "active")),
                     format_func=lambda x: STATUS_LABELS[x],
                     key=f"status_{s['id']}",
+                    label_visibility="collapsed",
                 )
                 if new_status != s.get("status"):
-                    if st.button("변경", key=f"change_{s['id']}"):
+                    if st.button("변경", key=f"change_{s['id']}", use_container_width=True):
                         try:
                             sb.table("pioneer_shops").update({"status": new_status}).eq("id", s["id"]).execute()
-                            st.success("변경되었습니다.")
                             st.rerun()
                         except Exception as e:
                             st.error(f"변경 실패: {e}")
