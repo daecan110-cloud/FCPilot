@@ -1,7 +1,6 @@
 ---
 name: sprint-done
 description: Sprint 완료 처리 — 테스트 실행, 체크리스트 생성, 텔레그램 발송, handoff 업데이트, commit+push
-user_invocable: true
 ---
 
 Sprint 완료 자동화. 아래 순서대로 반드시 실행한다:
