@@ -35,8 +35,10 @@ def render():
         st.info("PDF 파일을 업로드해주세요.")
         return
 
-    if uploaded_file.size > MAX_FILE_SIZE_MB * 1024 * 1024:
-        st.error(f"파일 크기가 {MAX_FILE_SIZE_MB}MB를 초과합니다.")
+    from utils.helpers import validate_file
+    file_err = validate_file(uploaded_file, ["pdf"], MAX_FILE_SIZE_MB)
+    if file_err:
+        st.error(file_err)
         return
 
     pdf_bytes = uploaded_file.read()
@@ -146,7 +148,7 @@ def _save_to_db(data: dict, silent: bool = False):
                         path, excel_bytes,
                         {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
                     )
-                    sb.table("analysis_records").update({"excel_path": path}).eq("id", record_id).execute()
+                    sb.table("analysis_records").update({"excel_path": path}).eq("id", record_id).eq("fc_id", fc_id).execute()
                 except Exception:
                     pass  # 업로드 실패해도 분석 기록은 유지
 

@@ -317,7 +317,7 @@ def _render_contact_logs(sb, client_id: str):
     fc_id = get_current_user_id()
     st.subheader("상담 이력")
     try:
-        res = sb.table("contact_logs").select("*").eq("client_id", client_id).order("created_at", desc=True).limit(50).execute()
+        res = sb.table("contact_logs").select("*").eq("client_id", client_id).eq("fc_id", fc_id).order("created_at", desc=True).limit(50).execute()
         logs = res.data or []
     except Exception as e:
         st.error(safe_error("이력 조회", e))

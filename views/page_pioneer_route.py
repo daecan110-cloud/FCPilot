@@ -79,9 +79,9 @@ def _render_today():
 
                 # 매장 상태 업데이트
                 if result == "contracted":
-                    sb.table("pioneer_shops").update({"status": "contracted"}).eq("id", shop_id).execute()
+                    sb.table("pioneer_shops").update({"status": "contracted"}).eq("id", shop_id).eq("fc_id", fc_id).execute()
                 elif result:
-                    sb.table("pioneer_shops").update({"status": "visited"}).eq("id", shop_id).execute()
+                    sb.table("pioneer_shops").update({"status": "visited"}).eq("id", shop_id).eq("fc_id", fc_id).execute()
 
                 st.success("방문 기록이 추가되었습니다.")
                 st.rerun()
@@ -230,7 +230,7 @@ def _regeocode_missing(sb, fc_id: str):
         coords = geocode(addr)
         if coords:
             try:
-                sb.table("pioneer_shops").update({"lat": coords[0], "lng": coords[1]}).eq("id", s["id"]).execute()
+                sb.table("pioneer_shops").update({"lat": coords[0], "lng": coords[1]}).eq("id", s["id"]).eq("fc_id", fc_id).execute()
                 ok += 1
             except Exception:
                 fail += 1

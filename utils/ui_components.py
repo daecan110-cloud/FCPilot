@@ -1,4 +1,6 @@
 """FCPilot 공통 UI 컴포넌트"""
+import html as _html
+
 import streamlit as st
 
 GRADE_COLORS = {
@@ -12,7 +14,7 @@ def grade_badge(grade: str) -> str:
     color = GRADE_COLORS.get(grade, "#9ca3af")
     return (
         f'<span style="background:{color}; color:white; padding:2px 10px; '
-        f'border-radius:6px; font-size:11px; font-weight:600; letter-spacing:0.5px;">{grade}</span>'
+        f'border-radius:6px; font-size:11px; font-weight:600; letter-spacing:0.5px;">{_html.escape(str(grade))}</span>'
     )
 
 

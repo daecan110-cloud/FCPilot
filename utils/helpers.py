@@ -32,8 +32,16 @@ def safe_error(action: str, e: Exception) -> str:
     return f"{action}: 오류가 발생했습니다. 다시 시도해주세요."
 
 
+_MAGIC_BYTES = {
+    "pdf": b"%PDF-",
+    "jpg": b"\xff\xd8\xff",
+    "jpeg": b"\xff\xd8\xff",
+    "png": b"\x89PNG\r\n\x1a\n",
+}
+
+
 def validate_file(uploaded_file, allowed_types: list, max_mb: int) -> str | None:
-    """파일 검증. 문제 있으면 에러 메시지 반환, 정상이면 None"""
+    """파일 검증 (확장자 + 크기 + magic bytes). 문제 있으면 에러 메시지 반환."""
     if uploaded_file is None:
         return "파일을 선택해주세요."
 
@@ -43,5 +51,13 @@ def validate_file(uploaded_file, allowed_types: list, max_mb: int) -> str | None
 
     if uploaded_file.size > max_mb * 1024 * 1024:
         return f"파일 크기가 {max_mb}MB를 초과합니다."
+
+    # magic bytes 검증
+    expected = _MAGIC_BYTES.get(ext)
+    if expected:
+        header = uploaded_file.read(len(expected))
+        uploaded_file.seek(0)
+        if not header.startswith(expected):
+            return f"파일 내용이 {ext} 형식과 일치하지 않습니다."
 
     return None

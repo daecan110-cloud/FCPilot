@@ -102,7 +102,10 @@ var DATA = {data_json};
 </body></html>"""
 
 
-_ROUTE_SCRIPT = """
+_ESC_JS = """function _e(s){if(!s)return'';var d=document.createElement('div');d.appendChild(document.createTextNode(s));return d.innerHTML;}
+"""
+
+_ROUTE_SCRIPT = _ESC_JS + """
 var valid = DATA.filter(function(v){return v.lat && v.lng;});
 var center = valid.length
   ? new naver.maps.LatLng(
@@ -127,10 +130,10 @@ valid.forEach(function(v){
     anchor:new naver.maps.Point(15,15)
   }});
   var iw=new naver.maps.InfoWindow({content:
-    '<div class="iw"><b>#'+v.order+' '+v.name+'</b>'+
-    (v.result?'결과: '+v.result+'<br>':'')+
-    (v.memo?v.memo+'<br>':'')+
-    (v.addr?'<small>'+v.addr+'</small>':'')+
+    '<div class="iw"><b>#'+v.order+' '+_e(v.name)+'</b>'+
+    (v.result?'결과: '+_e(v.result)+'<br>':'')+
+    (v.memo?_e(v.memo)+'<br>':'')+
+    (v.addr?'<small>'+_e(v.addr)+'</small>':'')+
     '</div>'
   });
   naver.maps.Event.addListener(m,'click',(function(m,iw){return function(){iw.getMap()?iw.close():iw.open(map,m);};})(m,iw));
@@ -146,7 +149,7 @@ if(coords.length>0){
 }
 """
 
-_PIONEER_SCRIPT = """
+_PIONEER_SCRIPT = _ESC_JS + """
 var valid = DATA.filter(function(s){return s.lat && s.lng;});
 var center = valid.length
   ? new naver.maps.LatLng(
@@ -170,11 +173,11 @@ DATA.forEach(function(s){
     anchor:new naver.maps.Point(7,7)
   }});
   var iw=new naver.maps.InfoWindow({content:
-    '<div class="iw"><b>'+s.name+'</b>'+
-    '상태: <span style="color:'+s.color+'">'+s.status+'</span><br>'+
-    (s.cat?'업종: '+s.cat+'<br>':'')+
-    (s.addr?'<small>'+s.addr+'</small>':'')+
-    (s.memo?'<br><small>'+s.memo+'</small>':'')+
+    '<div class="iw"><b>'+_e(s.name)+'</b>'+
+    '상태: <span style="color:'+s.color+'">'+_e(s.status)+'</span><br>'+
+    (s.cat?'업종: '+_e(s.cat)+'<br>':'')+
+    (s.addr?'<small>'+_e(s.addr)+'</small>':'')+
+    (s.memo?'<br><small>'+_e(s.memo)+'</small>':'')+
     '</div>'
   });
   naver.maps.Event.addListener(m,'click',(function(m,iw){return function(){iw.getMap()?iw.close():iw.open(map,m);};})(m,iw));

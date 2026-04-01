@@ -126,7 +126,7 @@ def _apply_changes(sb, fc_id: str, original_df: pd.DataFrame, edited_df: pd.Data
             edited_names = set(edited_df["상품명"].tolist())
             for r in original_df.itertuples():
                 if r.상품명 not in edited_names:
-                    sb.table("fp_products").delete().eq("id", r._id).execute()
+                    sb.table("fp_products").delete().eq("id", r._id).eq("fc_id", fc_id).execute()
 
         # 기존 행 수정 + 신규 행 추가
         for i, row in edited_df.iterrows():
@@ -141,7 +141,7 @@ def _apply_changes(sb, fc_id: str, original_df: pd.DataFrame, edited_df: pd.Data
                 pid = orig_ids[i]
                 sb.table("fp_products").update({
                     "name": name, "category": cat, "is_active": active, "updated_at": "now()",
-                }).eq("id", pid).execute()
+                }).eq("id", pid).eq("fc_id", fc_id).execute()
             else:  # 신규 행
                 sb.table("fp_products").insert({
                     "fc_id": fc_id, "name": name, "category": cat, "is_active": active,

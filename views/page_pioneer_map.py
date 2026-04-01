@@ -72,7 +72,7 @@ def _render_map():
                 if new_status != s.get("status"):
                     if st.button("변경", key=f"change_{s['id']}", use_container_width=True):
                         try:
-                            sb.table("pioneer_shops").update({"status": new_status}).eq("id", s["id"]).execute()
+                            sb.table("pioneer_shops").update({"status": new_status}).eq("id", s["id"]).eq("fc_id", fc_id).execute()
                             st.rerun()
                         except Exception as e:
                             st.error(safe_error("변경", e))
@@ -118,6 +118,13 @@ def _render_ocr():
     st.caption("간판 사진을 업로드하면 AI가 가게명/업종을 자동 추출합니다.")
 
     photo = st.file_uploader("간판 사진", type=["jpg", "jpeg", "png"])
+
+    if photo:
+        from utils.helpers import validate_file
+        photo_err = validate_file(photo, ["jpg", "jpeg", "png"], 10)
+        if photo_err:
+            st.error(photo_err)
+            photo = None
 
     if photo and st.button("간판 분석", type="primary"):
         from services.ocr_engine import extract_from_sign
