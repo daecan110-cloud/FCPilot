@@ -30,12 +30,13 @@ def render():
     _render_analysis(sb, fc_id, since)
 
 
-_PERIOD_DAYS = {"오늘": 1, "최근 3일": 3, "최근 7일": 7, "최근 30일": 30, "최근 3개월": 90}
+_PERIOD_DAYS = {"오늘": 0, "최근 3일": 3, "최근 7일": 7, "최근 30일": 30, "최근 3개월": 90}
 
 
 def _since(period: str) -> str | None:
-    d = _PERIOD_DAYS.get(period)
-    return str(date.today() - timedelta(days=d)) if d else None
+    if period not in _PERIOD_DAYS:
+        return None
+    return str(date.today() - timedelta(days=_PERIOD_DAYS[period]))
 
 
 def _q(sb, table: str, fields: str, fc_id: str, since: str | None):
