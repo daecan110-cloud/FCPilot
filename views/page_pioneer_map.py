@@ -4,7 +4,7 @@ import streamlit.components.v1 as components
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from utils.map_utils import STATUS_LABELS
-from utils.naver_map import pioneer_map_html
+from utils.kakao_map import pioneer_map_html
 from services.geocoding import geocode
 from config import ALLOWED_FILE_TYPES, MAX_FILE_SIZE_MB
 from utils.helpers import safe_error
@@ -224,29 +224,8 @@ def _dms_to_decimal(dms, ref) -> float | None:
 
 
 def _reverse_geocode(lat: float, lng: float) -> str:
-    try:
-        import requests
-        import streamlit as st
-        client_id = st.secrets["naver"]["client_id"]
-        client_secret = st.secrets["naver"]["client_secret"]
-        r = requests.get(
-            "https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc",
-            params={"coords": f"{lng},{lat}", "output": "json", "orders": "roadaddr,addr"},
-            headers={"X-NCP-APIGW-API-KEY-ID": client_id, "X-NCP-APIGW-API-KEY": client_secret},
-            timeout=5,
-        )
-        results = r.json().get("results", [])
-        if results:
-            region = results[0].get("region", {})
-            land = results[0].get("land", {})
-            area1 = region.get("area1", {}).get("name", "")
-            area2 = region.get("area2", {}).get("name", "")
-            area3 = region.get("area3", {}).get("name", "")
-            number = land.get("number1", "")
-            return " ".join(filter(None, [area1, area2, area3, number]))
-    except Exception:
-        pass
-    return ""
+    from services.geocoding import reverse_geocode
+    return reverse_geocode(lat, lng)
 
 
 # ── 팔로업 (BUG-08) ──

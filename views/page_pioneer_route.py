@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from utils.map_utils import VISIT_RESULT_LABELS
-from utils.naver_map import route_map_html
+from utils.kakao_map import route_map_html
 from services.geocoding import geocode
 from utils.helpers import safe_error
 
