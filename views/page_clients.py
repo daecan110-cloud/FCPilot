@@ -116,11 +116,11 @@ def _render_list():
     if region_filter:
         query = query.ilike("address", f"%{region_filter}%")
 
+    GRADE_ORDER = {"VIP": 0, "S": 1, "A": 2, "B": 3, "C": 4, "D": 5}
+
     if sort_by == "이름순":
         query = query.order("name")
-    elif sort_by == "등급순":
-        query = query.order("prospect_grade")
-    else:
+    elif sort_by != "등급순":
         query = query.order("created_at", desc=True)
 
     try:
@@ -129,6 +129,9 @@ def _render_list():
     except Exception as e:
         st.error(f"조회 실패: {e}")
         return
+
+    if sort_by == "등급순":
+        clients.sort(key=lambda c: GRADE_ORDER.get(c.get("prospect_grade", "D"), 5))
 
     if contact_filter != "전체" or sort_by == "최근 상담순":
         try:
