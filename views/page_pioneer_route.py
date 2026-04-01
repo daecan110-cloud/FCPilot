@@ -116,7 +116,6 @@ def _render_today():
             if st.button("📍 좌표 없는 매장 재조회", key="regeo_today"):
                 _regeocode_missing(sb, fc_id)
 
-        m = create_route_map(visits_for_map)
         components.html(route_map_html(visits_for_map, height=420), height=420)
 
         for v in visits_for_map:
