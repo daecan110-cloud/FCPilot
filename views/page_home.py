@@ -14,8 +14,16 @@ _TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
 
 
 def render():
-    st.header("오늘의 할 일")
-    st.caption(f"{date.today().strftime('%Y년 %m월 %d일')}")
+    # 헤더 영역
+    col_h1, col_h2 = st.columns([3, 1])
+    with col_h1:
+        st.markdown(
+            f'<div style="margin-bottom:4px;">'
+            f'<span style="font-size:26px; font-weight:700; color:#1a1a2e;">오늘의 할 일</span>'
+            f'</div>'
+            f'<span style="font-size:14px; color:#9ca3af;">{date.today().strftime("%Y년 %m월 %d일")}</span>',
+            unsafe_allow_html=True,
+        )
 
     fc_id = get_current_user_id()
     if not fc_id:
@@ -30,56 +38,49 @@ def render():
         buckets["this_month"], buckets["no_date"],
     )
 
-    # 요약 메트릭
+    # 요약 메트릭 — 컬러 아이콘 포함
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("오늘 예정", f"{len(today)}건")
-    c2.metric("이번 주", f"{len(this_week)}건")
-    c3.metric("이번달", f"{len(this_month)}건")
-    c4.metric("기간 없음", f"{len(no_date)}건")
+    c1.metric("🔴 오늘", f"{len(today)}건")
+    c2.metric("🟡 이번 주", f"{len(this_week)}건")
+    c3.metric("🔵 이번달", f"{len(this_month)}건")
+    c4.metric("⚪ 미정", f"{len(no_date)}건")
 
     # 상품 맵 한 번만 로드 (N+1 방지)
     _sb = get_supabase_client()
     from views.page_settings_products import get_active_products
     _products_map = {p["id"]: p["name"] for p in get_active_products(_sb, fc_id)}
 
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     with st.expander("📅 이번달 일정"):
         render_monthly_calendar(fc_id)
 
-    # 리마인드 추가
     with st.expander("➕ 리마인드 추가"):
         _render_add_reminder_form(fc_id)
 
-    st.divider()
+    # 섹션들
+    _render_section("🔴 오늘 예정", today, "today", _products_map, "📋", "오늘 예정된 리마인드가 없습니다")
+    _render_section("🟡 이번 주", this_week, "week", _products_map, "📅", "이번 주 예정된 리마인드가 없습니다")
+    _render_section("🔵 이번달", this_month, "month", _products_map, "📅", "이번달 추가 예정이 없습니다")
+    _render_section("⚪ 기간 없음", no_date, "nodate", _products_map, "📌", "기간 없는 리마인드가 없습니다")
 
-    section_header("🟡 오늘 예정", f"{len(today)}건")
-    for r in today:
-        _render_reminder_card(r, "today", _products_map)
-    if not today:
-        empty_state("📋", "오늘 예정된 리마인드가 없습니다")
-
-    st.divider()
-    section_header("🔵 이번 주", f"{len(this_week)}건")
-    for r in this_week:
-        _render_reminder_card(r, "week", _products_map)
-    if not this_week:
-        empty_state("📅", "이번 주 예정된 리마인드가 없습니다")
-
-    st.divider()
-    section_header("📅 이번달", f"{len(this_month)}건")
-    for r in this_month:
-        _render_reminder_card(r, "month", _products_map)
-    if not this_month:
-        empty_state("📅", "이번달 추가 예정이 없습니다")
-
-    st.divider()
-    section_header("📌 기간 없음", f"{len(no_date)}건")
-    for r in no_date:
-        _render_reminder_card(r, "nodate", _products_map)
-    if not no_date:
-        empty_state("📌", "기간 없는 리마인드가 없습니다")
-
-    st.divider()
+    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     _render_recent_activity(fc_id)
+
+
+def _render_section(title: str, items: list, bucket: str, products_map: dict, empty_icon: str, empty_msg: str):
+    """리마인드 섹션 렌더링"""
+    st.markdown(
+        f'<div style="margin-top:28px; margin-bottom:12px;">'
+        f'<span style="font-size:16px; font-weight:600; color:#1a1a2e;">{title}</span>'
+        f'<span style="font-size:13px; color:#9ca3af; margin-left:8px;">{len(items)}건</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    for r in items:
+        _render_reminder_card(r, bucket, products_map)
+    if not items:
+        empty_state(empty_icon, empty_msg)
 
 
 def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):

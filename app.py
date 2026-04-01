@@ -10,19 +10,15 @@ st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* Pretendard: html/body 상속으로 적용
-       [class*="st-"] !important 는 아이콘 span 폰트까지 덮어써서 arrow_right 노출 — 제거 */
     html, body {
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif !important;
-        color: #37352F;
+        color: #1a1a2e;
     }
-    /* 폼 요소는 브라우저 기본값에서 body 폰트 미상속 → 명시적 상속
-       [data-baseweb] * 는 Material Icons span 폰트까지 덮어써서 제거 */
     input, button, textarea, select, label {
         font-family: inherit !important;
     }
 
-    /* expander 아이콘 완전 숨김 — 다중 selector로 Streamlit 버전 무관 대응 */
+    /* expander 아이콘 숨김 */
     [data-testid="stExpanderToggleIcon"],
     [data-testid="stExpander"] details > summary svg,
     [data-testid="stExpander"] summary > div > span:first-child {
@@ -30,53 +26,127 @@ st.markdown("""
         font-size: 0 !important;
     }
 
-    .stApp { background-color: #FFFFFF; }
+    .stApp { background-color: #f8f9fc; }
 
+    /* 사이드바 */
     [data-testid="stSidebar"] {
-        background-color: #F7F7F5;
-        border-right: 1px solid #E8E8E3;
+        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+        border-right: none;
+    }
+    [data-testid="stSidebar"] * {
+        color: #e0e0e0 !important;
+    }
+    [data-testid="stSidebar"] .stRadio label {
+        padding: 8px 12px;
+        border-radius: 8px;
+        transition: background 0.15s;
+    }
+    [data-testid="stSidebar"] .stRadio label:hover {
+        background: rgba(255,255,255,0.08);
+    }
+    [data-testid="stSidebar"] .stRadio label[data-checked="true"],
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
+    }
+    [data-testid="stSidebar"] .stButton > button {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.15);
+        color: #e0e0e0 !important;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: rgba(255,255,255,0.18);
+    }
+    [data-testid="stSidebar"] hr {
+        border-color: rgba(255,255,255,0.1);
     }
 
-    h1 { font-weight: 700; font-size: 26px; color: #37352F; margin-bottom: 4px; }
-    h2 { font-weight: 600; font-size: 20px; color: #37352F; margin-top: 20px; }
-    h3 { font-weight: 600; font-size: 16px; color: #37352F; }
+    /* 타이포그래피 */
+    h1 { font-weight: 700; font-size: 26px; color: #1a1a2e; margin-bottom: 4px; }
+    h2 { font-weight: 600; font-size: 20px; color: #1a1a2e; margin-top: 20px; }
+    h3 { font-weight: 600; font-size: 16px; color: #1a1a2e; }
+
+    /* 메트릭 카드 */
+    [data-testid="stMetric"] {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        border: 1px solid #eef0f4;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #6b7280 !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #1a1a2e !important;
+        font-weight: 700 !important;
+    }
+
+    /* 컨테이너/카드 */
+    [data-testid="stExpander"],
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stVerticalBlock"][data-has-border="true"]) {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #eef0f4;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
 
     .notion-card {
-        background: #FFFFFF;
-        border: 1px solid #E8E8E3;
-        border-radius: 8px;
+        background: #ffffff;
+        border: 1px solid #eef0f4;
+        border-radius: 12px;
         padding: 16px;
         margin-bottom: 10px;
-        transition: background 0.1s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        transition: box-shadow 0.15s, transform 0.15s;
     }
-    .notion-card:hover { background: #F7F7F5; }
+    .notion-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transform: translateY(-1px);
+    }
 
+    /* 버튼 */
     .stButton > button {
-        border-radius: 6px;
+        border-radius: 8px;
         font-weight: 500;
         font-size: 14px;
+        transition: all 0.15s;
     }
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        border: none;
+    }
+    .stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #4338ca, #4f46e5);
+        box-shadow: 0 4px 12px rgba(79,70,229,0.3);
+    }
+
+    /* 인풋 */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
-        border: 1px solid #E8E8E3;
-        border-radius: 6px;
-        font-size: 14px;
-    }
-    hr { border-color: #E8E8E3; margin: 20px 0; }
-
-    [data-testid="stMetric"] {
-        background: #F7F7F5;
+        border: 1px solid #e5e7eb;
         border-radius: 8px;
-        padding: 10px;
+        font-size: 14px;
+        background: #ffffff;
     }
+    .stTextInput > div > div > input:focus,
+    .stTextArea > div > div > textarea:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+    }
+
+    hr { border-color: #eef0f4; margin: 24px 0; }
+
     .stTabs [data-baseweb="tab"] {
         font-size: 14px;
         font-weight: 500;
-        color: #787774;
+        color: #9ca3af;
+        border-radius: 8px;
     }
     .stTabs [aria-selected="true"] {
-        color: #37352F;
+        color: #4f46e5;
+        font-weight: 600;
     }
+
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
     header { visibility: hidden; }
@@ -112,10 +182,20 @@ def main():
     check_session_timeout()
 
     with st.sidebar:
-        st.markdown("### 🛡️ FCPilot")
+        st.markdown(
+            '<div style="text-align:center; padding:12px 0 4px;">'
+            '<span style="font-size:22px; font-weight:700; color:#ffffff !important;">🛡️ FCPilot</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         user = st.session_state.get("user")
         if user:
-            st.caption(user.email)
+            st.markdown(
+                f'<div style="text-align:center; padding-bottom:8px;">'
+                f'<span style="font-size:12px; color:#94a3b8 !important;">{user.email}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
         st.markdown("---")
 
         # UX-04: 영업 모드에 따라 탭 순서 변경

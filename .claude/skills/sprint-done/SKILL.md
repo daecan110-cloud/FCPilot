@@ -9,7 +9,12 @@ Sprint 완료 자동화. 아래 순서대로 반드시 실행한다:
 ```bash
 python tests/test_all.py
 ```
-실패하면 여기서 멈추고 실패 내용을 보고한다.
+- **성공** → 2단계로 진행
+- **실패** → 실패 내용을 텔레그램으로 발송한 뒤 여기서 멈춘다:
+```python
+from utils.telegram import send_message
+send_message("❌ Sprint 테스트 실패\n\n" + 실패_내용)
+```
 
 ## 2. 변경 파일 기반 테스트 체크리스트 생성
 ```bash

@@ -23,7 +23,7 @@ def check_and_send_daily_reminder():
     # fp_reminders: 지연 + 오늘 예정
     from services.fp_reminder_service import get_bucketed
     buckets = get_bucketed(fc_id)
-    due_reminders = buckets["overdue"] + buckets["today"]
+    due_reminders = buckets["today"]
 
     # 개척 팔로업: 기한 초과 매장
     from services.followup import get_followup_list
