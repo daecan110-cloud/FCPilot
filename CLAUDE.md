@@ -26,6 +26,10 @@ sql/ → 마이그레이션 / templates/ → 정적 파일
 - 종료: handoff.md 업데이트 → plan.md 체크 → commit+push
 - 테스트: Sprint 완료 시 / 3개+ 파일 변경 시 → `python tests/test_all.py`
 
+## Sprint 완료 규칙
+- 의미 있는 작업 단위가 끝났다고 판단되면 → "sprint-done 실행할까요?" 영민에게 물어보기
+- 세션 종료 시 → `/sprint-done` 자동 실행 (테스트 → 텔레그램 → handoff → commit+push)
+
 ## 스크린샷
 경로: `C:\FCPilot\screenshots\` (고정)
 "캡처 N장 봐줘" → 최신순 정렬 후 지정 장수만큼 읽기
