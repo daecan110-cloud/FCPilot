@@ -96,11 +96,22 @@
 - [x] `utils/secrets_loader.py` 공용 모듈 생성 — CLI 스크립트용 secrets.toml 파서
 - [x] hook 보안 스캔 패턴 강화 (JWT/봇토큰/Claude키/Gemini키 실제 포맷 정규식)
 
+### 텔레그램 봇 분리 완료
+- [x] `[telegram_dev]` — claudeFC_bot: 작업 알림 (Sprint, 에러, 테스트)
+- [x] `[telegram_user]` — FCPilot 봇: 사용자 기능 (고객 조회/등록, 리마인드, Claude 챗)
+- [x] Edge Function 환경변수명 변경 (TELEGRAM_USER_BOT_TOKEN)
+
 ### 영민 액션 필요
-- [ ] **Supabase service_role 키 재생성** (Dashboard → Settings → API → service_role → Regenerate)
-- [ ] **텔레그램 봇 토큰 재발급** (BotFather → /revoke → /newbot 또는 기존 봇 토큰 재발급)
-- [ ] **DB 비밀번호 변경** (Dashboard → Settings → Database → Reset password)
-- [ ] 재생성 후 secrets.toml 업데이트 필수
+- [ ] **Supabase service_role 키 재생성** (Dashboard → Settings → API)
+- [ ] **DB 비밀번호 변경** (Dashboard → Settings → Database)
+- [ ] **BotFather에서 봇 토큰 2개 재발급** → /revoke 후 새 토큰 발급
+  - claudeFC_bot 토큰 → secrets.toml `[telegram_dev].bot_token`
+  - FCPilot 봇 토큰 → secrets.toml `[telegram_user].bot_token`
+- [ ] **Supabase Edge Function 환경변수** 업데이트
+  - `TELEGRAM_USER_BOT_TOKEN` = FCPilot 봇 새 토큰
+  - `TELEGRAM_USER_CHAT_ID` = 8201988543
+- [ ] **Streamlit Cloud secrets** 업데이트 (같은 구조)
+- [ ] 위 전부 완료 후 secrets.toml 저장
 
 ### 근본 원인
 Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키 하드코딩으로 우회한 것 (Sprint 5~7 설계 실수)
@@ -113,7 +124,7 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 |----------|------|------|
 | 🟡 MID | 캘린더 날짜 버튼이 HTML과 중복 렌더링 | HTML 캘린더 + st.button 그리드 겹침 가능성 |
 | 🟢 LOW | 200줄 초과 파일 리팩토링 | page_clients.py (~530줄) |
-| 🟢 LOW | 텔레그램 봇 분리 | 개발 알림용/사용자용 분리 (실사용 후 결정) |
+| ✅ DONE | 텔레그램 봇 분리 | dev(claudeFC_bot) / user(FCPilot) 완료 |
 | 🟢 LOW | tools/telegram_chat.py | 별도 봇 토큰 설정 완료, 필요 시 사용 |
 
 ---
