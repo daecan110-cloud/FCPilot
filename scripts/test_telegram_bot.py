@@ -11,18 +11,17 @@ import requests
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-CHAT_ID = "8201988543"
-BOT_TOKEN = "8415171186:AAFks4TDdB4MSRapeMnE5CnXm6QC26r6BXs"
-BOT_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
-EDGE_FN_URL = "https://ghglnszzjuuvrrwpvhhb.supabase.co/functions/v1/telegram-bot"
+from utils.secrets_loader import load_secrets
 
-SUPABASE_URL = "https://ghglnszzjuuvrrwpvhhb.supabase.co"
-SERVICE_KEY = (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoZ2xuc3p6anV1dnJyd3B2aGhiIiwi"
-    "cm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDkxOTQ0OCwiZXhwIjoyMDkw"
-    "NDk1NDQ4fQ.e4AxO656yhPWJ_0LLlY-4amiyH1JGim-sFgtJ4drRvQ"
-)
+_secrets = load_secrets()
+CHAT_ID = str(_secrets["telegram"]["chat_id"])
+BOT_TOKEN = _secrets["telegram"]["bot_token"]
+BOT_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+SUPABASE_URL = _secrets["supabase"]["url"]
+SERVICE_KEY = _secrets["supabase"]["service_role_key"]
+EDGE_FN_URL = f"{SUPABASE_URL}/functions/v1/telegram-bot"
+
 SB_HEADERS = {"apikey": SERVICE_KEY, "Authorization": "Bearer " + SERVICE_KEY}
 EDGE_HEADERS = {"Authorization": "Bearer " + SERVICE_KEY, "Content-Type": "application/json"}
 

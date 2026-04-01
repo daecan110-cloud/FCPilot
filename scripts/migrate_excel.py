@@ -17,21 +17,18 @@ sys.path.insert(0, ROOT)
 
 import openpyxl
 import requests
+from utils.secrets_loader import load_secrets
 
 EXCEL_PATH = r"c:\Users\youngmin\Downloads\신한라이프 tool의 사본.xlsx"
 SHEET_NAME = "보험 DB터치"
 
-SUPABASE_URL = "https://ghglnszzjuuvrrwpvhhb.supabase.co"
-SERVICE_KEY = (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoZ2xuc3p6anV1dnJyd3B2aGhiIiwi"
-    "cm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDkxOTQ0OCwiZXhwIjoyMDkw"
-    "NDk1NDQ4fQ.e4AxO656yhPWJ_0LLlY-4amiyH1JGim-sFgtJ4drRvQ"
-)
+_secrets = load_secrets()
+SUPABASE_URL = _secrets["supabase"]["url"]
+SERVICE_KEY = _secrets["supabase"]["service_role_key"]
 SB_HEADERS = {"apikey": SERVICE_KEY, "Authorization": "Bearer " + SERVICE_KEY,
               "Content-Type": "application/json", "Prefer": "return=representation"}
 
-FC_ID = "ee41ae34-feef-4689-b005-f144cab4e4a6"  # 김영민fc (admin)
+FC_ID = _secrets.get("app", {}).get("admin_fc_id", "")
 
 # 등급 매핑: 엑셀 값 → DB CHECK 제약 (A/B/C/D)
 GRADE_MAP = {

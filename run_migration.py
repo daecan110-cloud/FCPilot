@@ -1,10 +1,17 @@
 """SQL 마이그레이션 실행 스크립트 (1회용)"""
+import os
 import sys
 
-import pg8000
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-DB_PASSWORD = r"7nj$NJ5z8,-e#.$"
-PROJECT_REF = "ghglnszzjuuvrrwpvhhb"
+import pg8000
+from utils.secrets_loader import load_secrets
+
+_secrets = load_secrets()
+DB_PASSWORD = _secrets.get("database", {}).get("password", "")
+# project ref를 supabase URL에서 추출
+_sb_url = _secrets.get("supabase", {}).get("url", "")
+PROJECT_REF = _sb_url.replace("https://", "").split(".")[0] if _sb_url else ""
 
 # Supabase 연결 옵션 (순서대로 시도)
 CONNECT_OPTIONS = [

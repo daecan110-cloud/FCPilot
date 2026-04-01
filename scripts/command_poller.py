@@ -17,19 +17,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import requests
+from utils.secrets_loader import load_secrets
 
 # ── 설정 ─────────────────────────────────────────────
 
-SUPABASE_URL = "https://ghglnszzjuuvrrwpvhhb.supabase.co"
-SUPABASE_SERVICE_KEY = (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoZ2xuc3p6anV1dnJyd3B2aGhiIiwi"
-    "cm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDkxOTQ0OCwiZXhwIjoyMDkw"
-    "NDk1NDQ4fQ.e4AxO656yhPWJ_0LLlY-4amiyH1JGim-sFgtJ4drRvQ"
-)
+_secrets = load_secrets()
+SUPABASE_URL = _secrets["supabase"]["url"]
+SUPABASE_SERVICE_KEY = _secrets["supabase"]["service_role_key"]
 
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "8415171186:AAFks4TDdB4MSRapeMnE5CnXm6QC26r6BXs")
-os.environ.setdefault("TELEGRAM_CHAT_ID", "8201988543")
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", _secrets["telegram"]["bot_token"])
+os.environ.setdefault("TELEGRAM_CHAT_ID", str(_secrets["telegram"]["chat_id"]))
 
 HEADERS = {
     "apikey": SUPABASE_SERVICE_KEY,

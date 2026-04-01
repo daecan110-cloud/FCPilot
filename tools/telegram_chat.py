@@ -6,7 +6,6 @@ PC에서 실행하면 텔레그램으로 Claude와 대화 가능.
 import os
 import sys
 import time
-import tomllib
 from datetime import datetime
 from pathlib import Path
 
@@ -16,25 +15,24 @@ sys.stdout.reconfigure(line_buffering=True)
 import anthropic
 import requests
 
+# 프로젝트 루트를 path에 추가
+ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(ROOT))
+
+from utils.secrets_loader import load_secrets
+
 # ── 설정 로드 ────────────────────────────────────────
 
 def load_config() -> dict:
     """secrets.toml에서 설정 로드 (telegram_chat 섹션 = 대화용 봇)"""
-    secrets_path = Path(__file__).parent.parent / ".streamlit" / "secrets.toml"
-    if not secrets_path.exists():
-        return {
-            "bot_token": os.environ.get("TELEGRAM_CHAT_BOT_TOKEN", ""),
-            "chat_id": os.environ.get("TELEGRAM_CHAT_ID", ""),
-            "claude_api_key": os.environ.get("ANTHROPIC_API_KEY", ""),
-        }
-    with open(secrets_path, "rb") as f:
-        data = tomllib.load(f)
-    # 대화용 봇: [telegram_chat] 섹션 사용
-    chat_cfg = data.get("telegram_chat", {})
+    secrets = load_secrets()
+    chat_cfg = secrets.get("telegram_chat", {})
     return {
-        "bot_token": chat_cfg.get("bot_token", ""),
-        "chat_id": str(data["telegram"]["chat_id"]),
-        "claude_api_key": data.get("claude", {}).get("api_key", "")
+        "bot_token": chat_cfg.get("bot_token", "")
+            or os.environ.get("TELEGRAM_CHAT_BOT_TOKEN", ""),
+        "chat_id": str(secrets.get("telegram", {}).get("chat_id", ""))
+            or os.environ.get("TELEGRAM_CHAT_ID", ""),
+        "claude_api_key": secrets.get("claude", {}).get("api_key", "")
             or os.environ.get("ANTHROPIC_API_KEY", ""),
     }
 
