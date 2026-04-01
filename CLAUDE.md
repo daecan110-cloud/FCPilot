@@ -14,6 +14,14 @@ Streamlit / Supabase / Claude API / Gemini / Naver Maps / Telegram / openpyxl
 - import 순서: 표준 → 서드파티 → 로컬
 - 개인정보/API키 커밋 금지 → .gitignore, secrets.toml
 
+## 보안 규칙 (절대 위반 금지)
+- API키/토큰/비밀번호를 .py에 직접 쓰지 마 → `st.secrets` 또는 `utils/secrets_loader.py`
+- `unsafe_allow_html=True` 쓸 때 DB값은 반드시 `esc()` → `from utils.helpers import esc`
+- `st.error(f"실패: {e}")` 금지 → `st.error(safe_error("작업명", e))`
+- `subprocess` 쓸 때 `shell=True` 금지 → 명령어 리스트 + `shell=False`
+- DB 함수(RPC) 만들면 반드시 role 제한 (anon/authenticated 차단)
+- 고객 데이터 수정/삭제 쿼리에 반드시 `.eq("fc_id", fc_id)` 포함
+
 ## 파일 구조
 ```
 app.py → 라우터만 / auth.py → 인증만 / config.py → 설정만
