@@ -267,7 +267,7 @@ def _render_analysis_history(sb, fc_id: str, client_name: str):
         col_info, col_btn = st.columns([3, 1])
         col_info.caption("보장분석 이력이 없습니다.")
         if col_btn.button("보장분석 하기", use_container_width=True):
-            st.session_state._nav_to = "보장분석"
+            st.session_state._nav_to = "📊 보장분석"
             st.rerun()
         return
     for r in records:
@@ -294,7 +294,7 @@ def _render_analysis_history(sb, fc_id: str, client_name: str):
                 except Exception:
                     pass
             if st.button("보장분석 다시 실행", key=f"rerun_analysis_{r['id']}", use_container_width=True):
-                st.session_state._nav_to = "보장분석"
+                st.session_state._nav_to = "📊 보장분석"
                 st.rerun()
 
 

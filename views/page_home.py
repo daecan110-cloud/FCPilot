@@ -106,7 +106,7 @@ def _render_reminder_card(r: dict, bucket: str):
             if st.button("고객", key=f"goto_{rid}_{bucket}", use_container_width=True):
                 st.session_state.clients_view = "detail"
                 st.session_state.selected_client_id = r.get("client_id")
-                st.session_state._nav_to = "고객관리"
+                st.session_state._nav_to = "👥 고객관리"
                 st.rerun()
 
         if st.session_state.get(edit_key):
@@ -192,7 +192,7 @@ def _render_recent_activity(fc_id: str):
     col_title, col_new, col_act = st.columns([3, 1, 1])
     col_title.subheader("최근 활동")
     if col_new.button("👤 고객 추가", use_container_width=True):
-        st.session_state._nav_to = "고객관리"
+        st.session_state._nav_to = "👥 고객관리"
         st.session_state.clients_view = "new"
         st.rerun()
     if col_act.button("📝 활동 추가", use_container_width=True):
