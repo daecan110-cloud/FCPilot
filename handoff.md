@@ -1,7 +1,7 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 10 완료 + 텔레그램 버그 수정**
+- Phase: **Sprint 10 완료 + 개발환경 자동화 (서브에이전트 + Hooks)**
 - 마지막 세션: 2026-03-31 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
@@ -44,6 +44,21 @@
 - [x] fp_reminders 미조회 버그 — `remind_trigger.py`가 구형 `reminder.py`만 사용하던 문제 수정
 - [x] 개척 팔로업 매장명 누락 — `p["shop"]["shop_name"]` 올바르게 참조
 - [x] 알림 포맷 개선 — "💬 상담 리마인드" / "🗺️ 개척 팔로업" 섹션 분리
+
+---
+
+## 개발환경 자동화 — 완료 (2026-03-31)
+
+- [x] `.claude/agents/code-reviewer.md` — bare except/API키/개인정보 print/200줄/컬럼명 점검
+- [x] `.claude/agents/codebase-explorer.md` — 구조 분석, 호출 관계, 영향 범위 파악
+- [x] `.claude/agents/test-runner.md` — 테스트 실행 + 결과 분석
+- [x] `CLAUDE.md` 서브에이전트 한국어 별칭 등록 (리뷰/분석/테스트)
+- [x] `.claude/settings.json` hooks 설정
+  - `SessionStart`: git pull + 보안 스캔 (API키/bare except/데이터파일)
+  - `SessionEnd`: 자동 commit + push
+  - `PreToolUse`: 민감 파일 수정/읽기 차단, 위험 명령 차단
+  - `PostToolUse`: py_compile 구문 검사, 개인정보 print 경고, API키 하드코딩 차단
+  - `UserPromptSubmit`: 최근 변경 diff 표시
 
 ---
 
