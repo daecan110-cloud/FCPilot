@@ -201,7 +201,7 @@ def _do_login(email: str, password: str):
 
 
 def _ensure_settings_row(user_id: str):
-    """로그인 성공 후 users_settings row 없으면 pending으로 생성"""
+    """로그인 성공 후 users_settings row 없으면 approved로 생성"""
     try:
         sb = get_supabase_client()
         res = sb.table("users_settings").select("id").eq("id", user_id).execute()
@@ -209,7 +209,7 @@ def _ensure_settings_row(user_id: str):
             from utils.db_admin import get_admin_client
             get_admin_client().table("users_settings").upsert({
                 "id": user_id,
-                "status": "pending",
+                "status": "approved",
                 "role": "user",
             }).execute()
     except Exception:
@@ -225,13 +225,13 @@ def _do_signup(email: str, password: str, display_name: str):
             "options": {"data": {"display_name": display_name}},
         })
         if res.user:
-            # 승인 대기 상태로 users_settings 등록 (admin client로 RLS 우회)
+            # 가입 즉시 approved — 로그인만 되면 바로 사용 가능
             try:
                 from utils.db_admin import get_admin_client
                 get_admin_client().table("users_settings").upsert({
                     "id": res.user.id,
                     "display_name": display_name,
-                    "status": "pending",
+                    "status": "approved",
                     "role": "user",
                 }).execute()
             except Exception:
