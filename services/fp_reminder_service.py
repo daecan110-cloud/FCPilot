@@ -41,6 +41,26 @@ def get_bucketed(fc_id: str) -> dict:
     return {"overdue": overdue, "today": today_list, "this_week": this_week}
 
 
+def get_this_month_count(fc_id: str) -> int:
+    """이번달 전체 pending 리마인드 건수"""
+    today = date.today()
+    import calendar as _cal
+    _, last_day = _cal.monthrange(today.year, today.month)
+    month_start = f"{today.year}-{today.month:02d}-01"
+    month_end = f"{today.year}-{today.month:02d}-{last_day:02d}"
+    try:
+        res = (get_supabase_client().table("fp_reminders")
+               .select("id", count="exact")
+               .eq("fc_id", fc_id)
+               .eq("status", "pending")
+               .gte("reminder_date", month_start)
+               .lte("reminder_date", month_end)
+               .execute())
+        return res.count or 0
+    except Exception:
+        return 0
+
+
 def get_client_reminders(fc_id: str, client_id: str) -> list[dict]:
     """특정 고객의 리마인드 목록 (최신순)"""
     try:

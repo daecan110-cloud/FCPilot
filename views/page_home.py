@@ -4,7 +4,7 @@ from datetime import date
 import streamlit as st
 
 from auth import get_current_user_id
-from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes, create_reminder
+from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes, create_reminder, get_this_month_count
 from services.remind_trigger import check_and_send_daily_reminder
 from utils.supabase_client import get_supabase_client
 from utils.calendar_render import render_monthly_calendar
@@ -26,11 +26,12 @@ def render():
 
     buckets = get_bucketed(fc_id)
     overdue, today, this_week = buckets["overdue"], buckets["today"], buckets["this_week"]
+    this_month = get_this_month_count(fc_id)
 
     # 요약 메트릭
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("오늘 예정", f"{len(today)}건")
-    c2.metric("지연", f"{len(overdue)}건", delta=f"-{len(overdue)}" if overdue else None, delta_color="inverse")
+    c2.metric("이번달", f"{this_month}건")
     c3.metric("이번 주", f"{len(this_week)}건")
     c4.metric("전체 대기", f"{len(overdue)+len(today)+len(this_week)}건")
 
