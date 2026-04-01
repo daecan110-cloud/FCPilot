@@ -34,6 +34,14 @@ def render_product_section():
         st.error(f"조회 실패: {e}")
         return
 
+    # 상품 없고 초기화 미완료 → admin 상품 한 번만 복사
+    if not rows and not _is_products_initialized(sb, fc_id):
+        _copy_admin_products(sb, fc_id)
+        try:
+            rows = sb.table("fp_products").select("*").eq("fc_id", fc_id).order("name").execute().data or []
+        except Exception:
+            pass
+
     # id는 숨기고, 아이콘 컬럼(표시용) 추가
     df = pd.DataFrame([{
         "_id": r["id"],
@@ -61,6 +69,48 @@ def render_product_section():
 
     if st.button("변경사항 저장", type="primary", use_container_width=True):
         _apply_changes(sb, fc_id, df, edited)
+
+
+def _is_products_initialized(sb, fc_id: str) -> bool:
+    try:
+        res = sb.table("users_settings").select("products_initialized").eq("id", fc_id).execute()
+        return bool(res.data and res.data[0].get("products_initialized"))
+    except Exception:
+        return False
+
+
+def _copy_admin_products(sb, fc_id: str):
+    """admin 상품을 현재 사용자에게 한 번만 복사"""
+    try:
+        from utils.db_admin import get_admin_client
+        admin_sb = get_admin_client()
+
+        # admin fc_id 조회
+        admin_res = admin_sb.table("users_settings").select("id").eq("role", "admin").execute()
+        if not admin_res.data:
+            return
+        admin_id = admin_res.data[0]["id"]
+        if admin_id == fc_id:
+            # 본인이 admin이면 복사 불필요, 플래그만 세팅
+            admin_sb.table("users_settings").update({"products_initialized": True}).eq("id", fc_id).execute()
+            return
+
+        # admin 상품 가져오기
+        prod_res = admin_sb.table("fp_products").select("name, category, is_active").eq("fc_id", admin_id).execute()
+        admin_products = prod_res.data or []
+
+        # 현재 사용자 계정으로 복사
+        if admin_products:
+            rows_to_insert = [
+                {"fc_id": fc_id, "name": p["name"], "category": p["category"], "is_active": p["is_active"]}
+                for p in admin_products
+            ]
+            admin_sb.table("fp_products").insert(rows_to_insert).execute()
+
+        # 초기화 완료 플래그 저장
+        admin_sb.table("users_settings").update({"products_initialized": True}).eq("id", fc_id).execute()
+    except Exception:
+        pass
 
 
 def _apply_changes(sb, fc_id: str, original_df: pd.DataFrame, edited_df: pd.DataFrame):
