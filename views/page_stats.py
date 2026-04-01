@@ -145,11 +145,12 @@ def _render_distribution(sb, fc_id: str):
 def _dist_cards(dist: dict, keys: list, label_fn):
     total = sum(dist.values())
     items = [(k, dist[k]) for k in keys if k in dist]
-    for row_start in range(0, len(items), 4):
-        row = items[row_start: row_start + 4]
-        cols = st.columns(4)
-        for i, (k, cnt) in enumerate(row):
-            cols[i].metric(label_fn(k), f"{cnt}명", f"{round(cnt/total*100,1)}%" if total else "0%")
+    for k, cnt in items:
+        pct = round(cnt / total * 100, 1) if total else 0
+        col_label, col_bar, col_cnt = st.columns([2, 5, 1])
+        col_label.caption(label_fn(k))
+        col_bar.progress(min(pct / 100, 1.0))
+        col_cnt.caption(f"{cnt}명 ({pct}%)")
 
 
 def _render_pioneer(sb, fc_id: str, since):
