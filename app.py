@@ -96,8 +96,14 @@ def main():
         show_login_page()
         return
 
-    # 강제 차단: admin이 rejected로 명시한 경우만 막음
-    if get_user_status() == "rejected":
+    # 승인 전 차단
+    status = get_user_status()
+    if status == "pending":
+        st.warning("관리자 승인 대기 중입니다. 승인 후 이용 가능합니다.")
+        if st.button("로그아웃"):
+            logout()
+        return
+    if status == "rejected":
         st.error("계정이 비활성화되었습니다. 관리자에게 문의해주세요.")
         if st.button("로그아웃"):
             logout()

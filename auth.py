@@ -201,7 +201,7 @@ def _do_login(email: str, password: str):
 
 
 def _ensure_settings_row(user_id: str):
-    """로그인 성공 후 users_settings row 없으면 approved로 생성"""
+    """로그인 성공 후 users_settings row 없으면 pending으로 생성"""
     try:
         sb = get_supabase_client()
         res = sb.table("users_settings").select("id").eq("id", user_id).execute()
@@ -209,7 +209,7 @@ def _ensure_settings_row(user_id: str):
             from utils.db_admin import get_admin_client
             get_admin_client().table("users_settings").upsert({
                 "id": user_id,
-                "status": "approved",
+                "status": "pending",
                 "role": "user",
             }).execute()
     except Exception:
@@ -225,13 +225,13 @@ def _do_signup(email: str, password: str, display_name: str):
             "options": {"data": {"display_name": display_name}},
         })
         if res.user:
-            # 가입 즉시 approved — 로그인만 되면 바로 사용 가능
+            # 가입 후 pending — 관리자 승인 필요
             try:
                 from utils.db_admin import get_admin_client
                 get_admin_client().table("users_settings").upsert({
                     "id": res.user.id,
                     "display_name": display_name,
-                    "status": "approved",
+                    "status": "pending",
                     "role": "user",
                 }).execute()
             except Exception:
@@ -240,14 +240,14 @@ def _do_signup(email: str, password: str, display_name: str):
             try:
                 from utils.telegram import send_message
                 send_message(
-                    f"🔔 신규 회원 가입\n\n"
+                    f"🔔 회원가입 승인 요청\n\n"
                     f"이름: {display_name or '(미입력)'}\n"
                     f"이메일: {email}\n\n"
-                    f"✅ 즉시 승인 완료 — 바로 이용 가능합니다."
+                    f"설정 > Admin 관리에서 승인해주세요."
                 )
             except Exception:
                 pass
-            st.success("회원가입이 완료되었습니다. 바로 로그인하여 이용하실 수 있습니다.")
+            st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 이용 가능합니다.")
         else:
             st.warning("회원가입 요청이 전송되었습니다. 이메일을 확인해주세요.")
     except Exception as e:
