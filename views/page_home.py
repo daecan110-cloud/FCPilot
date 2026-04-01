@@ -119,17 +119,31 @@ def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):
             st.caption(f"예정일: {d}" if d else "예정일: 미정")
         with col_btn:
             fc_id = r.get("fc_id", "")
-            if st.button("완료", key=f"done_{rid}_{bucket}", type="primary", use_container_width=True):
-                complete_reminder(fc_id, rid)
-                st.rerun()
-            if st.button("수정", key=f"edit_{rid}_{bucket}", use_container_width=True):
-                st.session_state[edit_key] = not st.session_state.get(edit_key, False)
-                st.rerun()
-            if st.button("고객", key=f"goto_{rid}_{bucket}", use_container_width=True):
+            st.button(
+                "완료", key=f"done_{rid}_{bucket}", type="primary",
+                use_container_width=True,
+                on_click=complete_reminder, args=(fc_id, rid),
+            )
+
+            def _toggle_edit(ek):
+                st.session_state[ek] = not st.session_state.get(ek, False)
+
+            st.button(
+                "수정", key=f"edit_{rid}_{bucket}",
+                use_container_width=True,
+                on_click=_toggle_edit, args=(edit_key,),
+            )
+
+            def _goto_client(cid):
                 st.session_state.clients_view = "detail"
-                st.session_state.selected_client_id = r.get("client_id")
+                st.session_state.selected_client_id = cid
                 st.session_state._nav_to = "👥 고객관리"
-                st.rerun()
+
+            st.button(
+                "고객", key=f"goto_{rid}_{bucket}",
+                use_container_width=True,
+                on_click=_goto_client, args=(r.get("client_id"),),
+            )
 
         if st.session_state.get(edit_key):
             _render_edit_form(r, edit_key)
