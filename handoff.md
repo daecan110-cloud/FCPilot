@@ -1,7 +1,7 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 11-1 완료 (UI 리뉴얼 + 버그 수정) — 영민 테스트 대기 중**
+- Phase: **보안 점검 완료 + Sprint 11-1 — 영민 테스트 대기 중**
 - 마지막 세션: 2026-04-01 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
@@ -86,6 +86,24 @@
 - [x] CLAUDE.md: sprint-done 자동 실행 규칙 추가
 - [x] plan.md: 백로그 + Sprint 로드맵 업데이트
 - [x] 텔레그램 Claude 챗봇 스크립트 (tools/telegram_chat.py)
+
+---
+
+## 보안 점검 (2026-04-01)
+
+### 수정 완료
+- [x] 6개 파일에서 하드코딩 키 제거 (service_role_key, 봇 토큰, DB 비밀번호, FC_ID)
+- [x] `utils/secrets_loader.py` 공용 모듈 생성 — CLI 스크립트용 secrets.toml 파서
+- [x] hook 보안 스캔 패턴 강화 (JWT/봇토큰/Claude키/Gemini키 실제 포맷 정규식)
+
+### 영민 액션 필요
+- [ ] **Supabase service_role 키 재생성** (Dashboard → Settings → API → service_role → Regenerate)
+- [ ] **텔레그램 봇 토큰 재발급** (BotFather → /revoke → /newbot 또는 기존 봇 토큰 재발급)
+- [ ] **DB 비밀번호 변경** (Dashboard → Settings → Database → Reset password)
+- [ ] 재생성 후 secrets.toml 업데이트 필수
+
+### 근본 원인
+Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키 하드코딩으로 우회한 것 (Sprint 5~7 설계 실수)
 
 ---
 
