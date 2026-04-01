@@ -9,33 +9,25 @@ st.set_page_config(**PAGE_CONFIG)
 st.markdown("""
 <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Sharp:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
 
-    /* Pretendard 전역 적용 — st- 클래스 포함 */
-    html, body, [class*="st-"] {
+    /* Pretendard: html/body 상속으로 적용
+       [class*="st-"] !important 는 아이콘 span 폰트까지 덮어써서 arrow_right 노출 — 제거 */
+    html, body {
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif !important;
         color: #37352F;
     }
-
-    /* Material Symbols/Icons 폰트 복원
-       [class*="st-"] !important 에 덮어씌워지므로 아이콘 클래스에 재적용 */
-    .material-symbols-sharp,
-    .material-symbols-outlined,
-    .material-symbols-rounded,
-    .material-icons-sharp,
-    .material-icons {
-        font-family: 'Material Symbols Sharp', 'Material Icons Sharp',
-                     'Material Icons' !important;
-        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        /* font-size 0으로 폰트 미로드 시 텍스트 크기 숨김 안전망 */
-        line-height: 1;
+    /* 폼 요소는 브라우저 기본값에서 body 폰트 미상속 → 명시적 상속 */
+    input, button, textarea, select, label,
+    [data-baseweb], [data-baseweb] * {
+        font-family: inherit !important;
     }
 
-    /* expander 아이콘 영역 완전 숨김 — 어느 Streamlit 버전이든 대응 */
+    /* expander 아이콘 완전 숨김 — 다중 selector로 Streamlit 버전 무관 대응 */
     [data-testid="stExpanderToggleIcon"],
-    [data-testid="stExpander"] summary > div > span:first-child,
-    [data-testid="stExpander"] details > summary svg {
+    [data-testid="stExpander"] details > summary svg,
+    [data-testid="stExpander"] summary > div > span:first-child {
         display: none !important;
+        font-size: 0 !important;
     }
 
     .stApp { background-color: #FFFFFF; }

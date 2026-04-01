@@ -81,7 +81,12 @@ def get_current_user_id() -> str:
 
 
 def get_user_status() -> str:
-    """users_settings.status 반환 — 없으면 'pending' (미승인 안전 기본값)"""
+    """users_settings.status 반환
+    - row 있고 status 명시: 그 값 반환
+    - row 있고 status null: 'approved' (기존 사용자 호환)
+    - row 없음: 'pending' (신규 가입 후 upsert 실패 케이스)
+    - DB 예외: 'approved' (오류 시 기존 사용자 차단 방지)
+    """
     user_id = get_current_user_id()
     if not user_id:
         return "anonymous"
@@ -89,10 +94,11 @@ def get_user_status() -> str:
         sb = get_supabase_client()
         res = sb.table("users_settings").select("status").eq("id", user_id).execute()
         if res.data:
-            return res.data[0].get("status") or "pending"
+            return res.data[0].get("status") or "approved"
+        return "pending"  # row 없음 = 신규 미승인
     except Exception:
         pass
-    return "pending"
+    return "approved"  # DB 오류 시 기존 사용자 차단 방지
 
 
 def is_admin() -> bool:
@@ -172,20 +178,42 @@ def _do_login(email: str, password: str):
         st.session_state.session = res.session
         st.session_state.last_activity = time.time()
 
-        # 쿠키를 지금 바로 set()하면 st.rerun() 때문에 JS가 실행 안 됨.
-        # 대신 pending 플래그로 저장 → 다음 렌더(init_auth)에서 설정.
         if res.session:
             st.session_state._pending_cookies = {
                 "access": res.session.access_token,
                 "refresh": res.session.refresh_token,
             }
 
+        # 로그인 성공 시 users_settings row 없으면 pending으로 생성
+        # (회원가입 시 upsert 실패한 경우 복구)
+        if res.user:
+            _ensure_settings_row(res.user.id)
+
         st.rerun()
     except Exception as e:
-        if "Invalid login" in str(e) or "invalid_credentials" in str(e):
+        err = str(e)
+        if "Invalid login" in err or "invalid_credentials" in err:
             st.error("이메일 또는 비밀번호가 올바르지 않습니다.")
+        elif "Email not confirmed" in err or "email_not_confirmed" in err:
+            st.error("이메일 인증이 필요합니다. 가입 시 받은 이메일을 확인해주세요.")
         else:
-            st.error("로그인에 실패했습니다. 잠시 후 다시 시도해주세요.")
+            st.error(f"로그인 실패: {err}")
+
+
+def _ensure_settings_row(user_id: str):
+    """로그인 성공 후 users_settings row 없으면 pending으로 생성"""
+    try:
+        sb = get_supabase_client()
+        res = sb.table("users_settings").select("id").eq("id", user_id).execute()
+        if not res.data:
+            from utils.db_admin import get_admin_client
+            get_admin_client().table("users_settings").upsert({
+                "id": user_id,
+                "status": "pending",
+                "role": "user",
+            }).execute()
+    except Exception:
+        pass
 
 
 def _do_signup(email: str, password: str, display_name: str):
