@@ -136,9 +136,10 @@ def _build_calendar_html(
 ) -> str:
     """HTML 캘린더 그리드 생성"""
     days = ["월", "화", "수", "목", "금", "토", "일"]
+    day_colors = ["#9ca3af"] * 5 + ["#ef4444", "#ef4444"]
     header = "".join(
         f"<div style='flex:1;text-align:center;font-size:12px;font-weight:600;"
-        f"color:{"#ef4444" if i >= 5 else "#9ca3af"};padding:8px 0;'>{d}</div>"
+        f"color:{day_colors[i]};padding:8px 0;'>{d}</div>"
         for i, d in enumerate(days)
     )
 
