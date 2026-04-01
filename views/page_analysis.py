@@ -5,18 +5,21 @@ from services.analysis_engine import analyze_and_generate
 from services.yakwan_engine import analyze_yakwan, format_display
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
+from utils.ui_components import section_header
 
 
 def render():
     st.header("보장분석")
-    st.caption("보험 계약 PDF를 업로드하면 자동으로 보장분석표를 생성합니다.")
 
+    section_header("Step 1. PDF 업로드")
     uploaded_file = st.file_uploader(
         "보험 계약서 PDF 업로드",
         type=["pdf"],
         help=f"최대 {MAX_FILE_SIZE_MB}MB",
+        label_visibility="collapsed",
     )
 
+    section_header("Step 2. 옵션 설정")
     col1, col2 = st.columns([3, 1])
     with col1:
         client_name = st.text_input(
@@ -106,15 +109,15 @@ def _show_result(data: dict):
     st.divider()
     contracts = data.get("_all_contracts", data.get("계약", []))
     if contracts:
-        st.subheader(f"계약 현황 ({len(contracts)}건)")
-        for c in contracts:
-            prem = c.get("월보험료", 0)
-            st.markdown(
-                f"- **{c.get('보험사', '')}** | "
-                f"{c.get('상품명', '')[:30]} | "
-                f"월 {prem:,}원 | "
-                f"{c.get('보장나이', '')}"
-            )
+        with st.expander(f"📋 계약 목록 ({len(contracts)}건)", expanded=True):
+            for c in contracts:
+                prem = c.get("월보험료", 0)
+                st.markdown(
+                    f"- **{c.get('보험사', '')}** | "
+                    f"{c.get('상품명', '')[:30]} | "
+                    f"월 {prem:,}원 | "
+                    f"{c.get('보장나이', '')}"
+                )
 
 
 def _save_to_db(data: dict, silent: bool = False):
