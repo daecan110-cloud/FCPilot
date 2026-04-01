@@ -9,44 +9,35 @@ def render():
 
     sb = get_supabase_client()
     user_id = get_current_user_id()
-
-    # 기존 설정 로드
     settings = _load_settings(sb, user_id)
 
-    with st.form("settings_form"):
-        display_name = st.text_input(
-            "이름",
-            value=settings.get("display_name", ""),
-        )
-        company = st.text_input(
-            "소속",
-            value=settings.get("company", "신한라이프"),
-        )
-        mode = st.selectbox(
-            "영업 모드",
-            options=["pioneer", "referral", "both"],
-            format_func=lambda x: {"pioneer": "개척", "referral": "소개", "both": "병행"}[x],
-            index=["pioneer", "referral", "both"].index(settings.get("mode", "pioneer")),
-        )
+    with st.expander("👤 프로필 설정", expanded=True):
+        with st.form("settings_form"):
+            display_name = st.text_input(
+                "이름",
+                value=settings.get("display_name", ""),
+            )
+            company = st.text_input(
+                "소속",
+                value=settings.get("company", "신한라이프"),
+            )
+            mode = st.selectbox(
+                "영업 모드",
+                options=["pioneer", "referral", "both"],
+                format_func=lambda x: {"pioneer": "개척", "referral": "소개", "both": "병행"}[x],
+                index=["pioneer", "referral", "both"].index(settings.get("mode", "pioneer")),
+            )
+            if st.form_submit_button("저장", use_container_width=True, type="primary"):
+                _save_settings(sb, user_id, display_name, company, mode)
 
-        if st.form_submit_button("저장", use_container_width=True, type="primary"):
-            _save_settings(sb, user_id, display_name, company, mode)
+    with st.expander("📦 상품 관리"):
+        from views.page_settings_products import render_product_section
+        render_product_section()
 
-    st.divider()
+    with st.expander("🏷️ 유입경로 관리"):
+        _render_source_categories(sb, user_id)
 
-    # 상품 관리
-    from views.page_settings_products import render_product_section
-    render_product_section()
-
-    st.divider()
-
-    # 유입경로 카테고리 관리
-    _render_source_categories(sb, user_id)
-
-    st.divider()
-
-    # 데이터 관리 (UX-05: CSV 가져오기/내보내기)
-    with st.expander("데이터 관리"):
+    with st.expander("📂 데이터 관리"):
         st.caption("고객 데이터를 CSV로 가져오거나 내보낼 수 있습니다.")
         csv_file = st.file_uploader("CSV 가져오기", type=["csv"], key="settings_csv")
         if csv_file and st.button("가져오기 시작", type="primary"):
@@ -59,12 +50,13 @@ def render():
                     for e in result["errors"]:
                         st.caption(e)
 
-    st.caption(f"FCPilot v1.0.0 | User ID: {user_id[:8]}... | 역할: {settings.get('role', 'user')}")
-
-    # Admin 전용 섹션
     if is_admin():
-        from views.page_settings_admin import render_admin_section
-        render_admin_section(sb)
+        with st.expander("🔧 Admin 관리"):
+            from views.page_settings_admin import render_admin_section
+            render_admin_section(sb)
+
+    st.markdown("---")
+    st.caption(f"FCPilot v1.0.0 · {user_id[:8]}... · 역할: {settings.get('role', 'user')}")
 
 
 _DEFAULT_CATEGORIES = ["DB고객", "개인(지인)", "개척", "소개", "기타"]
