@@ -1,7 +1,7 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **보안 Sprint 완료 — 영민 테스트 대기 중**
+- Phase: **Sprint 12 완료 (보안+카카오맵+리팩토링) — 영민 테스트 대기 중**
 - 마지막 세션: 2026-04-01 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
@@ -15,7 +15,7 @@
 - 고객 CRM (목록/상세/등록/수정/삭제, 전화번호 암호화)
 - 상담이력 CRUD (등록/수정/삭제/인라인 수정)
 - 개척지도 + OCR (EXIF GPS 자동주소 포함) + 팔로업
-- 동선기록 탭 + Naver Maps JS API v3 지도
+- 동선기록 탭 + 카카오맵 JS API 지도 (Sprint 12에서 네이버→카카오 전환)
 - 상품 관리 (fp_products) + 상담 제안 상품 연동
 - fp_reminders 리마인드 시스템 (3구역 표시/등록/수정/완료)
 - 홈 월간 캘린더 (대기●/완료✓ 배지)
@@ -118,13 +118,23 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 
 ---
 
+## Sprint 12 — 완료 (2026-04-01)
+
+- [x] 네이버 지도 → 카카오맵 전환 (utils/kakao_map.py + services/geocoding.py)
+- [x] 카카오 지오코딩 + 역지오코딩 연동
+- [x] page_clients.py 560줄 → 3파일 분리 (263+175+126)
+- [x] 미사용 create_route_map 호출 제거
+
+---
+
 ## 미완료 항목
 
 | 우선순위 | 항목 | 비고 |
 |----------|------|------|
 | 🟡 MID | 캘린더 날짜 버튼이 HTML과 중복 렌더링 | HTML 캘린더 + st.button 그리드 겹침 가능성 |
-| 🟢 LOW | 200줄 초과 파일 리팩토링 | page_clients.py (~530줄) |
+| ✅ DONE | 200줄 초과 파일 리팩토링 | page_clients 3파일 분리 완료 |
 | ✅ DONE | 텔레그램 봇 분리 | dev(claudeFC_bot) / user(FCPilot) 완료 |
+| ✅ DONE | 카카오맵 전환 | 네이버 의존 제거 완료 |
 | 🟢 LOW | tools/telegram_chat.py | 별도 봇 토큰 설정 완료, 필요 시 사용 |
 
 ---
