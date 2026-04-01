@@ -152,45 +152,31 @@ def _render_list():
             pass
 
     if not clients:
-        st.info("등록된 고객이 없습니다.")
+        from utils.ui_components import empty_state
+        empty_state("👥", "등록된 고객이 없습니다")
         return
 
     st.caption(f"{len(clients)}명")
 
+    from utils.ui_components import grade_badge as _grade_badge
     for c in clients:
         grade = c.get("prospect_grade", "C")
-        grade_color = {"VIP": "violet", "S": "green", "A": "red", "B": "orange", "C": "blue", "D": "gray"}.get(grade, "blue")
-        col_name, col_info, col_detail, col_del = st.columns([3, 4, 1, 1])
-        with col_name:
-            st.markdown(f"**{c['name']}** :{grade_color}[{grade}]")
-        with col_info:
-            source = c.get("db_source", "")
-            age = c.get("age_group") or (f"{c['age']}세" if c.get("age") else "")
-            info = age
-            if source:
-                info += f" | {source}"
-            if c.get("address"):
-                info += f" | {c['address']}"
-            st.caption(info)
-        with col_detail:
-            if st.button("상세", key=f"detail_{c['id']}"):
-                st.session_state.clients_view = "detail"
-                st.session_state.selected_client_id = c["id"]
-                st.rerun()
-        with col_del:
-            confirm_key = f"confirm_del_list_{c['id']}"
-            if st.session_state.get(confirm_key):
-                if st.button("확인", key=f"del_confirm_{c['id']}", type="primary"):
-                    try:
-                        sb.table("contact_logs").delete().eq("client_id", c["id"]).eq("fc_id", fc_id).execute()
-                        sb.table("clients").delete().eq("id", c["id"]).eq("fc_id", fc_id).execute()
-                        st.session_state.pop(confirm_key, None)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"삭제 실패: {e}")
-            else:
-                if st.button("삭제", key=f"del_{c['id']}"):
-                    st.session_state[confirm_key] = True
+        grade_html = _grade_badge(grade)
+        source = c.get("db_source", "")
+        age = c.get("age_group") or (f"{c['age']}세" if c.get("age") else "")
+        meta = " · ".join(filter(None, [age, source]))
+        with st.container(border=True):
+            c_info, c_btn = st.columns([5, 1])
+            with c_info:
+                st.markdown(
+                    f'**{c["name"]}** {grade_html} &nbsp;'
+                    f'<span style="color:#787774; font-size:13px;">{meta}</span>',
+                    unsafe_allow_html=True,
+                )
+            with c_btn:
+                if st.button("상세", key=f"detail_{c['id']}", use_container_width=True):
+                    st.session_state.clients_view = "detail"
+                    st.session_state.selected_client_id = c["id"]
                     st.rerun()
 
 
@@ -241,18 +227,17 @@ def _render_detail():
         st.session_state.edit_client = client
         st.rerun()
 
-    st.divider()
-    _render_contact_logs(sb, client_id)
-    _render_new_contact(sb, client_id)
-
-    st.divider()
-    _render_reminder_section(sb, fc_id=get_current_user_id(), client_id=client_id)
-
-    st.divider()
-    _render_analysis_history(sb, fc_id, client["name"])
-
-    st.divider()
-    _render_client_delete(sb, client_id)
+    st.markdown("---")
+    tab_contact, tab_remind, tab_analysis, tab_del = st.tabs(["📝 상담이력", "🔔 리마인드", "📊 보장분석", "🗑️ 삭제"])
+    with tab_contact:
+        _render_contact_logs(sb, client_id)
+        _render_new_contact(sb, client_id)
+    with tab_remind:
+        _render_reminder_section(sb, fc_id=fc_id, client_id=client_id)
+    with tab_analysis:
+        _render_analysis_history(sb, fc_id, client["name"])
+    with tab_del:
+        _render_client_delete(sb, client_id)
 
 
 def _render_analysis_history(sb, fc_id: str, client_name: str):
@@ -300,6 +285,7 @@ def _render_analysis_history(sb, fc_id: str, client_name: str):
 
 def _render_client_delete(sb, client_id: str):
     """고객 삭제 (확인 후 contact_logs CASCADE 삭제)"""
+    fc_id = get_current_user_id()
     confirm_key = f"confirm_del_client_{client_id}"
     if st.session_state.get(confirm_key):
         st.warning("고객 정보와 모든 상담 이력이 삭제됩니다. 계속하시겠습니까?")
@@ -323,6 +309,7 @@ def _render_client_delete(sb, client_id: str):
 
 
 def _render_contact_logs(sb, client_id: str):
+    fc_id = get_current_user_id()
     st.subheader("상담 이력")
     try:
         res = sb.table("contact_logs").select("*").eq("client_id", client_id).order("created_at", desc=True).limit(50).execute()
