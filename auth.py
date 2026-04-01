@@ -240,14 +240,14 @@ def _do_signup(email: str, password: str, display_name: str):
             try:
                 from utils.telegram import send_message
                 send_message(
-                    f"🔔 회원가입 승인 요청\n\n"
+                    f"🔔 신규 회원 가입\n\n"
                     f"이름: {display_name or '(미입력)'}\n"
                     f"이메일: {email}\n\n"
-                    f"설정 > Admin 관리에서 승인해주세요."
+                    f"✅ 즉시 승인 완료 — 바로 이용 가능합니다."
                 )
             except Exception:
                 pass
-            st.success("회원가입 신청이 완료되었습니다. 관리자 승인 후 이용 가능합니다.")
+            st.success("회원가입이 완료되었습니다. 바로 로그인하여 이용하실 수 있습니다.")
         else:
             st.warning("회원가입 요청이 전송되었습니다. 이메일을 확인해주세요.")
     except Exception as e:
