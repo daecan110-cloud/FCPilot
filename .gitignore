@@ -32,6 +32,9 @@ v[0-9]_*.xlsx
 ~$*.xlsx
 *보장분석.pdf
 
+# Screenshots (협업용 캡처 - 개인정보 포함 가능)
+screenshots/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -39,6 +39,16 @@ scripts/            → 로컬 실행 스크립트 (command_poller 등).
 supabase/functions/ → Edge Function (TypeScript/Deno).
 ```
 
+## 스크린샷 협업
+
+영민이 "최근 스크린샷 봐줘" 또는 "캡처 봐줘" 라고 하면:
+```python
+# C:\FCPilot\screenshots\ 폴더에서 최근 파일 3개 자동 조회
+import glob, os
+files = sorted(glob.glob("C:/FCPilot/screenshots/*"), key=os.path.getmtime, reverse=True)[:3]
+```
+캡처 저장 경로: `C:\FCPilot\screenshots\` (고정)
+
 ## 세션 시작 시
 
 1. `git pull origin main` → 최신 코드 동기화
