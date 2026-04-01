@@ -41,13 +41,11 @@ supabase/functions/ → Edge Function (TypeScript/Deno).
 
 ## 스크린샷 협업
 
-영민이 "최근 스크린샷 봐줘" 또는 "캡처 봐줘" 라고 하면:
-```python
-# C:\FCPilot\screenshots\ 폴더에서 최근 파일 3개 자동 조회
-import glob, os
-files = sorted(glob.glob("C:/FCPilot/screenshots/*"), key=os.path.getmtime, reverse=True)[:3]
-```
 캡처 저장 경로: `C:\FCPilot\screenshots\` (고정)
+
+영민이 "최근 스크린샷 N장 봐줘" 또는 "캡처 봐줘" 라고 하면:
+수정 시간 기준 최신순으로 정렬 후 영민이 지정한 장수만큼 읽는다.
+장수 미지정 시 몇 장인지 먼저 물어본다.
 
 ## 세션 시작 시
 
