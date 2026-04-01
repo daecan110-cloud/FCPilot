@@ -13,8 +13,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
-const CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID")!;
+const BOT_TOKEN = Deno.env.get("TELEGRAM_USER_BOT_TOKEN")!;
+const CHAT_ID = Deno.env.get("TELEGRAM_USER_CHAT_ID")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 

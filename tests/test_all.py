@@ -23,9 +23,10 @@ _secrets = load_secrets()
 SUPABASE_URL = _secrets["supabase"]["url"]
 SUPABASE_SERVICE_KEY = _secrets["supabase"]["service_role_key"]
 
-# 텔레그램 설정 (Streamlit 외부 실행용)
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", _secrets["telegram"]["bot_token"])
-os.environ.setdefault("TELEGRAM_CHAT_ID", str(_secrets["telegram"]["chat_id"]))
+# 텔레그램 설정 (dev 봇 — Streamlit 외부 실행용)
+_tg_dev = _secrets.get("telegram_dev", {})
+os.environ.setdefault("TELEGRAM_DEV_BOT_TOKEN", _tg_dev.get("bot_token", ""))
+os.environ.setdefault("TELEGRAM_DEV_CHAT_ID", str(_tg_dev.get("chat_id", "")))
 
 TABLES = [
     "users_settings", "clients", "contact_logs",
@@ -201,8 +202,8 @@ def test_template_exists(result: TestResult):
 def test_telegram_send(result: TestResult):
     """텔레그램 발송 테스트"""
     try:
-        token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-        chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+        token = os.environ.get("TELEGRAM_DEV_BOT_TOKEN", "")
+        chat_id = os.environ.get("TELEGRAM_DEV_CHAT_ID", "")
         res = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             json={"chat_id": chat_id, "text": "🧪 FCPilot 자동 테스트 실행 중..."},
@@ -292,8 +293,8 @@ def run_all_tests() -> TestResult:
 def send_report(result: TestResult):
     """테스트 결과 텔레그램 보고"""
     try:
-        token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-        chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+        token = os.environ.get("TELEGRAM_DEV_BOT_TOKEN", "")
+        chat_id = os.environ.get("TELEGRAM_DEV_CHAT_ID", "")
         requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             json={

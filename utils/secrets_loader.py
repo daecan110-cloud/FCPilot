@@ -35,8 +35,12 @@ def load_secrets() -> dict:
             "anon_key": os.environ.get("SUPABASE_ANON_KEY", ""),
             "service_role_key": os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""),
         },
-        "telegram": {
-            "bot_token": os.environ.get("TELEGRAM_BOT_TOKEN", ""),
-            "chat_id": os.environ.get("TELEGRAM_CHAT_ID", ""),
+        "telegram_dev": {
+            "bot_token": os.environ.get("TELEGRAM_DEV_BOT_TOKEN", ""),
+            "chat_id": os.environ.get("TELEGRAM_DEV_CHAT_ID", ""),
+        },
+        "telegram_user": {
+            "bot_token": os.environ.get("TELEGRAM_USER_BOT_TOKEN", ""),
+            "chat_id": os.environ.get("TELEGRAM_USER_CHAT_ID", ""),
         },
     }

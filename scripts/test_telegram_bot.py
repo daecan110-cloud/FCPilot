@@ -14,8 +14,9 @@ sys.path.insert(0, ROOT)
 from utils.secrets_loader import load_secrets
 
 _secrets = load_secrets()
-CHAT_ID = str(_secrets["telegram"]["chat_id"])
-BOT_TOKEN = _secrets["telegram"]["bot_token"]
+_tg_user = _secrets.get("telegram_user", {})
+CHAT_ID = str(_tg_user.get("chat_id", ""))
+BOT_TOKEN = _tg_user.get("bot_token", "")
 BOT_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 SUPABASE_URL = _secrets["supabase"]["url"]

@@ -25,8 +25,9 @@ _secrets = load_secrets()
 SUPABASE_URL = _secrets["supabase"]["url"]
 SUPABASE_SERVICE_KEY = _secrets["supabase"]["service_role_key"]
 
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", _secrets["telegram"]["bot_token"])
-os.environ.setdefault("TELEGRAM_CHAT_ID", str(_secrets["telegram"]["chat_id"]))
+_tg_dev = _secrets.get("telegram_dev", {})
+os.environ.setdefault("TELEGRAM_DEV_BOT_TOKEN", _tg_dev.get("bot_token", ""))
+os.environ.setdefault("TELEGRAM_DEV_CHAT_ID", str(_tg_dev.get("chat_id", "")))
 
 HEADERS = {
     "apikey": SUPABASE_SERVICE_KEY,
@@ -109,9 +110,9 @@ def execute_command(command: str) -> tuple[bool, str]:
 # ── 텔레그램 보고 ────────────────────────────────────
 
 def send_telegram(text: str):
-    """결과 텔레그램 발송"""
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    """결과 텔레그램 발송 (dev 봇)"""
+    token = os.environ.get("TELEGRAM_DEV_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_DEV_CHAT_ID", "")
     try:
         requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
