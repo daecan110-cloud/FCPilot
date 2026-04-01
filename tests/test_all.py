@@ -200,21 +200,19 @@ def test_template_exists(result: TestResult):
 
 
 def test_telegram_send(result: TestResult):
-    """텔레그램 발송 테스트"""
+    """텔레그램 연결 테스트 (메시지 발송 없이 getMe API로 확인)"""
     try:
         token = os.environ.get("TELEGRAM_DEV_BOT_TOKEN", "")
-        chat_id = os.environ.get("TELEGRAM_DEV_CHAT_ID", "")
-        res = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": "🧪 FCPilot 자동 테스트 실행 중..."},
+        res = requests.get(
+            f"https://api.telegram.org/bot{token}/getMe",
             timeout=10,
         )
         if res.status_code == 200:
-            result.ok("Telegram: 발송")
+            result.ok("Telegram: 연결")
         else:
-            result.fail("Telegram: 발송", f"HTTP {res.status_code}")
+            result.fail("Telegram: 연결", f"HTTP {res.status_code}")
     except Exception as e:
-        result.fail("Telegram: 발송", str(e)[:60])
+        result.fail("Telegram: 연결", str(e)[:60])
 
 
 def test_streamlit_app_syntax(result: TestResult):
