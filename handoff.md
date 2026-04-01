@@ -1,8 +1,8 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 10 완료 + 개발환경 자동화 (서브에이전트 + Hooks)**
-- 마지막 세션: 2026-03-31 (Claude Code)
+- Phase: **Sprint 11-1 완료 (UI 리뉴얼 + 버그 수정) — 영민 테스트 대기 중**
+- 마지막 세션: 2026-04-01 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
 
@@ -62,12 +62,41 @@
 
 ---
 
+## Sprint 11-1 — 완료 (2026-04-01)
+
+### UI 리뉴얼
+- [x] 다크 네이비 사이드바 + 흰색 텍스트
+- [x] 메트릭/카드 흰색 배경 + 그림자 + 둥근 모서리(12px)
+- [x] Primary 색상 인디고(#4f46e5)로 변경
+- [x] Pretendard 폰트 유지
+
+### 홈 UX 개선
+- [x] 리마인드 4섹션 → 탭 방식 변경 (오늘/이번주/이번달/미정)
+- [x] 캘린더 디자인 개선 + 오늘 버튼 추가
+- [x] 리마인드 버튼 on_click 콜백 (더블클릭 문제 해결)
+
+### 버그 수정
+- [x] remind_trigger KeyError 'overdue' 수정
+- [x] 고객 등급 VIP/S 저장 실패 → DB constraint 확장
+- [x] 등급순 정렬 VIP→S→A→B→C→D 순서 수정
+- [x] 리마인드 텔레그램 중복 발송 → DB 기반 하루 1회 제한
+
+### 기타
+- [x] sprint-done 스킬: 테스트 실패 시 텔레그램 알림 추가
+- [x] CLAUDE.md: sprint-done 자동 실행 규칙 추가
+- [x] plan.md: 백로그 + Sprint 로드맵 업데이트
+- [x] 텔레그램 Claude 챗봇 스크립트 (tools/telegram_chat.py)
+
+---
+
 ## 미완료 항목
 
 | 우선순위 | 항목 | 비고 |
 |----------|------|------|
+| 🟡 MID | 캘린더 날짜 버튼이 HTML과 중복 렌더링 | HTML 캘린더 + st.button 그리드 겹침 가능성 |
 | 🟢 LOW | 200줄 초과 파일 리팩토링 | page_clients.py (~530줄) |
 | 🟢 LOW | 텔레그램 봇 분리 | 개발 알림용/사용자용 분리 (실사용 후 결정) |
+| 🟢 LOW | tools/telegram_chat.py | 별도 봇 토큰 설정 완료, 필요 시 사용 |
 
 ---
 

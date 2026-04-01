@@ -89,7 +89,14 @@
 - [x] CLAUDE.md 한국어 별칭 등록
 - [x] `.claude/settings.json` hooks (SessionStart/End, PreToolUse, PostToolUse, UserPromptSubmit)
 
----
+## Sprint 11-1 — 완료 (2026-04-01)
+- [x] UI 리뉴얼 (다크 사이드바, 인디고 테마, 카드 그림자)
+- [x] 홈 리마인드 탭 방식 변경 + 캘린더 디자인 개선 + 오늘 버튼
+- [x] 리마인드 버튼 더블클릭 문제 해결 (on_click 콜백)
+- [x] 고객 VIP/S 등급 저장 실패 수정 (DB constraint 확장)
+- [x] 등급순 정렬 VIP→S→A→B→C→D 수정
+- [x] 리마인드 텔레그램 중복 발송 수정 (DB 기반 하루 1회)
+- [x] remind_trigger KeyError 'overdue' 수정
 
 ---
 
