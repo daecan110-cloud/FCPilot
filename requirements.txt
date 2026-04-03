@@ -10,3 +10,4 @@ requests>=2.31.0
 Pillow>=10.0.0
 streamlit-cookies-controller>=0.0.4
 streamlit-sortables>=0.3.1
+pg8000>=1.30.0

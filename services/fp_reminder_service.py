@@ -6,6 +6,18 @@ from utils.supabase_client import get_supabase_client
 
 _PURPOSES = ["초회 상담", "재상담", "설계 제안", "계약 체결", "점검", "기타"]
 
+RESULT_OPTIONS = [
+    ("contracted", "계약 체결"),
+    ("interest", "관심/긍정"),
+    ("revisit", "재방문 필요"),
+    ("rejected", "거절"),
+    ("no_show", "미방문/부재"),
+    ("postponed", "연기"),
+    ("other", "기타"),
+]
+
+RESULT_MAP = {k: v for k, v in RESULT_OPTIONS}
+
 
 def purposes() -> list[str]:
     return _PURPOSES
@@ -91,13 +103,21 @@ def create_reminder(fc_id: str, client_id: str, reminder_date: str | None,
         return False
 
 
-def complete_reminder(fc_id: str, reminder_id: str) -> bool:
+def complete_reminder(fc_id: str, reminder_id: str,
+                      result: str = "", result_memo: str = "") -> bool:
     try:
         from datetime import datetime
-        get_supabase_client().table("fp_reminders").update({
+        data = {
             "status": "completed",
             "completed_at": datetime.now().isoformat(),
-        }).eq("id", reminder_id).eq("fc_id", fc_id).execute()
+        }
+        if result:
+            data["result"] = result
+        if result_memo:
+            data["result_memo"] = result_memo
+        get_supabase_client().table("fp_reminders").update(
+            data
+        ).eq("id", reminder_id).eq("fc_id", fc_id).execute()
         return True
     except Exception:
         return False
@@ -111,6 +131,21 @@ def cancel_reminder(fc_id: str, reminder_id: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def get_past_reminders(fc_id: str, limit: int = 50) -> list[dict]:
+    """완료/취소된 리마인드 목록 (최신 완료순)"""
+    try:
+        return (get_supabase_client()
+                .table("fp_reminders")
+                .select("*, clients(name, prospect_grade)")
+                .eq("fc_id", fc_id)
+                .in_("status", ["completed", "cancelled"])
+                .order("completed_at", desc=True)
+                .limit(limit)
+                .execute().data or [])
+    except Exception:
+        return []
 
 
 def update_reminder(fc_id: str, reminder_id: str, reminder_date: str | None,

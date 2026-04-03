@@ -160,6 +160,8 @@ st.markdown("""
 
 
 def main():
+    from utils.db_migrate import run_auto_migrations
+    run_auto_migrations()
     init_auth()  # 새로고침 시 쿠키에서 세션 복원
 
     if not is_logged_in():

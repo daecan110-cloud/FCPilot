@@ -4,7 +4,10 @@ from datetime import date
 import streamlit as st
 
 from auth import get_current_user_id
-from services.fp_reminder_service import get_bucketed, complete_reminder, cancel_reminder, update_reminder, purposes, create_reminder
+from services.fp_reminder_service import (
+    get_bucketed, complete_reminder, cancel_reminder, update_reminder,
+    purposes, create_reminder, get_past_reminders, RESULT_OPTIONS, RESULT_MAP,
+)
 from services.remind_trigger import check_and_send_daily_reminder
 from utils.calendar_render import render_monthly_calendar
 from utils.helpers import safe_error
@@ -60,11 +63,13 @@ def render():
         _render_add_reminder_form(fc_id)
 
     # 탭 방식 리마인드
-    tab_today, tab_week, tab_month, tab_nodate = st.tabs([
+    past = get_past_reminders(fc_id)
+    tab_today, tab_week, tab_month, tab_nodate, tab_past = st.tabs([
         f"🔴 오늘 ({len(today)})",
         f"🟡 이번 주 ({len(this_week)})",
         f"🔵 이번달 ({len(this_month)})",
         f"⚪ 미정 ({len(no_date)})",
+        f"✅ 지난 리마인드 ({len(past)})",
     ])
     with tab_today:
         for r in today:
@@ -86,6 +91,11 @@ def render():
             _render_reminder_card(r, "nodate", _products_map)
         if not no_date:
             empty_state("📌", "기간 없는 리마인드가 없습니다")
+    with tab_past:
+        for r in past:
+            _render_past_card(r, _products_map)
+        if not past:
+            empty_state("📋", "완료/취소된 리마인드가 없습니다")
 
     st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
     _render_recent_activity(fc_id)
@@ -101,7 +111,6 @@ def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):
     memo = r.get("memo", "")
     d = r.get("reminder_date", "")
 
-    # 제안 상품 이름 — 미리 로드된 맵 사용 (쿼리 없음)
     prod_label = ""
     if r.get("product_ids") and products_map:
         names = [products_map[pid] for pid in r["product_ids"] if pid in products_map]
@@ -110,6 +119,7 @@ def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):
 
     grade_html = _grade_badge(grade) if grade else ""
     edit_key = f"edit_reminder_{rid}"
+    complete_key = f"complete_reminder_{rid}"
 
     with st.container(border=True):
         col_info, col_btn = st.columns([4, 1])
@@ -121,19 +131,19 @@ def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):
             st.caption(f"예정일: {d}" if d else "예정일: 미정")
         with col_btn:
             fc_id = r.get("fc_id", "")
+
+            def _toggle(key):
+                st.session_state[key] = not st.session_state.get(key, False)
+
             st.button(
                 "완료", key=f"done_{rid}_{bucket}", type="primary",
                 use_container_width=True,
-                on_click=complete_reminder, args=(fc_id, rid),
+                on_click=_toggle, args=(complete_key,),
             )
-
-            def _toggle_edit(ek):
-                st.session_state[ek] = not st.session_state.get(ek, False)
-
             st.button(
                 "수정", key=f"edit_{rid}_{bucket}",
                 use_container_width=True,
-                on_click=_toggle_edit, args=(edit_key,),
+                on_click=_toggle, args=(edit_key,),
             )
 
             def _goto_client(cid):
@@ -147,8 +157,83 @@ def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):
                 on_click=_goto_client, args=(r.get("client_id"),),
             )
 
+        # 완료 결과 입력 폼
+        if st.session_state.get(complete_key):
+            _render_complete_form(r, complete_key)
+
         if st.session_state.get(edit_key):
             _render_edit_form(r, edit_key)
+
+
+def _render_complete_form(r: dict, complete_key: str):
+    """완료 시 결과 + FC 후기 입력"""
+    rid = r["id"]
+    fc_id = r.get("fc_id", "")
+    with st.form(f"complete_form_{rid}"):
+        st.caption("결과를 기록하세요")
+        result = st.selectbox(
+            "결과",
+            [k for k, _ in RESULT_OPTIONS],
+            format_func=lambda x: RESULT_MAP.get(x, x),
+        )
+        result_memo = st.text_area(
+            "FC 후기 / 메모",
+            placeholder="왜 실패했나요? 다음에 어떻게 접근할까요? 계약 후기 등",
+            height=100,
+        )
+        c1, c2 = st.columns(2)
+        if c1.form_submit_button("완료 저장", type="primary", use_container_width=True):
+            if complete_reminder(fc_id, rid, result, result_memo):
+                st.session_state.pop(complete_key, None)
+                st.rerun()
+            else:
+                st.error("저장 실패")
+        if c2.form_submit_button("취소", use_container_width=True):
+            st.session_state.pop(complete_key, None)
+            st.rerun()
+
+
+def _render_past_card(r: dict, products_map: dict = None):
+    """완료/취소된 리마인드 카드"""
+    client = r.get("clients") or {}
+    name = client.get("name", "이름 없음")
+    grade = client.get("prospect_grade", "")
+    purpose = r.get("purpose", "")
+    status = r.get("status", "")
+    result = r.get("result", "")
+    result_memo = r.get("result_memo", "")
+    memo = r.get("memo", "")
+    d = r.get("reminder_date", "")
+    completed_at = (r.get("completed_at") or "")[:10]
+
+    prod_label = ""
+    if r.get("product_ids") and products_map:
+        names = [products_map[pid] for pid in r["product_ids"] if pid in products_map]
+        if names:
+            prod_label = " | " + ", ".join(names)
+
+    grade_html = _grade_badge(grade) if grade else ""
+    status_icon = "✅" if status == "completed" else "❌"
+    result_label = RESULT_MAP.get(result, "") if result else ""
+
+    with st.container(border=True):
+        from utils.helpers import esc
+        header = f"{status_icon} **{esc(name)}** {grade_html} — {esc(purpose)}{esc(prod_label)}"
+        st.markdown(header, unsafe_allow_html=True)
+
+        info_parts = []
+        if d:
+            info_parts.append(f"예정: {d}")
+        if completed_at:
+            info_parts.append(f"완료: {completed_at}")
+        if result_label:
+            info_parts.append(f"결과: {result_label}")
+        st.caption(" | ".join(info_parts))
+
+        if result_memo:
+            st.caption(f"FC 후기: {result_memo}")
+        elif memo:
+            st.caption(f"메모: {memo}")
 
 
 def _render_add_reminder_form(fc_id: str):
