@@ -1,8 +1,8 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 12 완료 (보안+카카오맵+리팩토링) — 영민 테스트 대기 중**
-- 마지막 세션: 2026-04-01 (Claude Code)
+- Phase: **Sprint 14 완료 (온보딩+봇분리+RLS확인)**
+- 마지막 세션: 2026-04-04 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
 
@@ -107,11 +107,8 @@
 - [x] BotFather 봇 토큰 2개 재발급
 - [x] secrets.toml 전체 업데이트
 - [x] exec_sql RPC role 제한 SQL 실행
-- [ ] **Supabase Edge Function 환경변수** 업데이트 (미완료)
-  - `TELEGRAM_USER_BOT_TOKEN` = FCPilot 봇 토큰
-  - `TELEGRAM_USER_CHAT_ID` = 8201988543
-  - 기존 `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` 삭제
-- [ ] **Streamlit Cloud secrets** 업데이트 (telegram → telegram_dev/telegram_user 구조 변경)
+- [x] **Supabase Edge Function 환경변수** 업데이트 (2026-04-02 완료)
+- [x] **Streamlit Cloud secrets** 업데이트 (2026-04-02 완료, telegram_dev/telegram_user 구조)
 
 ### 근본 원인
 Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키 하드코딩으로 우회한 것 (Sprint 5~7 설계 실수)
@@ -127,14 +124,46 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 
 ---
 
+## Sprint 13 — 완료 (2026-04-02)
+
+### 기타 이슈 수정
+- [x] 캘린더 중복 렌더링 수정 — HTML 캘린더 제거, st.button 통일 + 뱃지 표시
+- [x] 구형 `services/reminder.py` 삭제 — 미사용 확인, fp_reminders로 대체됨
+
+### 테스트 수정
+- [x] `services.reminder` → `services.fp_reminder_service` 변경
+- [x] `fp_` 접두사 검사 allowlist 추가 (DB 테이블명/쿠키명 오탐 해소)
+- [x] 테스트 결과 텔레그램 발송 제거
+
+### 파일 분리 (전 파일 200줄 이하)
+- [x] `page_analysis.py` (343줄) → `page_analysis.py` (158) + `page_analysis_yakwan.py` (186)
+- [x] `page_home.py` (294줄) → `page_home.py` (145) + `page_home_forms.py` (155)
+- [x] `page_pioneer_map.py` (350줄) → `page_pioneer_map.py` (116) + `page_pioneer_followup.py` (134) + `page_pioneer_ocr.py` (118)
+- [x] `page_pioneer_route.py` (239줄) → `page_pioneer_route.py` (120) + `page_pioneer_history.py` (120)
+
+### 버그 수정
+- [x] `page_pioneer_route.py:200` 미사용 `create_route_map()` 호출 제거
+
+### 코드 품질 개선
+- [x] 에러 메시지 보안 — `page_settings.py`, `page_settings_admin.py` safe_error 적용
+- [x] `page_clients.py` 고객 저장 시 로딩 표시 추가
+- [x] `page_home_forms.py` 활동 추가 시 로딩 표시 추가
+- [x] AI 응답 실패 시 safe_error 사용으로 변경
+
+---
+
+## Sprint 14 — 완료 (2026-04-04)
+
+- [x] 동료 FC 온보딩 확인 — 기존 Sprint에서 구현 완료 확인 (회원가입 승인, Admin UI, 텔레그램 알림)
+- [x] 텔레그램 봇 분리 (#15) 확인 — dev/user 분리 완료 확인
+- [x] RLS + fc_id 보안 전 테이블 확인
+
+---
+
 ## 미완료 항목
 
 | 우선순위 | 항목 | 비고 |
 |----------|------|------|
-| 🟡 MID | 캘린더 날짜 버튼이 HTML과 중복 렌더링 | HTML 캘린더 + st.button 그리드 겹침 가능성 |
-| ✅ DONE | 200줄 초과 파일 리팩토링 | page_clients 3파일 분리 완료 |
-| ✅ DONE | 텔레그램 봇 분리 | dev(claudeFC_bot) / user(FCPilot) 완료 |
-| ✅ DONE | 카카오맵 전환 | 네이버 의존 제거 완료 |
 | 🟢 LOW | tools/telegram_chat.py | 별도 봇 토큰 설정 완료, 필요 시 사용 |
 
 ---
@@ -159,10 +188,7 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 
 ## 알려진 이슈
 
-- Naver Maps JS API: NCP 콘솔에서 `fcpilot-kr.streamlit.app` 도메인 등록 필요
 - Gemini 무료 tier: 분당 2회 제한 → 429 시 자동 재시도 대응 완료
-- page_clients.py ~530줄 (200줄 초과) — 향후 분리 예정
-- `reminder.py` (구형 contact_logs 기반 리마인드 조회)는 fp_reminders와 별개로 존재 — 사용처 없으면 추후 정리 필요
 
 ---
 

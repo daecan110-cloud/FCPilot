@@ -45,6 +45,8 @@ def extract_from_sign(image_bytes: bytes, media_type: str = "image/jpeg") -> dic
         }],
     )
 
+    if not message.content:
+        return {"shop_name": "", "category": "", "items": []}
     return _parse(message.content[0].text)
 
 

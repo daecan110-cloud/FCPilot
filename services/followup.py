@@ -54,7 +54,10 @@ def get_followup_list(fc_id: str) -> list[dict]:
         if rule["days"] == 0:
             continue
 
-        visit_date = date.fromisoformat(last_visit["visit_date"])
+        vd = last_visit.get("visit_date")
+        if not vd:
+            continue
+        visit_date = date.fromisoformat(vd)
         due = visit_date + timedelta(days=rule["days"])
         overdue = today >= due
         days_left = (due - today).days

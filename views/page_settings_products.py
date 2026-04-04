@@ -120,13 +120,11 @@ def _apply_changes(sb, fc_id: str, original_df: pd.DataFrame, edited_df: pd.Data
     edited_len = len(edited_df)
 
     try:
-        # 삭제된 행 처리 (편집 후 행 수가 줄어든 경우)
-        if edited_len < orig_len:
-            # data_editor는 삭제된 행 인덱스를 알 수 없으므로 상품명 기준 비교
-            edited_names = set(edited_df["상품명"].tolist())
-            for r in original_df.itertuples():
-                if r.상품명 not in edited_names:
-                    sb.table("fp_products").delete().eq("id", r._id).eq("fc_id", fc_id).execute()
+        # 삭제된 행 처리: edited_df에 없는 원본 인덱스 찾기
+        edited_indices = set(edited_df.index.tolist())
+        for i, oid in enumerate(orig_ids):
+            if i not in edited_indices:
+                sb.table("fp_products").delete().eq("id", oid).eq("fc_id", fc_id).execute()
 
         # 기존 행 수정 + 신규 행 추가
         for i, row in edited_df.iterrows():
@@ -139,8 +137,10 @@ def _apply_changes(sb, fc_id: str, original_df: pd.DataFrame, edited_df: pd.Data
 
             if i < orig_len:  # 기존 행
                 pid = orig_ids[i]
+                from datetime import datetime, timezone
                 sb.table("fp_products").update({
-                    "name": name, "category": cat, "is_active": active, "updated_at": "now()",
+                    "name": name, "category": cat, "is_active": active,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
                 }).eq("id", pid).eq("fc_id", fc_id).execute()
             else:  # 신규 행
                 sb.table("fp_products").insert({

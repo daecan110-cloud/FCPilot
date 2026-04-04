@@ -1,8 +1,7 @@
 """보장분석 탭 UI"""
 import streamlit as st
-from config import MAX_FILE_SIZE_MB, CLAUDE_MODEL
+from config import MAX_FILE_SIZE_MB
 from services.analysis_engine import analyze_and_generate
-from services.yakwan_engine import analyze_yakwan, format_display
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from utils.helpers import safe_error
@@ -56,9 +55,8 @@ def render():
         if client_name:
             data["고객명"] = client_name
             try:
-                _, excel_files = analyze_and_generate(
-                    pdf_bytes, include_review=include_review,
-                )
+                from services.analysis_engine import regenerate_excel
+                excel_files = regenerate_excel(data, include_review=include_review)
             except Exception as e:
                 st.error(safe_error("엑셀 재생성", e))
                 return
@@ -76,7 +74,6 @@ def render():
     if data is None:
         return
 
-    # 보장분석 결과 + 약관 분석을 탭으로 통합
     tab_result, tab_yakwan = st.tabs(["보장분석 결과", "약관 분석 + AI 상담"])
 
     with tab_result:
@@ -89,17 +86,19 @@ def render():
                     st.warning(w)
 
         excel_files = st.session_state.get("excel_files", [])
-        for filename, excel_bytes in excel_files:
+        for idx, (filename, excel_bytes) in enumerate(excel_files):
             st.download_button(
                 label=f"다운로드: {filename}",
                 data=excel_bytes,
                 file_name=filename,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
+                key=f"dl_{idx}_{filename}",
             )
 
     with tab_yakwan:
-        _render_yakwan_section(data)
+        from views.page_analysis_yakwan import render_yakwan_section
+        render_yakwan_section(data)
 
 
 def _show_result(data: dict):
@@ -112,7 +111,7 @@ def _show_result(data: dict):
     st.divider()
     contracts = data.get("_all_contracts", data.get("계약", []))
     if contracts:
-        with st.expander(f"📋 계약 목록 ({len(contracts)}건)", expanded=True):
+        with st.expander(f"계약 목록 ({len(contracts)}건)", expanded=True):
             for c in contracts:
                 prem = c.get("월보험료", 0)
                 st.markdown(
@@ -157,187 +156,3 @@ def _save_to_db(data: dict, silent: bool = False):
     except Exception as e:
         if not silent:
             st.error(safe_error("저장", e))
-
-
-# ── 약관 분석 + AI 상담 ──
-
-def _render_yakwan_section(data: dict):
-    st.subheader("약관 분석")
-    st.caption("계약을 선택하고 약관 PDF를 업로드 → 면책/특이사항 분석 + AI 상담으로 K열 내용 확정")
-
-    contracts = data.get("_all_contracts", data.get("계약", []))
-    if not contracts:
-        st.info("보장분석을 먼저 실행하세요.")
-        return
-
-    options = [
-        f"[{i+1}] {c.get('보험사', '')} - {c.get('상품명', '')[:25]}"
-        for i, c in enumerate(contracts)
-    ]
-    selected = st.selectbox(
-        "분석할 계약 선택",
-        options,
-        index=st.session_state.get("yakwan_selected_idx"),
-        placeholder="계약을 선택하세요",
-    )
-
-    if selected:
-        idx = int(selected.split("]")[0].replace("[", "")) - 1
-        st.session_state.yakwan_selected_idx = idx
-        contract = contracts[idx]
-    else:
-        return
-
-    yakwan_pdf = st.file_uploader("약관 PDF 업로드", type=["pdf"], key="yakwan_pdf")
-
-    if yakwan_pdf and st.button("약관 분석 시작", use_container_width=True, type="primary"):
-        yakwan_bytes = yakwan_pdf.read()
-        with st.spinner(f"{contract.get('상품명', '')[:20]} 약관 분석 중..."):
-            try:
-                result = analyze_yakwan(
-                    yakwan_bytes,
-                    contract.get("보험사", ""),
-                    contract.get("상품명", ""),
-                )
-            except Exception as e:
-                st.error(safe_error("약관 분석", e))
-                return
-
-        if "yakwan_results" not in st.session_state:
-            st.session_state.yakwan_results = {}
-        st.session_state.yakwan_results[idx] = result
-        # 새 계약 분석 시 채팅 초기화
-        st.session_state.pop(f"yakwan_chat_{idx}", None)
-        _save_yakwan_to_db(idx, contract, result)
-        st.rerun()
-
-    # 분석 결과 + AI 상담
-    yakwan_results = st.session_state.get("yakwan_results", {})
-    result = yakwan_results.get(idx)
-
-    if result:
-        with st.expander("약관 분석 결과", expanded=True):
-            st.markdown(format_display(result))
-            k_text = result.get("k_column", "")
-            if k_text:
-                st.info(f"K열 자동 요약: {k_text}")
-
-        st.divider()
-        _render_yakwan_chat(idx, contract, result)
-
-        st.divider()
-        _render_k_column_apply(data, idx, result)
-    else:
-        st.caption("약관 PDF를 업로드하고 분석을 시작하면 AI와 상담할 수 있습니다.")
-
-
-def _render_yakwan_chat(contract_idx: int, contract: dict, yakwan_result: dict):
-    """약관 내용 AI 상담 채팅창"""
-    st.subheader("AI 약관 상담")
-    st.caption("특약 면책기간, 보장범위, 감액조건 등 K열에 넣을 내용을 AI와 상담하세요.")
-
-    chat_key = f"yakwan_chat_{contract_idx}"
-    if chat_key not in st.session_state:
-        st.session_state[chat_key] = []
-
-    # 채팅 이력 표시
-    for msg in st.session_state[chat_key]:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
-
-    # 채팅 입력
-    if prompt := st.chat_input(
-        "예: 암 면책기간이 얼마나 되나요? / K열에 뭐라고 쓸까요?",
-        key=f"chat_input_{contract_idx}",
-    ):
-        st.session_state[chat_key].append({"role": "user", "content": prompt})
-        with st.spinner("AI 답변 중..."):
-            reply = _chat_with_ai(contract, yakwan_result, st.session_state[chat_key])
-        st.session_state[chat_key].append({"role": "assistant", "content": reply})
-        st.rerun()
-
-    if st.session_state[chat_key]:
-        if st.button("채팅 초기화", key=f"chat_clear_{contract_idx}"):
-            st.session_state[chat_key] = []
-            st.rerun()
-
-
-def _chat_with_ai(contract: dict, yakwan_result: dict, messages: list) -> str:
-    """Claude API로 약관 상담 응답 생성"""
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=st.secrets["claude"]["api_key"])
-
-        system = f"""보험 약관 분석 전문가로서 FC(재무컨설턴트)의 질문에 실무적으로 답합니다.
-
-현재 분석 계약:
-- 보험사: {contract.get('보험사', '')}
-- 상품명: {contract.get('상품명', '')}
-
-약관 분석 결과:
-{format_display(yakwan_result)}
-
-K열 자동 요약: {yakwan_result.get('k_column', '(없음)')}
-
-FC가 이 계약의 특약 면책기간, 보장범위, 감액조건, 주계약 내용 등에 대해 묻습니다.
-엑셀 보장분석표 K열(특이사항)에 기재할 내용을 함께 결정하는 것도 도와주세요.
-짧고 실무적으로 답변하세요. 고객명/전화번호 언급 금지."""
-
-        response = client.messages.create(
-            model=CLAUDE_MODEL,
-            max_tokens=800,
-            system=system,
-            messages=[{"role": m["role"], "content": m["content"]} for m in messages],
-        )
-        return response.content[0].text
-    except Exception as e:
-        return f"AI 응답 실패: {e}"
-
-
-def _render_k_column_apply(data: dict, idx: int, result: dict):
-    """K열 내용 확정 후 엑셀 재생성"""
-    st.subheader("K열 확정 및 엑셀 재생성")
-
-    k_default = result.get("k_column", "")
-    k_text = st.text_area(
-        "K열에 기재할 내용 (AI 상담 후 수정 가능)",
-        value=k_default,
-        height=80,
-        key=f"k_text_{idx}",
-    )
-
-    if st.button("이 내용으로 엑셀 재생성", use_container_width=True, type="primary"):
-        yakwan_results = st.session_state.get("yakwan_results", {})
-        k_column_data = {}
-        for i, r in yakwan_results.items():
-            k_column_data[i] = r.get("k_column", "")
-        # 현재 선택 계약의 K열은 텍스트 박스 값 우선
-        if k_text.strip():
-            k_column_data[idx] = k_text.strip()
-
-        pdf_bytes = st.session_state.get("pdf_bytes")
-        include_review = st.session_state.get("include_review", False)
-        if pdf_bytes:
-            try:
-                _, excel_files = analyze_and_generate(
-                    pdf_bytes, include_review=include_review, k_column_data=k_column_data,
-                )
-                st.session_state.excel_files = excel_files
-                st.success("엑셀 재생성 완료. '보장분석 결과' 탭에서 다운로드하세요.")
-            except Exception as e:
-                st.error(safe_error("재생성", e))
-
-
-def _save_yakwan_to_db(idx: int, contract: dict, result: dict):
-    try:
-        sb = get_supabase_client()
-        sb.table("yakwan_records").insert({
-            "fc_id": get_current_user_id(),
-            "contract_index": idx,
-            "company": contract.get("보험사", ""),
-            "product": contract.get("상품명", ""),
-            "yakwan_result": result,
-            "k_column_text": result.get("k_column", ""),
-        }).execute()
-    except Exception:
-        pass

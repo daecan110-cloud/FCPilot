@@ -21,8 +21,11 @@ def parse_amount(s) -> int:
 
 def extract_from_pdf(pdf_bytes) -> dict:
     """PDF 바이트에서 보장분석 데이터 추출"""
-    pdf = pdfplumber.open(pdf_bytes)
+    with pdfplumber.open(pdf_bytes) as pdf:
+        return _do_extract(pdf)
 
+
+def _do_extract(pdf) -> dict:
     result = {
         "고객명": "", "성별": "", "나이": 0,
         "_all_contracts": [], "_coverage_raw": {},
@@ -30,6 +33,9 @@ def extract_from_pdf(pdf_bytes) -> dict:
         "기납입보험료": {}, "납입할보험료": {},
         "_warnings": [],
     }
+
+    if len(pdf.pages) < 1:
+        return result
 
     p1_text = pdf.pages[0].extract_text() or ""
 
@@ -41,6 +47,8 @@ def extract_from_pdf(pdf_bytes) -> dict:
         result["고객명"] = m.group(1)
 
     # Page 3: 계약현황
+    if len(pdf.pages) < 3:
+        return result
     p3 = pdf.pages[2]
     p3_text = p3.extract_text() or ""
     all_contracts = _parse_contracts(p3)
@@ -57,8 +65,6 @@ def extract_from_pdf(pdf_bytes) -> dict:
     # 검증: Page 4~5 보장진단 합계와 비교
     warnings = _verify_coverages(pdf, coverage_raw)
     result["_warnings"] = warnings
-
-    pdf.close()
 
     # 결과 조립
     result["_all_contracts"] = all_contracts
@@ -119,7 +125,7 @@ def _extract_demographics(result: dict, pdf, p1_text: str, p3_text: str):
         result["성별"] = m_tag.group(2)
         result["나이"] = int(m_tag.group(1)) + 8
 
-    p2_text = pdf.pages[1].extract_text() or "" if len(pdf.pages) > 1 else ""
+    p2_text = (pdf.pages[1].extract_text() or "") if len(pdf.pages) > 1 else ""
     m_info = re.search(r"/\s*(\d+)\s*/\s*(남|여)성", p2_text)
     if m_info:
         result["나이"] = int(m_info.group(1))

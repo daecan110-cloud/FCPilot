@@ -13,7 +13,10 @@ def migrate_clients_csv(csv_bytes: bytes) -> dict:
     CSV 컬럼 (유연하게 매핑):
       이름, 전화번호, 나이, 성별, 직업, 주소, 등급, 출처, 메모
     """
-    text = csv_bytes.decode("utf-8-sig")
+    try:
+        text = csv_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = csv_bytes.decode("cp949", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
 
     sb = get_supabase_client()
@@ -71,7 +74,11 @@ def migrate_clients_csv(csv_bytes: bytes) -> dict:
             }).execute()
             success += 1
         except Exception as e:
-            errors.append(f"행 {i}: {e}")
+            err_msg = str(e)
+            if any(k in err_msg.lower() for k in ["duplicate", "null value", "violates"]):
+                errors.append(f"행 {i}: {err_msg[:80]}")
+            else:
+                errors.append(f"행 {i}: 저장 실패 — 관리자에게 문의하세요.")
 
     return {"success": success, "errors": errors}
 

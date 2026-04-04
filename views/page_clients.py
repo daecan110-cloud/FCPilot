@@ -250,14 +250,15 @@ def _render_form(edit=False):
                     "address": address.strip(),
                     "memo": memo.strip(),
                 }
-                try:
-                    if edit:
-                        sb.table("clients").update(data).eq("id", client["id"]).eq("fc_id", get_current_user_id()).execute()
-                    else:
-                        data["fc_id"] = get_current_user_id()
-                        sb.table("clients").insert(data).execute()
-                    st.success("저장되었습니다.")
-                    st.session_state.clients_view = "list"
-                    st.rerun()
-                except Exception as e:
-                    st.error(safe_error("저장", e))
+                with st.spinner("저장 중..."):
+                    try:
+                        if edit:
+                            sb.table("clients").update(data).eq("id", client["id"]).eq("fc_id", get_current_user_id()).execute()
+                        else:
+                            data["fc_id"] = get_current_user_id()
+                            sb.table("clients").insert(data).execute()
+                        st.success("저장되었습니다.")
+                        st.session_state.clients_view = "list"
+                        st.rerun()
+                    except Exception as e:
+                        st.error(safe_error("저장", e))

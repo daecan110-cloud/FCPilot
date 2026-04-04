@@ -23,3 +23,11 @@ def analyze_and_generate(
         data["_k_column"] = k_column_data
     excel_files = generate_analysis_excel(data, include_review=include_review)
     return data, excel_files
+
+
+def regenerate_excel(
+    data: dict,
+    include_review: bool = False,
+) -> list[tuple[str, bytes]]:
+    """기존 분석 데이터로 엑셀만 재생성 (PDF 재분석 없이)"""
+    return generate_analysis_excel(data, include_review=include_review)

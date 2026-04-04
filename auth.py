@@ -117,8 +117,8 @@ def check_session_timeout():
         return
     elapsed = time.time() - st.session_state.last_activity
     if elapsed > SESSION_TIMEOUT:
+        st.session_state._timeout_msg = True
         logout()
-        st.warning("60분 동안 활동이 없어 자동 로그아웃되었습니다.")
         st.rerun()
     else:
         st.session_state.last_activity = time.time()
@@ -127,6 +127,8 @@ def check_session_timeout():
 # ── 로그인 UI ─────────────────────────────────────────────
 
 def show_login_page():
+    if st.session_state.pop("_timeout_msg", False):
+        st.warning("60분 동안 활동이 없어 자동 로그아웃되었습니다.")
     st.title("🛡️ FCPilot")
     st.caption("보험 FC 업무 통합 플랫폼")
 
@@ -192,7 +194,8 @@ def _do_login(email: str, password: str):
         elif "Email not confirmed" in err or "email_not_confirmed" in err:
             st.error("이메일 인증이 필요합니다. 가입 시 받은 이메일을 확인해주세요.")
         else:
-            st.error(f"로그인 실패: {err}")
+            from utils.helpers import safe_error
+            st.error(safe_error("로그인", Exception(err)))
 
 
 def _ensure_settings_row(user_id: str):
@@ -250,7 +253,8 @@ def _do_signup(email: str, password: str, display_name: str):
         if "already registered" in msg:
             st.error("이미 등록된 이메일입니다.")
         else:
-            st.error(f"회원가입 실패: {msg}")
+            from utils.helpers import safe_error
+            st.error(safe_error("회원가입", Exception(msg)))
 
 
 def logout():

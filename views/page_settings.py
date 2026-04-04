@@ -41,6 +41,9 @@ def render():
     with st.expander("💾 데이터 관리"):
         st.caption("고객 데이터를 CSV로 가져오거나 내보낼 수 있습니다.")
         csv_file = st.file_uploader("CSV 가져오기", type=["csv"], key="settings_csv")
+        if csv_file and csv_file.size > 10 * 1024 * 1024:
+            st.error("파일 크기는 10MB 이하만 가능합니다.")
+            csv_file = None
         if csv_file and st.button("가져오기 시작", type="primary"):
             from services.migration import migrate_clients_csv
             with st.spinner("마이그레이션 중..."):
@@ -126,7 +129,7 @@ def _load_settings(sb, user_id: str) -> dict:
         if res.data:
             return res.data[0]
     except Exception as e:
-        st.warning(f"설정 로드 실패: {e}")
+        st.warning(safe_error("설정 로드", e))
     return {}
 
 

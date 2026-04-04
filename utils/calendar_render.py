@@ -7,6 +7,38 @@ import streamlit as st
 from utils.supabase_client import get_supabase_client
 
 
+def _nav_prev():
+    if st.session_state.cal_month == 1:
+        st.session_state.cal_year -= 1
+        st.session_state.cal_month = 12
+    else:
+        st.session_state.cal_month -= 1
+    st.session_state.pop("cal_selected_date", None)
+
+
+def _nav_next():
+    if st.session_state.cal_month == 12:
+        st.session_state.cal_year += 1
+        st.session_state.cal_month = 1
+    else:
+        st.session_state.cal_month += 1
+    st.session_state.pop("cal_selected_date", None)
+
+
+def _nav_today():
+    t = date.today()
+    st.session_state.cal_year = t.year
+    st.session_state.cal_month = t.month
+    st.session_state.pop("cal_selected_date", None)
+
+
+def _select_date(day_str):
+    if st.session_state.get("cal_selected_date") == day_str:
+        st.session_state.pop("cal_selected_date", None)
+    else:
+        st.session_state.cal_selected_date = day_str
+
+
 def render_monthly_calendar(fc_id: str):
     today = date.today()
 
@@ -18,35 +50,18 @@ def render_monthly_calendar(fc_id: str):
     year = st.session_state.cal_year
     month = st.session_state.cal_month
 
-    # 월 이동 버튼 — ◀ [오늘] 2026년 4월 ▶
+    # 월 이동
     c1, c2, c3, c4 = st.columns([1, 1, 4, 1])
-    if c1.button("◀", key="cal_prev", use_container_width=True):
-        if month == 1:
-            st.session_state.cal_year -= 1
-            st.session_state.cal_month = 12
-        else:
-            st.session_state.cal_month -= 1
-        st.session_state.pop("cal_selected_date", None)
-        st.rerun()
+    c1.button("◀", key="cal_prev", use_container_width=True, on_click=_nav_prev)
     is_current = year == today.year and month == today.month
-    if c2.button("오늘", key="cal_today", use_container_width=True, disabled=is_current):
-        st.session_state.cal_year = today.year
-        st.session_state.cal_month = today.month
-        st.session_state.pop("cal_selected_date", None)
-        st.rerun()
+    c2.button("오늘", key="cal_today", use_container_width=True,
+              disabled=is_current, on_click=_nav_today)
     c3.markdown(
         f"<div style='text-align:center;font-size:16px;font-weight:700;"
         f"color:#1a1a2e;padding:6px 0;'>{year}년 {month}월</div>",
         unsafe_allow_html=True,
     )
-    if c4.button("▶", key="cal_next", use_container_width=True):
-        if month == 12:
-            st.session_state.cal_year += 1
-            st.session_state.cal_month = 1
-        else:
-            st.session_state.cal_month += 1
-        st.session_state.pop("cal_selected_date", None)
-        st.rerun()
+    c4.button("▶", key="cal_next", use_container_width=True, on_click=_nav_next)
 
     # 해당 월 리마인드 조회
     _, last_day = calendar.monthrange(year, month)
@@ -79,11 +94,18 @@ def render_monthly_calendar(fc_id: str):
     cal_matrix = calendar.monthcalendar(year, month)
     selected = st.session_state.get("cal_selected_date")
 
-    # HTML 캘린더 렌더링
-    html = _build_calendar_html(cal_matrix, year, month, today_str, date_map, selected)
-    st.markdown(html, unsafe_allow_html=True)
+    # 요일 헤더
+    day_labels = ["월", "화", "수", "목", "금", "토", "일"]
+    hdr_cols = st.columns(7)
+    for i, lbl in enumerate(day_labels):
+        color = "#ef4444" if i >= 5 else "#9ca3af"
+        hdr_cols[i].markdown(
+            f"<div style='text-align:center;font-size:12px;font-weight:600;"
+            f"color:{color};'>{lbl}</div>",
+            unsafe_allow_html=True,
+        )
 
-    # 날짜 선택 (버튼 그리드 — 투명 오버레이)
+    # 날짜 버튼 그리드
     for week in cal_matrix:
         cols = st.columns(7)
         for i, day in enumerate(week):
@@ -91,100 +113,39 @@ def render_monthly_calendar(fc_id: str):
                 cols[i].write("")
                 continue
             day_str = f"{year}-{month:02d}-{day:02d}"
-            if cols[i].button(str(day), key=f"cal_{day_str}", use_container_width=True):
-                if selected == day_str:
-                    st.session_state.pop("cal_selected_date", None)
-                else:
-                    st.session_state.cal_selected_date = day_str
-                st.rerun()
+            info = date_map.get(day_str, {})
+            pending = info.get("pending", 0)
+            done = info.get("completed", 0)
+
+            label = str(day)
+            if pending:
+                label += " 🟡"
+            elif done:
+                label += " ✅"
+
+            btn_type = "primary" if day_str == today_str else "secondary"
+            cols[i].button(
+                label, key=f"cal_{day_str}",
+                use_container_width=True, type=btn_type,
+                on_click=_select_date, args=(day_str,),
+            )
 
     # 선택된 날짜 상세
     if selected and selected.startswith(f"{year}-{month:02d}"):
         day_rows = [r for r in rows if r.get("reminder_date") == selected]
         st.markdown(
-            f"<div style='margin-top:12px; padding:12px 16px; background:#ffffff; "
-            f"border-radius:10px; border:1px solid #eef0f4;'>"
-            f"<span style='font-weight:600; color:#1a1a2e;'>{selected} 일정</span></div>",
+            f"<div style='margin-top:8px; padding:10px 14px; background:#f8f9fb; "
+            f"border-radius:8px; border:1px solid #eef0f4;'>"
+            f"<b>{selected} 일정</b></div>",
             unsafe_allow_html=True,
         )
         if day_rows:
             for r in day_rows:
                 client = r.get("clients") or {}
                 name = client.get("name", "")
-                status_icon = {"pending": "🟡", "completed": "✅", "cancelled": "❌"}.get(r.get("status", ""), "")
+                status_icon = {"pending": "🟡", "completed": "✅",
+                               "cancelled": "❌"}.get(r.get("status", ""), "")
                 memo_part = f" | {r['memo'][:20]}" if r.get("memo") else ""
                 st.markdown(f"{status_icon} **{name}** — {r.get('purpose', '')}{memo_part}")
         else:
             st.caption("일정 없음")
-
-    # 월간 요약
-    if rows:
-        pending_total = sum(d.get("pending", 0) for d in date_map.values())
-        done_total = sum(d.get("completed", 0) for d in date_map.values())
-        st.markdown(
-            f"<div style='text-align:center; padding:8px; color:#9ca3af; font-size:13px;'>"
-            f"대기 <b style=\"color:#f59e0b\">{pending_total}</b>건 · "
-            f"완료 <b style=\"color:#059669\">{done_total}</b>건"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
-
-def _build_calendar_html(
-    cal_matrix: list, year: int, month: int,
-    today_str: str, date_map: dict, selected: str | None,
-) -> str:
-    """HTML 캘린더 그리드 생성"""
-    days = ["월", "화", "수", "목", "금", "토", "일"]
-    day_colors = ["#9ca3af"] * 5 + ["#ef4444", "#ef4444"]
-    header = "".join(
-        f"<div style='flex:1;text-align:center;font-size:12px;font-weight:600;"
-        f"color:{day_colors[i]};padding:8px 0;'>{d}</div>"
-        for i, d in enumerate(days)
-    )
-
-    weeks_html = ""
-    for week in cal_matrix:
-        cells = ""
-        for i, day in enumerate(week):
-            if day == 0:
-                cells += "<div style='flex:1;padding:6px;min-height:36px;'></div>"
-                continue
-
-            day_str = f"{year}-{month:02d}-{day:02d}"
-            info = date_map.get(day_str, {})
-            pending = info.get("pending", 0)
-            done = info.get("completed", 0)
-            is_today = day_str == today_str
-            is_selected = day_str == selected
-            is_weekend = i >= 5
-
-            # 스타일 결정
-            bg = "#4f46e5" if is_today else "#eef2ff" if is_selected else "transparent"
-            color = "#ffffff" if is_today else "#ef4444" if is_weekend else "#1a1a2e"
-            border = "2px solid #4f46e5" if is_selected and not is_today else "none"
-            font_weight = "700" if is_today or pending else "400"
-
-            # 뱃지
-            badge = ""
-            if pending:
-                badge = f"<div style='width:6px;height:6px;border-radius:50%;background:#f59e0b;margin:2px auto 0;'></div>"
-            elif done:
-                badge = f"<div style='width:6px;height:6px;border-radius:50%;background:#059669;margin:2px auto 0;'></div>"
-
-            cells += (
-                f"<div style='flex:1;text-align:center;padding:4px 0;'>"
-                f"<div style='display:inline-flex;flex-direction:column;align-items:center;"
-                f"width:32px;height:40px;justify-content:center;"
-                f"background:{bg};border-radius:10px;border:{border};"
-                f"color:{color};font-size:14px;font-weight:{font_weight};'>"
-                f"{day}{badge}</div></div>"
-            )
-        weeks_html += f"<div style='display:flex;'>{cells}</div>"
-
-    return (
-        f"<div style='background:#ffffff;border-radius:12px;padding:12px 8px;"
-        f"border:1px solid #eef0f4;'>"
-        f"<div style='display:flex;border-bottom:1px solid #eef0f4;margin-bottom:4px;'>{header}</div>"
-        f"{weeks_html}</div>"
-    )

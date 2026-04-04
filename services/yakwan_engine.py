@@ -57,6 +57,8 @@ def analyze_yakwan(pdf_bytes: bytes, company: str, product: str) -> dict:
                     ],
                 }],
             )
+            if not message.content:
+                raise ValueError("AI 응답이 비어 있습니다.")
             return _parse(message.content[0].text)
         except Exception as e:
             err = str(e)

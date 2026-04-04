@@ -6,7 +6,6 @@ from utils.supabase_client import get_supabase_client
 from utils.map_utils import STATUS_LABELS
 from utils.kakao_map import pioneer_map_html
 from services.geocoding import geocode
-from config import ALLOWED_FILE_TYPES, MAX_FILE_SIZE_MB
 from utils.helpers import safe_error
 
 CATEGORY_OPTIONS = ["음식점", "카페", "미용실/뷰티", "학원/교육", "병원/약국", "편의점/마트", "의류/패션", "사무실/오피스", "기타"]
@@ -19,11 +18,13 @@ def render():
     with tab_map:
         _render_map()
     with tab_followup:
-        _render_followup()
+        from views.page_pioneer_followup import render_followup
+        render_followup()
     with tab_register:
         _render_register()
     with tab_ocr:
-        _render_ocr()
+        from views.page_pioneer_ocr import render_ocr
+        render_ocr()
 
 
 def _render_map():
@@ -64,8 +65,8 @@ def _render_map():
                 new_status = st.selectbox(
                     "상태",
                     options=list(STATUS_LABELS.keys()),
-                    index=list(STATUS_LABELS.keys()).index(s.get("status", "active")),
-                    format_func=lambda x: STATUS_LABELS[x],
+                    index=list(STATUS_LABELS.keys()).index(s.get("status", "active")) if s.get("status", "active") in STATUS_LABELS else 0,
+                    format_func=lambda x: STATUS_LABELS.get(x, x),
                     key=f"status_{s['id']}",
                     label_visibility="collapsed",
                 )
@@ -113,238 +114,3 @@ def _render_register():
                     st.error(safe_error("등록", e))
 
 
-def _render_ocr():
-    st.subheader("간판 OCR")
-    st.caption("간판 사진을 업로드하면 AI가 가게명/업종을 자동 추출합니다.")
-
-    photo = st.file_uploader("간판 사진", type=["jpg", "jpeg", "png"])
-
-    if photo:
-        from utils.helpers import validate_file
-        photo_err = validate_file(photo, ["jpg", "jpeg", "png"], 10)
-        if photo_err:
-            st.error(photo_err)
-            photo = None
-
-    if photo and st.button("간판 분석", type="primary"):
-        from services.ocr_engine import extract_from_sign
-        img_bytes = photo.read()
-        media = f"image/{photo.name.rsplit('.', 1)[-1].lower()}"
-        if media == "image/jpg":
-            media = "image/jpeg"
-
-        # BUG-06: EXIF GPS → 자동 주소
-        gps_address = _extract_gps_address(img_bytes)
-
-        with st.spinner("간판 분석 중..."):
-            result = extract_from_sign(img_bytes, media)
-
-        if gps_address and not result.get("address"):
-            result["address"] = gps_address
-
-        st.session_state.ocr_result = result
-        st.image(img_bytes, width=300)
-
-    result = st.session_state.get("ocr_result")
-    if result:
-        st.subheader("추출 결과 (수정 후 등록)")
-        shop_name = st.text_input("매장명", value=result.get("shop_name", ""))
-        address = st.text_input("주소", value=result.get("address", ""))
-
-        # BUG-05: 업종 드롭다운 (OCR 추천값 기본 선택)
-        ocr_cat = result.get("category", "")
-        cat_idx = next((i for i, c in enumerate(CATEGORY_OPTIONS) if ocr_cat and ocr_cat[:3] in c), len(CATEGORY_OPTIONS) - 1)
-        category = st.selectbox("업종", CATEGORY_OPTIONS, index=cat_idx)
-
-        if st.button("이 매장 등록", use_container_width=True, type="primary"):
-            lat, lng = None, None
-            if address:
-                coords = geocode(address)
-                if coords:
-                    lat, lng = coords
-            try:
-                sb = get_supabase_client()
-                sb.table("pioneer_shops").insert({
-                    "fc_id": get_current_user_id(),
-                    "shop_name": shop_name.strip(),
-                    "address": address.strip(),
-                    "lat": lat,
-                    "lng": lng,
-                    "category": category,
-                    "phone": result.get("phone", ""),
-                }).execute()
-                st.success(f"'{shop_name}' 등록 완료!")
-                st.session_state.pop("ocr_result", None)
-            except Exception as e:
-                st.error(safe_error("등록", e))
-
-
-def _extract_gps_address(image_bytes: bytes) -> str:
-    """사진 EXIF GPS → Naver Reverse Geocoding → 주소 반환. 없으면 빈 문자열."""
-    try:
-        from PIL import Image
-        from PIL.ExifTags import TAGS, GPSTAGS
-        import io
-
-        img = Image.open(io.BytesIO(image_bytes))
-        exif = img._getexif()
-        if not exif:
-            return ""
-
-        gps_info = {}
-        for tag_id, value in exif.items():
-            if TAGS.get(tag_id) == "GPSInfo":
-                for gps_tag_id, gps_value in value.items():
-                    gps_info[GPSTAGS.get(gps_tag_id, gps_tag_id)] = gps_value
-
-        if not gps_info:
-            return ""
-
-        lat = _dms_to_decimal(gps_info.get("GPSLatitude"), gps_info.get("GPSLatitudeRef"))
-        lng = _dms_to_decimal(gps_info.get("GPSLongitude"), gps_info.get("GPSLongitudeRef"))
-        if not lat or not lng:
-            return ""
-
-        return _reverse_geocode(lat, lng)
-    except Exception:
-        return ""
-
-
-def _dms_to_decimal(dms, ref) -> float | None:
-    try:
-        d = float(dms[0])
-        m = float(dms[1])
-        s = float(dms[2])
-        decimal = d + m / 60 + s / 3600
-        if ref in ("S", "W"):
-            decimal = -decimal
-        return decimal
-    except Exception:
-        return None
-
-
-def _reverse_geocode(lat: float, lng: float) -> str:
-    from services.geocoding import reverse_geocode
-    return reverse_geocode(lat, lng)
-
-
-# ── 팔로업 (BUG-08) ──
-
-def _render_followup():
-    sb = get_supabase_client()
-    fc_id = get_current_user_id()
-
-    st.subheader("팔로업 현황")
-
-    try:
-        shops_res = sb.table("pioneer_shops").select("*").eq("fc_id", fc_id).order("created_at", desc=True).execute()
-        shops = shops_res.data or []
-    except Exception as e:
-        st.error(safe_error("매장 조회", e))
-        return
-
-    if not shops:
-        st.info("등록된 매장이 없습니다.")
-        return
-
-    # 방문 이력 일괄 조회
-    try:
-        visits_res = sb.table("pioneer_visits").select("*").eq("fc_id", fc_id).order("visit_date", desc=True).execute()
-        all_visits = visits_res.data or []
-    except Exception:
-        all_visits = []
-
-    from collections import defaultdict
-    visits_by_shop: dict = defaultdict(list)
-    for v in all_visits:
-        visits_by_shop[v["shop_id"]].append(v)
-
-    status_filter = st.selectbox("상태 필터", ["전체"] + list(STATUS_LABELS.values()))
-
-    for shop in shops:
-        status_label = STATUS_LABELS.get(shop.get("status", ""), "등록")
-        if status_filter != "전체" and status_label != status_filter:
-            continue
-
-        visits = visits_by_shop.get(shop["id"], [])
-        visit_count = len(visits)
-        last_visit = visits[0] if visits else None
-
-        with st.expander(f"**{shop.get('shop_name', '')}** — {status_label} | 방문 {visit_count}회"):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.text(f"주소: {shop.get('address', '-')}")
-                st.text(f"업종: {shop.get('category', '-')}")
-                if last_visit:
-                    st.text(f"최근 방문: {last_visit.get('visit_date', '-')}")
-                    if last_visit.get("memo"):
-                        st.caption(f"메모: {last_visit['memo']}")
-            with col2:
-                new_status = st.selectbox(
-                    "상태 변경",
-                    list(STATUS_LABELS.keys()),
-                    index=list(STATUS_LABELS.keys()).index(shop.get("status", "active")),
-                    format_func=lambda x: STATUS_LABELS[x],
-                    key=f"fu_status_{shop['id']}",
-                )
-                if st.button("상태 저장", key=f"fu_save_{shop['id']}"):
-                    try:
-                        sb.table("pioneer_shops").update({"status": new_status}).eq("id", shop["id"]).eq("fc_id", fc_id).execute()
-                        st.success("저장됨")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(safe_error("처리", e))
-
-            st.divider()
-            edit_key = f"edit_shop_{shop['id']}"
-            del_key = f"del_shop_{shop['id']}"
-
-            if st.session_state.get(edit_key):
-                with st.form(f"shop_edit_{shop['id']}"):
-                    new_name = st.text_input("매장명", value=shop.get("shop_name", ""))
-                    new_addr = st.text_input("주소", value=shop.get("address", ""))
-                    cat_list = CATEGORY_OPTIONS
-                    cat_idx = cat_list.index(shop.get("category", "기타")) if shop.get("category") in cat_list else len(cat_list) - 1
-                    new_cat = st.selectbox("업종", cat_list, index=cat_idx)
-                    new_memo = st.text_area("메모", value=shop.get("memo") or "")
-                    sc1, sc2 = st.columns(2)
-                    if sc1.form_submit_button("저장", type="primary", use_container_width=True):
-                        try:
-                            upd = {"shop_name": new_name.strip(), "address": new_addr.strip(),
-                                   "category": new_cat, "memo": new_memo.strip()}
-                            if new_addr.strip() and new_addr.strip() != shop.get("address", ""):
-                                coords = geocode(new_addr.strip())
-                                if coords:
-                                    upd["lat"], upd["lng"] = coords
-                            sb.table("pioneer_shops").update(upd).eq("id", shop["id"]).eq("fc_id", fc_id).execute()
-                            st.session_state.pop(edit_key, None)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(safe_error("수정", e))
-                    if sc2.form_submit_button("취소", use_container_width=True):
-                        st.session_state.pop(edit_key, None)
-                        st.rerun()
-
-            elif st.session_state.get(del_key):
-                st.warning(f"'{shop.get('shop_name','')}' 매장과 모든 방문 기록({visit_count}건)을 삭제합니다.")
-                dc1, dc2 = st.columns(2)
-                if dc1.button("삭제 확인", key=f"del_confirm_{shop['id']}", type="primary", use_container_width=True):
-                    try:
-                        sb.table("pioneer_visits").delete().eq("shop_id", shop["id"]).eq("fc_id", fc_id).execute()
-                        sb.table("pioneer_shops").delete().eq("id", shop["id"]).eq("fc_id", fc_id).execute()
-                        st.session_state.pop(del_key, None)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(safe_error("삭제", e))
-                if dc2.button("취소", key=f"del_cancel_{shop['id']}", use_container_width=True):
-                    st.session_state.pop(del_key, None)
-                    st.rerun()
-
-            else:
-                bc1, bc2 = st.columns(2)
-                if bc1.button("수정", key=f"edit_btn_{shop['id']}", use_container_width=True):
-                    st.session_state[edit_key] = True
-                    st.rerun()
-                if bc2.button("삭제", key=f"del_btn_{shop['id']}", use_container_width=True):
-                    st.session_state[del_key] = True
-                    st.rerun()

@@ -194,7 +194,7 @@ def main():
         if user:
             st.markdown(
                 f'<div style="text-align:center; padding-bottom:8px;">'
-                f'<span style="font-size:12px; color:#94a3b8 !important;">{user.email}</span>'
+                f'<span style="font-size:12px; color:#94a3b8 !important;">{__import__("html").escape(str(user.email))}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )

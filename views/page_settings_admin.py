@@ -138,7 +138,7 @@ def _delete_user(sb, user_id: str):
     try:
         sb.auth.admin.delete_user(user_id)
     except Exception as e:
-        st.warning(f"Auth 계정 삭제 실패 (설정은 삭제됨): {e}")
+        st.warning(f"Auth 계정 삭제 실패 (설정은 삭제됨): {safe_error('Auth 삭제', e)}")
     st.success("삭제 완료")
 
 
