@@ -4,7 +4,7 @@ import streamlit as st
 
 from auth import get_current_user_id
 from services.fp_reminder_service import (
-    update_reminder, purposes, create_reminder, RESULT_MAP,
+    update_reminder, purposes, create_reminder, RESULT_OPTIONS, RESULT_MAP,
 )
 from utils.helpers import safe_error
 from utils.supabase_client import get_supabase_client
@@ -12,29 +12,31 @@ from utils.supabase_client import get_supabase_client
 _TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
 
 
+def _search_client(sb, fc_id, search, key_prefix="home_remind"):
+    if not search.strip():
+        return None
+    try:
+        results = (sb.table("clients").select("id, name, prospect_grade")
+                   .eq("fc_id", fc_id).ilike("name", f"%{search.strip()}%")
+                   .limit(10).execute().data or [])
+    except Exception:
+        results = []
+    if results:
+        opts = {f"{r['name']} [{r.get('prospect_grade','')}]": r["id"] for r in results}
+        lbl = st.selectbox("고객 선택", list(opts.keys()), key=f"{key_prefix}_client")
+        return opts[lbl]
+    st.caption("검색 결과 없음")
+    return None
+
+
 def render_add_reminder_form(fc_id: str):
     from views.page_settings_products import get_active_products
     sb = get_supabase_client()
 
     search = st.text_input("고객 이름 검색", placeholder="이름 입력 후 선택", key="home_remind_search")
-    client_id = client_label = None
-    if search.strip():
-        try:
-            results = (sb.table("clients").select("id, name, prospect_grade")
-                       .eq("fc_id", fc_id).ilike("name", f"%{search.strip()}%")
-                       .limit(10).execute().data or [])
-        except Exception:
-            results = []
-        if results:
-            opts = {f"{r['name']} [{r.get('prospect_grade','')}]": r["id"] for r in results}
-            lbl = st.selectbox("고객 선택", list(opts.keys()), key="home_remind_client")
-            client_id, client_label = opts[lbl], lbl
-        else:
-            st.caption("검색 결과가 없습니다.")
-
+    client_id = _search_client(sb, fc_id, search)
     if not client_id:
         return
-
     products = get_active_products(sb, fc_id)
     prod_map = {p["name"]: p["id"] for p in products}
     with st.form("home_add_reminder"):
@@ -51,7 +53,7 @@ def render_add_reminder_form(fc_id: str):
                 st.session_state.pop("home_remind_client", None)
                 st.rerun()
             else:
-                st.error("리마인드 등록에 실패했습니다. 다시 시도해주세요.")
+                st.error("리마인드 등록에 실패했습니다.")
 
 
 def render_edit_form(r: dict, edit_key: str):
@@ -64,6 +66,8 @@ def render_edit_form(r: dict, edit_key: str):
     prod_map = {p["name"]: p["id"] for p in products}
     id_to_name = {p["id"]: p["name"] for p in products}
     current_names = [id_to_name[pid] for pid in (r.get("product_ids") or []) if pid in id_to_name]
+    is_done = r.get("status") in ("completed", "cancelled")
+
     with st.form(f"edit_form_{rid}"):
         has_date = bool(r.get("reminder_date"))
         no_date = st.checkbox("날짜 없음", value=not has_date)
@@ -79,24 +83,37 @@ def render_edit_form(r: dict, edit_key: str):
         new_purpose = st.selectbox("상담 목적", purposes(), index=p_idx)
         new_prods = st.multiselect("제안 상품", list(prod_map.keys()), default=current_names) if products else []
         new_memo = st.text_input("메모", value=r.get("memo") or "")
+
+        # 완료된 리마인드는 결과/후기도 수정 가능
+        new_result = new_result_memo = None
+        if is_done:
+            result_keys = [k for k, _ in RESULT_OPTIONS]
+            cur_result = r.get("result", "")
+            r_idx = result_keys.index(cur_result) if cur_result in result_keys else 0
+            new_result = st.selectbox("결과", result_keys,
+                                      index=r_idx, format_func=lambda x: RESULT_MAP.get(x, x))
+            new_result_memo = st.text_input("FC 후기", value=r.get("result_memo") or "")
+
         c1, c2 = st.columns(2)
         if c1.form_submit_button("저장", type="primary", use_container_width=True):
             pids = [prod_map[n] for n in new_prods if n in prod_map] or None
             new_date_str = str(new_date) if new_date else None
-            if update_reminder(fc_id, rid, new_date_str, new_purpose, pids, new_memo):
+            if update_reminder(fc_id, rid, new_date_str, new_purpose, pids, new_memo,
+                               result=new_result, result_memo=new_result_memo):
                 st.session_state.pop(edit_key, None)
                 st.rerun()
             else:
-                st.error("저장 실패")
+                st.error("저장 실패 — 다시 시도해주세요.")
         if c2.form_submit_button("취소", use_container_width=True):
             st.session_state.pop(edit_key, None)
             st.rerun()
 
 
 def render_past_card(r: dict, products_map: dict = None):
-    """완료/취소된 리마인드 카드"""
+    """완료/취소된 리마인드 카드 — 수정 가능"""
     from utils.ui_components import grade_badge as _grade_badge
 
+    rid = r["id"]
     client = r.get("clients") or {}
     name = client.get("name", "이름 없음")
     grade = client.get("prospect_grade", "")
@@ -117,25 +134,34 @@ def render_past_card(r: dict, products_map: dict = None):
     grade_html = _grade_badge(grade) if grade else ""
     status_icon = "✅" if status == "completed" else "❌"
     result_label = RESULT_MAP.get(result, "") if result else ""
+    edit_key = f"edit_past_{rid}"
 
     with st.container(border=True):
-        from utils.helpers import esc
-        header = f"{status_icon} **{esc(name)}** {grade_html} — {esc(purpose)}{esc(prod_label)}"
-        st.markdown(header, unsafe_allow_html=True)
+        col_info, col_btn = st.columns([5, 1])
+        with col_info:
+            from utils.helpers import esc
+            header = f"{status_icon} **{esc(name)}** {grade_html} — {esc(purpose)}{esc(prod_label)}"
+            st.markdown(header, unsafe_allow_html=True)
+            info_parts = []
+            if d:
+                info_parts.append(f"예정: {d}")
+            if completed_at:
+                info_parts.append(f"완료: {completed_at}")
+            if result_label:
+                info_parts.append(f"결과: {result_label}")
+            st.caption(" | ".join(info_parts))
+            if result_memo:
+                st.caption(f"FC 후기: {result_memo}")
+            elif memo:
+                st.caption(f"메모: {memo}")
+        with col_btn:
+            def _toggle_edit(ek):
+                st.session_state[ek] = not st.session_state.get(ek, False)
+            st.button("수정", key=f"edit_past_btn_{rid}",
+                      use_container_width=True, on_click=_toggle_edit, args=(edit_key,))
 
-        info_parts = []
-        if d:
-            info_parts.append(f"예정: {d}")
-        if completed_at:
-            info_parts.append(f"완료: {completed_at}")
-        if result_label:
-            info_parts.append(f"결과: {result_label}")
-        st.caption(" | ".join(info_parts))
-
-        if result_memo:
-            st.caption(f"FC 후기: {result_memo}")
-        elif memo:
-            st.caption(f"메모: {memo}")
+        if st.session_state.get(edit_key):
+            render_edit_form(r, edit_key)
 
 
 def render_recent_activity(fc_id: str):
@@ -169,19 +195,7 @@ def render_recent_activity(fc_id: str):
 
 def _render_quick_activity(fc_id: str, sb):
     search = st.text_input("고객 검색", key="home_act_search", placeholder="이름 입력")
-    client_id = None
-    if search.strip():
-        try:
-            results = (sb.table("clients").select("id, name").eq("fc_id", fc_id)
-                       .ilike("name", f"%{search.strip()}%").limit(5).execute().data or [])
-        except Exception:
-            results = []
-        if results:
-            opts = {r["name"]: r["id"] for r in results}
-            sel = st.selectbox("고객 선택", list(opts.keys()), key="home_act_client")
-            client_id = opts[sel]
-        else:
-            st.caption("검색 결과 없음")
+    client_id = _search_client(sb, fc_id, search, key_prefix="home_act")
     if client_id:
         with st.form("home_quick_act"):
             method = st.selectbox("연락 방식", _TOUCH_OPTIONS)

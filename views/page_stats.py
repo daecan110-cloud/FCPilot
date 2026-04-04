@@ -28,6 +28,8 @@ def render():
     _render_pioneer(sb, fc_id, since)
     st.divider()
     _render_analysis(sb, fc_id, since)
+    st.divider()
+    _render_reminders(sb, fc_id, since)
 
 
 _PERIOD_DAYS = {"오늘": 0, "최근 3일": 3, "최근 7일": 7, "최근 30일": 30, "최근 3개월": 90}
@@ -195,3 +197,45 @@ def _render_analysis(sb, fc_id: str, since):
     c1, c2 = st.columns(2)
     c1.metric("보장분석 실행", f"{a_cnt}건")
     c2.metric("약관분석 실행", f"{y_cnt}건")
+
+
+def _render_reminders(sb, fc_id: str, since):
+    from services.fp_reminder_service import RESULT_MAP
+    st.subheader("리마인드 결과")
+    try:
+        q = sb.table("fp_reminders").select("status, result, completed_at").eq("fc_id", fc_id)
+        rows = (q.gte("completed_at", since) if since else q).execute().data or []
+    except Exception:
+        rows = []
+
+    completed = [r for r in rows if r.get("status") == "completed"]
+    cancelled = [r for r in rows if r.get("status") == "cancelled"]
+    pending_q = sb.table("fp_reminders").select("id", count="exact").eq("fc_id", fc_id).eq("status", "pending")
+    try:
+        pending_cnt = pending_q.execute().count or 0
+    except Exception:
+        pending_cnt = 0
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("대기 중", f"{pending_cnt}건")
+    c2.metric("완료", f"{len(completed)}건")
+    c3.metric("취소", f"{len(cancelled)}건")
+    total_done = len(completed) + len(cancelled)
+    rate = round(len(completed) / max(total_done, 1) * 100, 1)
+    c4.metric("완료율", f"{rate}%")
+
+    if completed:
+        result_dist: dict = {}
+        for r in completed:
+            k = r.get("result") or "미지정"
+            result_dist[k] = result_dist.get(k, 0) + 1
+        st.caption("결과 분포")
+        total = len(completed)
+        for k in sorted(result_dist, key=lambda x: -result_dist[x]):
+            cnt = result_dist[k]
+            label = RESULT_MAP.get(k, k) if k != "미지정" else "미지정"
+            pct = round(cnt / total * 100, 1)
+            col_l, col_bar, col_c = st.columns([2, 5, 1])
+            col_l.caption(label)
+            col_bar.progress(min(pct / 100, 1.0))
+            col_c.caption(f"{cnt}건 ({pct}%)")

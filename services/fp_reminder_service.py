@@ -105,16 +105,14 @@ def create_reminder(fc_id: str, client_id: str, reminder_date: str | None,
 
 def complete_reminder(fc_id: str, reminder_id: str,
                       result: str = "", result_memo: str = "") -> bool:
+    from datetime import datetime
+    data = {
+        "status": "completed",
+        "completed_at": datetime.now().isoformat(),
+        "result": result or "",
+        "result_memo": result_memo or "",
+    }
     try:
-        from datetime import datetime
-        data = {
-            "status": "completed",
-            "completed_at": datetime.now().isoformat(),
-        }
-        if result:
-            data["result"] = result
-        if result_memo:
-            data["result_memo"] = result_memo
         get_supabase_client().table("fp_reminders").update(
             data
         ).eq("id", reminder_id).eq("fc_id", fc_id).execute()
@@ -149,14 +147,22 @@ def get_past_reminders(fc_id: str, limit: int = 50) -> list[dict]:
 
 
 def update_reminder(fc_id: str, reminder_id: str, reminder_date: str | None,
-                    purpose: str, product_ids: list | None, memo: str) -> bool:
+                    purpose: str, product_ids: list | None, memo: str,
+                    result: str = None, result_memo: str = None) -> bool:
+    data = {
+        "reminder_date": reminder_date,
+        "purpose": purpose,
+        "product_ids": product_ids or None,
+        "memo": memo or None,
+    }
+    if result is not None:
+        data["result"] = result
+    if result_memo is not None:
+        data["result_memo"] = result_memo
     try:
-        get_supabase_client().table("fp_reminders").update({
-            "reminder_date": reminder_date,
-            "purpose": purpose,
-            "product_ids": product_ids or None,
-            "memo": memo or None,
-        }).eq("id", reminder_id).eq("fc_id", fc_id).execute()
+        get_supabase_client().table("fp_reminders").update(
+            data
+        ).eq("id", reminder_id).eq("fc_id", fc_id).execute()
         return True
     except Exception:
         return False
