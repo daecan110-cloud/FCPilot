@@ -49,9 +49,12 @@ def render_reminder_section(sb, fc_id: str, client_id: str):
                         )
                         c1, c2 = st.columns(2)
                         if c1.form_submit_button("완료 저장", type="primary", use_container_width=True):
-                            complete_reminder(fc_id, r["id"], result, result_memo)
-                            st.session_state.pop(complete_key, None)
-                            st.rerun()
+                            res = complete_reminder(fc_id, r["id"], result, result_memo)
+                            if res is True:
+                                st.session_state.pop(complete_key, None)
+                                st.rerun()
+                            else:
+                                st.error(f"저장 실패: {res}")
                         if c2.form_submit_button("취소", use_container_width=True):
                             st.session_state.pop(complete_key, None)
                             st.rerun()

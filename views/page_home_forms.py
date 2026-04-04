@@ -98,12 +98,13 @@ def render_edit_form(r: dict, edit_key: str):
         if c1.form_submit_button("저장", type="primary", use_container_width=True):
             pids = [prod_map[n] for n in new_prods if n in prod_map] or None
             new_date_str = str(new_date) if new_date else None
-            if update_reminder(fc_id, rid, new_date_str, new_purpose, pids, new_memo,
-                               result=new_result, result_memo=new_result_memo):
+            res = update_reminder(fc_id, rid, new_date_str, new_purpose, pids, new_memo,
+                                  result=new_result, result_memo=new_result_memo)
+            if res is True:
                 st.session_state.pop(edit_key, None)
                 st.rerun()
             else:
-                st.error("저장 실패 — 다시 시도해주세요.")
+                st.error(f"저장 실패: {res}")
         if c2.form_submit_button("취소", use_container_width=True):
             st.session_state.pop(edit_key, None)
             st.rerun()

@@ -104,21 +104,24 @@ def create_reminder(fc_id: str, client_id: str, reminder_date: str | None,
 
 
 def complete_reminder(fc_id: str, reminder_id: str,
-                      result: str = "", result_memo: str = "") -> bool:
+                      result: str = "", result_memo: str = "") -> str | bool:
+    """완료 처리. 성공 시 True, 실패 시 에러 메시지 문자열 반환."""
     from datetime import datetime
     data = {
         "status": "completed",
         "completed_at": datetime.now().isoformat(),
-        "result": result or "",
-        "result_memo": result_memo or "",
     }
+    if result:
+        data["result"] = result
+    if result_memo:
+        data["result_memo"] = result_memo
     try:
         get_supabase_client().table("fp_reminders").update(
             data
         ).eq("id", reminder_id).eq("fc_id", fc_id).execute()
         return True
-    except Exception:
-        return False
+    except Exception as e:
+        return str(e)[:120]
 
 
 def cancel_reminder(fc_id: str, reminder_id: str) -> bool:
@@ -148,7 +151,8 @@ def get_past_reminders(fc_id: str, limit: int = 50) -> list[dict]:
 
 def update_reminder(fc_id: str, reminder_id: str, reminder_date: str | None,
                     purpose: str, product_ids: list | None, memo: str,
-                    result: str = None, result_memo: str = None) -> bool:
+                    result: str = None, result_memo: str = None) -> str | bool:
+    """수정. 성공 시 True, 실패 시 에러 메시지 문자열 반환."""
     data = {
         "reminder_date": reminder_date,
         "purpose": purpose,
@@ -164,5 +168,5 @@ def update_reminder(fc_id: str, reminder_id: str, reminder_date: str | None,
             data
         ).eq("id", reminder_id).eq("fc_id", fc_id).execute()
         return True
-    except Exception:
-        return False
+    except Exception as e:
+        return str(e)[:120]

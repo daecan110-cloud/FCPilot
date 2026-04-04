@@ -176,11 +176,12 @@ def _render_complete_form(r: dict, complete_key: str):
         )
         c1, c2 = st.columns(2)
         if c1.form_submit_button("완료 저장", type="primary", use_container_width=True):
-            if complete_reminder(fc_id, rid, result, result_memo):
+            res = complete_reminder(fc_id, rid, result, result_memo)
+            if res is True:
                 st.session_state.pop(complete_key, None)
                 st.rerun()
             else:
-                st.error("저장 실패")
+                st.error(f"저장 실패: {res}")
         if c2.form_submit_button("취소", use_container_width=True):
             st.session_state.pop(complete_key, None)
             st.rerun()
