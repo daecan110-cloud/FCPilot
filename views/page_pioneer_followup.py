@@ -27,6 +27,8 @@ def render_followup():
         st.info("등록된 매장이 없습니다.")
         return
 
+    _render_delete_all(sb, fc_id, shops)
+
     try:
         visits_res = sb.table("pioneer_visits").select("*").eq("fc_id", fc_id).order("visit_date", desc=True).execute()
         all_visits = visits_res.data or []
@@ -76,6 +78,29 @@ def render_followup():
 
             st.divider()
             _render_shop_actions(sb, fc_id, shop, visit_count)
+
+
+def _render_delete_all(sb, fc_id: str, shops: list):
+    """전체 매장 삭제 UI"""
+    if st.session_state.get("delete_all_confirm"):
+        total = len(shops)
+        st.error(f"등록된 매장 {total}개와 모든 방문 기록을 삭제합니다. 되돌릴 수 없습니다.")
+        c1, c2 = st.columns(2)
+        if c1.button("전체 삭제 확인", type="primary", use_container_width=True):
+            try:
+                sb.table("pioneer_visits").delete().eq("fc_id", fc_id).neq("id", "").execute()
+                sb.table("pioneer_shops").delete().eq("fc_id", fc_id).neq("id", "").execute()
+                st.session_state.pop("delete_all_confirm", None)
+                st.rerun()
+            except Exception as e:
+                st.error(safe_error("전체 삭제", e))
+        if c2.button("취소", key="del_all_cancel", use_container_width=True):
+            st.session_state.pop("delete_all_confirm", None)
+            st.rerun()
+    else:
+        if st.button("전체 삭제", type="secondary", use_container_width=False):
+            st.session_state["delete_all_confirm"] = True
+            st.rerun()
 
 
 def _render_shop_actions(sb, fc_id: str, shop: dict, visit_count: int):
