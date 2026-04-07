@@ -14,6 +14,10 @@ def render_ocr():
     st.subheader("간판 OCR")
     st.caption("간판 사진을 업로드하면 AI가 가게명/업종을 자동 추출합니다.")
 
+    msg = st.session_state.pop("ocr_msg", None)
+    if msg:
+        st.success(msg)
+
     photo = st.file_uploader("간판 사진", type=["jpg", "jpeg", "png"])
 
     if photo:
@@ -106,8 +110,9 @@ def render_ocr():
                 "phone": ocr.get("phone", ""),
                 "photo_url": photo_url,
             }).execute()
-            st.success(f"'{shop_name}' 등록 완료!")
             st.session_state.pop("ocr_data", None)
+            st.session_state["ocr_msg"] = f"'{shop_name}' 등록 완료!"
+            st.rerun()
         except Exception as e:
             st.error(safe_error("등록", e))
 
