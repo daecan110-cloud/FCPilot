@@ -86,10 +86,12 @@ def _html(data_json: str, mode: str, height: int) -> str:
 </style>
 </head><body>
 <div id="map"></div>
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={key}"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={key}&autoload=false"></script>
 <script>
 var DATA = {data_json};
+kakao.maps.load(function(){{
 {map_script}
+}});
 </script>
 </body></html>"""
 
