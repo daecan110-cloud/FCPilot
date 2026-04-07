@@ -2,7 +2,6 @@
 from datetime import date, timedelta
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
@@ -79,7 +78,7 @@ def render_history():
             if st.button("좌표 재조회", key="regeo_hist"):
                 _regeocode_missing(sb, fc_id)
 
-    components.html(route_map_html(visits_for_map, height=420), height=440)
+    st.html(route_map_html(visits_for_map, height=420))
 
     for v in visits_for_map:
         result_text = VISIT_RESULT_LABELS.get(v["result"], "")
