@@ -78,7 +78,7 @@ def render_history():
             if st.button("좌표 재조회", key="regeo_hist"):
                 _regeocode_missing(sb, fc_id)
 
-    st.html(route_map_html(visits_for_map, height=420), height=420)
+    st.html(route_map_html(visits_for_map, height=420))
 
     for v in visits_for_map:
         result_text = VISIT_RESULT_LABELS.get(v["result"], "")
