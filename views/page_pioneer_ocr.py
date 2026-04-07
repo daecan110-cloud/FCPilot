@@ -40,17 +40,32 @@ def render_ocr():
     # 매장명
     shop_name = st.text_input("매장명", value=ocr.get("shop_name", ""))
 
-    # 카카오 검색 결과 → selectbox
-    places = ocr.get("places", [])
+    # 주소 검색
     address = ocr.get("address", "")
     lat, lng = ocr.get("lat"), ocr.get("lng")
 
+    sc1, sc2 = st.columns([4, 1])
+    with sc1:
+        search_q = st.text_input("주소 검색", value=shop_name, placeholder="매장명 또는 주소 입력")
+    with sc2:
+        st.write("")
+        st.write("")
+        do_search = st.button("검색")
+
+    if do_search and search_q:
+        found = search_keyword(search_q)
+        if found:
+            ocr["places"] = found
+        else:
+            st.warning("검색 결과 없음")
+
+    places = ocr.get("places", [])
     if places:
         place_options = ["직접 입력"] + [
             f"{p['place_name']} — {p.get('road_address_name') or p.get('address_name', '')}"
             for p in places
         ]
-        choice = st.selectbox("카카오 검색 결과", place_options)
+        choice = st.selectbox("검색 결과에서 선택", place_options)
         if choice != "직접 입력":
             idx = place_options.index(choice) - 1
             picked = places[idx]
