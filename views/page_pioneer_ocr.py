@@ -87,12 +87,17 @@ def _upload_photo(sb, fc_id: str, img_bytes: bytes | None, ext: str) -> str:
         return ""
     try:
         import uuid
+        from supabase import create_client
+        admin_sb = create_client(
+            st.secrets["supabase"]["url"],
+            st.secrets["supabase"]["service_role_key"],
+        )
         filename = f"{fc_id}/{uuid.uuid4().hex}.{ext}"
-        sb.storage.from_("pioneer-photos").upload(
+        admin_sb.storage.from_("pioneer-photos").upload(
             filename, img_bytes,
             file_options={"content-type": f"image/{ext}"},
         )
-        url = sb.storage.from_("pioneer-photos").get_public_url(filename)
+        url = admin_sb.storage.from_("pioneer-photos").get_public_url(filename)
         return url
     except Exception:
         return ""
