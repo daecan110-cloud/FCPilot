@@ -26,7 +26,7 @@ _RESULT_LABELS = {
 }
 
 
-def pioneer_map_html(shops: list, height: int = 500) -> None:
+def pioneer_map_html(shops: list, height: int = 500, key: str = "pioneer") -> None:
     """개척 매장 지도 (상태별 색상 마커)"""
     valid = [s for s in shops if s.get("lat") and s.get("lng")]
 
@@ -68,10 +68,10 @@ def pioneer_map_html(shops: list, height: int = 500) -> None:
         ).add_to(m)
 
     _fit_bounds(m, valid)
-    st_folium(m, height=height, use_container_width=True, returned_objects=[])
+    st_folium(m, height=height, use_container_width=True, returned_objects=[], key=key)
 
 
-def route_map_html(visits: list, height: int = 420) -> None:
+def route_map_html(visits: list, height: int = 420, key: str = "route") -> None:
     """방문 동선 지도 (번호 마커 + 폴리라인)"""
     valid = [v for v in visits if v.get("lat") and v.get("lng")]
 
@@ -124,7 +124,7 @@ def route_map_html(visits: list, height: int = 420) -> None:
         ).add_to(m)
 
     _fit_bounds(m, valid)
-    st_folium(m, height=height, use_container_width=True, returned_objects=[])
+    st_folium(m, height=height, use_container_width=True, returned_objects=[], key=key)
 
 
 def _fit_bounds(m: folium.Map, items: list) -> None:
