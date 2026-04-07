@@ -88,8 +88,10 @@ def _render_delete_all(sb, fc_id: str, shops: list):
         c1, c2 = st.columns(2)
         if c1.button("전체 삭제 확인", type="primary", use_container_width=True):
             try:
-                sb.table("pioneer_visits").delete().eq("fc_id", fc_id).neq("id", "").execute()
-                sb.table("pioneer_shops").delete().eq("fc_id", fc_id).neq("id", "").execute()
+                shop_ids = [s["id"] for s in shops]
+                for sid in shop_ids:
+                    sb.table("pioneer_visits").delete().eq("shop_id", sid).eq("fc_id", fc_id).execute()
+                    sb.table("pioneer_shops").delete().eq("id", sid).eq("fc_id", fc_id).execute()
                 st.session_state.pop("delete_all_confirm", None)
                 st.rerun()
             except Exception as e:
