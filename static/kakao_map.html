@@ -14,141 +14,79 @@
 <script>
 window.onerror=function(m){document.getElementById('err').innerText='JS: '+m;}
 
-// URL hash에서 파라미터 파싱
 function getParam(name){
-  var h = location.hash.substring(1);
-  var params = {};
-  h.split('&').forEach(function(p){
-    var kv = p.split('=');
-    if(kv.length===2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
-  });
-  return params[name] || '';
+  var h=location.hash.substring(1);
+  var idx=h.indexOf(name+'=');
+  if(idx===-1)return'';
+  var rest=h.substring(idx+name.length+1);
+  var end=rest.indexOf('&');
+  return end===-1?rest:rest.substring(0,end);
 }
 
-var appKey = getParam('key');
-var mode = getParam('mode');
+var appKey=getParam('key');
+var mode=getParam('mode');
+var dataStr=decodeURIComponent(getParam('data'));
+var DATA=[];
+try{DATA=JSON.parse(dataStr);}catch(e){DATA=[];}
 
 if(!appKey){
-  document.getElementById('err').innerText = 'API key 없음';
-} else {
-  // postMessage로 데이터 수신 대기
-  window.addEventListener('message', function(e){
-    if(e.data && e.data.type === 'mapData'){
-      initMap(e.data.items, mode);
-    }
-  });
-
-  // SDK 동적 로드
-  var s = document.createElement('script');
-  s.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + appKey + '&autoload=false';
-  s.onload = function(){
+  document.getElementById('err').innerText='API key missing';
+}else{
+  var s=document.createElement('script');
+  s.src='https://dapi.kakao.com/v2/maps/sdk.js?appkey='+appKey+'&autoload=false';
+  s.onload=function(){
     kakao.maps.load(function(){
-      // SDK 준비 완료 → 부모에게 알림
-      window.parent.postMessage({type:'mapReady'}, '*');
+      try{
+        if(mode==='route')initRoute(DATA);
+        else initPioneer(DATA);
+      }catch(e){document.getElementById('err').innerText='Init: '+e.message;}
     });
   };
-  s.onerror = function(){
-    document.getElementById('err').innerText = 'SDK 로드 실패';
-  };
+  s.onerror=function(){document.getElementById('err').innerText='SDK load failed';};
   document.head.appendChild(s);
 }
 
 function _e(s){if(!s)return'';var d=document.createElement('div');d.appendChild(document.createTextNode(s));return d.innerHTML;}
 
-function initMap(DATA, mode){
-  if(mode === 'route') initRoute(DATA);
-  else initPioneer(DATA);
-}
-
 function initRoute(DATA){
-  var valid = DATA.filter(function(v){return v.lat && v.lng;});
-  var cLat = valid.length ? valid.reduce(function(s,v){return s+v.lat;},0)/valid.length : 37.5665;
-  var cLng = valid.length ? valid.reduce(function(s,v){return s+v.lng;},0)/valid.length : 126.9780;
-
-  var map = new kakao.maps.Map(document.getElementById('map'), {
-    center: new kakao.maps.LatLng(cLat, cLng), level: 5
-  });
-  map.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.TOPRIGHT);
-  map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
-
-  var coords = [];
+  var valid=DATA.filter(function(v){return v.lat&&v.lng;});
+  var cLat=valid.length?valid.reduce(function(s,v){return s+v.lat;},0)/valid.length:37.5665;
+  var cLng=valid.length?valid.reduce(function(s,v){return s+v.lng;},0)/valid.length:126.9780;
+  var map=new kakao.maps.Map(document.getElementById('map'),{center:new kakao.maps.LatLng(cLat,cLng),level:5});
+  map.addControl(new kakao.maps.MapTypeControl(),kakao.maps.ControlPosition.TOPRIGHT);
+  map.addControl(new kakao.maps.ZoomControl(),kakao.maps.ControlPosition.RIGHT);
+  var coords=[];
   valid.forEach(function(v){
-    var pos = new kakao.maps.LatLng(v.lat, v.lng);
-    coords.push(pos);
-
-    var content = '<div style="background:#1E88E5;color:#fff;border-radius:50%;width:30px;height:30px;'+
-      'text-align:center;line-height:30px;font-weight:bold;font-size:14px;border:2px solid #fff;'+
-      'box-shadow:0 2px 6px rgba(0,0,0,.4);cursor:pointer">'+v.order+'</div>';
-    var overlay = new kakao.maps.CustomOverlay({
-      position: pos, content: content, yAnchor: 0.5, xAnchor: 0.5
-    });
-    overlay.setMap(map);
-
-    var iwContent = '<div class="iw"><b>#'+v.order+' '+_e(v.name)+'</b>'+
-      (v.result?'\uacb0\uacfc: '+_e(v.result)+'<br>':'')+
-      (v.memo?_e(v.memo)+'<br>':'')+
-      (v.addr?'<small>'+_e(v.addr)+'</small>':'')+
-      '</div>';
-    var iw = new kakao.maps.InfoWindow({content: iwContent, removable: true});
-    var marker = new kakao.maps.Marker({position: pos, map: map, opacity: 0});
-    kakao.maps.event.addListener(marker, 'click', (function(m, w){
-      return function(){ w.open(map, m); };
-    })(marker, iw));
+    var pos=new kakao.maps.LatLng(v.lat,v.lng);coords.push(pos);
+    var content='<div style="background:#1E88E5;color:#fff;border-radius:50%;width:30px;height:30px;text-align:center;line-height:30px;font-weight:bold;font-size:14px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);cursor:pointer">'+v.order+'</div>';
+    new kakao.maps.CustomOverlay({position:pos,content:content,yAnchor:0.5,xAnchor:0.5,map:map});
+    var iwC='<div class="iw"><b>#'+v.order+' '+_e(v.name)+'</b>'+(v.result?'\uacb0\uacfc: '+_e(v.result)+'<br>':'')+(v.memo?_e(v.memo)+'<br>':'')+(v.addr?'<small>'+_e(v.addr)+'</small>':'')+'</div>';
+    var iw=new kakao.maps.InfoWindow({content:iwC,removable:true});
+    var mk=new kakao.maps.Marker({position:pos,map:map,opacity:0});
+    kakao.maps.event.addListener(mk,'click',(function(m,w){return function(){w.open(map,m);};})(mk,iw));
   });
-
-  if(coords.length >= 2){
-    new kakao.maps.Polyline({
-      map: map, path: coords,
-      strokeWeight: 4, strokeColor: '#1E88E5', strokeOpacity: 0.8, strokeStyle: 'solid'
-    });
-  }
-  if(coords.length > 0){
-    var bounds = new kakao.maps.LatLngBounds();
-    coords.forEach(function(c){ bounds.extend(c); });
-    map.setBounds(bounds, 50, 50, 50, 50);
-  }
+  if(coords.length>=2){new kakao.maps.Polyline({map:map,path:coords,strokeWeight:4,strokeColor:'#1E88E5',strokeOpacity:0.8,strokeStyle:'solid'});}
+  if(coords.length>0){var b=new kakao.maps.LatLngBounds();coords.forEach(function(c){b.extend(c);});map.setBounds(b,50,50,50,50);}
 }
 
 function initPioneer(DATA){
-  var valid = DATA.filter(function(s){return s.lat && s.lng;});
-  var cLat = valid.length ? valid.reduce(function(s,v){return s+v.lat;},0)/valid.length : 37.5665;
-  var cLng = valid.length ? valid.reduce(function(s,v){return s+v.lng;},0)/valid.length : 126.9780;
-
-  var map = new kakao.maps.Map(document.getElementById('map'), {
-    center: new kakao.maps.LatLng(cLat, cLng), level: 6
-  });
-  map.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.TOPRIGHT);
-  map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
-
+  var valid=DATA.filter(function(s){return s.lat&&s.lng;});
+  var cLat=valid.length?valid.reduce(function(s,v){return s+v.lat;},0)/valid.length:37.5665;
+  var cLng=valid.length?valid.reduce(function(s,v){return s+v.lng;},0)/valid.length:126.9780;
+  var map=new kakao.maps.Map(document.getElementById('map'),{center:new kakao.maps.LatLng(cLat,cLng),level:6});
+  map.addControl(new kakao.maps.MapTypeControl(),kakao.maps.ControlPosition.TOPRIGHT);
+  map.addControl(new kakao.maps.ZoomControl(),kakao.maps.ControlPosition.RIGHT);
   DATA.forEach(function(s){
-    if(!s.lat || !s.lng) return;
-    var pos = new kakao.maps.LatLng(s.lat, s.lng);
-
-    var dot = '<div style="background:'+s.color+';width:14px;height:14px;border-radius:50%;'+
-      'border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer"></div>';
-    var overlay = new kakao.maps.CustomOverlay({
-      position: pos, content: dot, yAnchor: 0.5, xAnchor: 0.5
-    });
-    overlay.setMap(map);
-
-    var iwContent = '<div class="iw"><b>'+_e(s.name)+'</b>'+
-      '\uc0c1\ud0dc: <span style="color:'+s.color+'">'+_e(s.status)+'</span><br>'+
-      (s.cat?'\uc5c5\uc885: '+_e(s.cat)+'<br>':'')+
-      (s.addr?'<small>'+_e(s.addr)+'</small>':'')+
-      (s.memo?'<br><small>'+_e(s.memo)+'</small>':'')+
-      '</div>';
-    var iw = new kakao.maps.InfoWindow({content: iwContent, removable: true});
-    var marker = new kakao.maps.Marker({position: pos, map: map, opacity: 0});
-    kakao.maps.event.addListener(marker, 'click', (function(m, w){
-      return function(){ w.open(map, m); };
-    })(marker, iw));
+    if(!s.lat||!s.lng)return;
+    var pos=new kakao.maps.LatLng(s.lat,s.lng);
+    var dot='<div style="background:'+s.color+';width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer"></div>';
+    new kakao.maps.CustomOverlay({position:pos,content:dot,yAnchor:0.5,xAnchor:0.5,map:map});
+    var iwC='<div class="iw"><b>'+_e(s.name)+'</b>\uc0c1\ud0dc: <span style="color:'+s.color+'">'+_e(s.status)+'</span><br>'+(s.cat?'\uc5c5\uc885: '+_e(s.cat)+'<br>':'')+(s.addr?'<small>'+_e(s.addr)+'</small>':'')+(s.memo?'<br><small>'+_e(s.memo)+'</small>':'')+'</div>';
+    var iw=new kakao.maps.InfoWindow({content:iwC,removable:true});
+    var mk=new kakao.maps.Marker({position:pos,map:map,opacity:0});
+    kakao.maps.event.addListener(mk,'click',(function(m,w){return function(){w.open(map,m);};})(mk,iw));
   });
-
-  if(valid.length > 0){
-    var bounds = new kakao.maps.LatLngBounds();
-    valid.forEach(function(s){ bounds.extend(new kakao.maps.LatLng(s.lat, s.lng)); });
-    map.setBounds(bounds, 50, 50, 50, 50);
-  }
+  if(valid.length>0){var b=new kakao.maps.LatLngBounds();valid.forEach(function(s){b.extend(new kakao.maps.LatLng(s.lat,s.lng));});map.setBounds(b,50,50,50,50);}
 }
 </script>
 </body></html>

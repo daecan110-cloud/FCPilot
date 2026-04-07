@@ -1,8 +1,8 @@
 """Kakao Maps — 정적 HTML + postMessage 방식 지도 컴포넌트"""
 import json
 import hashlib
+import urllib.parse
 import streamlit as st
-import streamlit.components.v1 as components
 
 
 _STATUS_COLORS = {
@@ -73,35 +73,15 @@ def pioneer_map_html(shops: list, height: int = 500) -> str:
 
 
 def _render(data: list, mode: str, height: int) -> None:
-    """정적 HTML iframe + postMessage로 지도 데이터 전달"""
+    """정적 HTML iframe으로 지도 렌더링 (앱 도메인에서 서빙)"""
     key = _app_key()
     data_json = _safe_json(data)
-    # 데이터 해시로 고유 iframe key 생성 (중복 방지)
-    data_hash = hashlib.md5(data_json.encode()).hexdigest()[:8]
+    encoded = urllib.parse.quote(data_json)
 
-    iframe_url = f"/_stcore/static/kakao_map.html#key={key}&mode={mode}"
+    iframe_url = f"/_stcore/static/kakao_map.html#key={key}&mode={mode}&data={encoded}"
 
-    # 부모 페이지에서 iframe에 postMessage로 데이터 전달
-    wrapper_html = f"""
-    <iframe id="kakaoMap_{data_hash}" src="{iframe_url}"
-      width="100%" height="{height}" frameborder="0"
-      style="border:none;border-radius:8px"></iframe>
-    <script>
-    (function(){{
-      var iframe = document.getElementById('kakaoMap_{data_hash}');
-      var data = {data_json};
-      function sendData(){{
-        iframe.contentWindow.postMessage({{type:'mapData', items:data}}, '*');
-      }}
-      // SDK 준비 완료 메시지 수신 시 데이터 전송
-      window.addEventListener('message', function(e){{
-        if(e.data && e.data.type === 'mapReady') sendData();
-      }});
-      // iframe 이미 로드된 경우 대비
-      iframe.addEventListener('load', function(){{
-        setTimeout(sendData, 500);
-      }});
-    }})();
-    </script>
-    """
-    components.html(wrapper_html, height=height + 10)
+    st.markdown(
+        f'<iframe src="{iframe_url}" width="100%" height="{height}" '
+        f'frameborder="0" style="border:none;border-radius:8px"></iframe>',
+        unsafe_allow_html=True,
+    )
