@@ -52,6 +52,9 @@ def render_followup():
         last_visit = visits[0] if visits else None
 
         with st.expander(f"**{shop.get('shop_name', '')}** — {status_label} | 방문 {visit_count}회"):
+            photo_url = shop.get("photo_url", "")
+            if photo_url:
+                st.image(photo_url, width=200, caption="간판 사진")
             col1, col2 = st.columns(2)
             with col1:
                 st.text(f"주소: {shop.get('address', '-')}")

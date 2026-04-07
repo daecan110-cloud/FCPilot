@@ -25,7 +25,8 @@ def render_ocr():
     if photo and st.button("간판 분석", type="primary"):
         from services.ocr_engine import extract_from_sign
         img_bytes = photo.read()
-        media = f"image/{photo.name.rsplit('.', 1)[-1].lower()}"
+        ext = photo.name.rsplit(".", 1)[-1].lower()
+        media = f"image/{ext}"
         if media == "image/jpg":
             media = "image/jpeg"
 
@@ -38,6 +39,8 @@ def render_ocr():
             result["address"] = gps_address
 
         st.session_state.ocr_result = result
+        st.session_state.ocr_photo_bytes = img_bytes
+        st.session_state.ocr_photo_ext = ext if ext != "jpg" else "jpeg"
         st.image(img_bytes, width=300)
 
     result = st.session_state.get("ocr_result")
@@ -58,19 +61,41 @@ def render_ocr():
                     lat, lng = coords
             try:
                 sb = get_supabase_client()
+                fc_id = get_current_user_id()
+                photo_url = _upload_photo(sb, fc_id, st.session_state.get("ocr_photo_bytes"), st.session_state.get("ocr_photo_ext", "jpeg"))
                 sb.table("pioneer_shops").insert({
-                    "fc_id": get_current_user_id(),
+                    "fc_id": fc_id,
                     "shop_name": shop_name.strip(),
                     "address": address.strip(),
                     "lat": lat,
                     "lng": lng,
                     "category": category,
                     "phone": result.get("phone", ""),
+                    "photo_url": photo_url,
                 }).execute()
                 st.success(f"'{shop_name}' 등록 완료!")
                 st.session_state.pop("ocr_result", None)
+                st.session_state.pop("ocr_photo_bytes", None)
+                st.session_state.pop("ocr_photo_ext", None)
             except Exception as e:
                 st.error(safe_error("등록", e))
+
+
+def _upload_photo(sb, fc_id: str, img_bytes: bytes | None, ext: str) -> str:
+    """간판 사진을 Supabase Storage에 업로드, public URL 반환"""
+    if not img_bytes:
+        return ""
+    try:
+        import uuid
+        filename = f"{fc_id}/{uuid.uuid4().hex}.{ext}"
+        sb.storage.from_("pioneer-photos").upload(
+            filename, img_bytes,
+            file_options={"content-type": f"image/{ext}"},
+        )
+        url = sb.storage.from_("pioneer-photos").get_public_url(filename)
+        return url
+    except Exception:
+        return ""
 
 
 def _extract_gps_address(image_bytes: bytes) -> str:
