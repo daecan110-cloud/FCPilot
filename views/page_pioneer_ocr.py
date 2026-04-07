@@ -58,24 +58,26 @@ def render_ocr():
 
         # 카카오 검색 결과 표시
         places = st.session_state.get("kakao_places", [])
-        address = result.get("address", "")
+        ocr_addr = result.get("address", "")
+        if ocr_addr and not _is_korean_address(ocr_addr):
+            ocr_addr = ""
         picked_lat, picked_lng = None, None
 
         if places:
-            no_select = "직접 입력"
-            options = [no_select] + [
+            options = [
                 f"{p['place_name']} — {p.get('road_address_name') or p.get('address_name', '')}"
                 for p in places
             ]
-            selected = st.radio("카카오 검색 결과", options, key="ocr_place_select")
-            if selected != no_select:
-                idx = options.index(selected) - 1
-                picked = places[idx]
-                address = picked.get("road_address_name") or picked.get("address_name", "")
-                picked_lat = float(picked.get("y", 0))
-                picked_lng = float(picked.get("x", 0))
+            selected_idx = st.radio("카카오 검색 결과", options, key="ocr_place_select", index=0)
+            idx = options.index(selected_idx)
+            picked = places[idx]
+            default_addr = picked.get("road_address_name") or picked.get("address_name", "")
+            picked_lat = float(picked.get("y", 0))
+            picked_lng = float(picked.get("x", 0))
+        else:
+            default_addr = ocr_addr
 
-        address = st.text_input("주소", value=address, key="ocr_address")
+        address = st.text_input("주소", value=default_addr, key="ocr_address")
 
         ocr_cat = result.get("category", "")
         cat_idx = next((i for i, c in enumerate(CATEGORY_OPTIONS) if ocr_cat and ocr_cat[:3] in c), len(CATEGORY_OPTIONS) - 1)
@@ -108,6 +110,12 @@ def render_ocr():
                 st.session_state.pop("kakao_places", None)
             except Exception as e:
                 st.error(safe_error("등록", e))
+
+
+def _is_korean_address(text: str) -> bool:
+    """한국 주소 패턴인지 간단 체크"""
+    import re
+    return bool(re.search(r"(시|군|구|동|읍|면|리|로|길|번지)", text))
 
 
 def _upload_photo(sb, fc_id: str, img_bytes: bytes | None, ext: str) -> str:
