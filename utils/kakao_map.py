@@ -79,19 +79,33 @@ def _html(data_json: str, mode: str, height: int) -> str:
 <html><head><meta charset="UTF-8">
 <style>
   html,body{{margin:0;padding:0;width:100%;height:100%}}
-  #map{{width:100%;height:{height}px}}
+  #map{{width:100%;height:{height}px;background:#f0f0f0}}
+  #err{{color:red;padding:10px;font-size:14px}}
   .iw{{padding:10px;font-size:13px;line-height:1.6;min-width:160px;max-width:260px}}
   .iw b{{font-size:14px;display:block;margin-bottom:2px}}
   .iw small{{color:#888}}
 </style>
 </head><body>
+<div id="err"></div>
 <div id="map"></div>
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={key}&autoload=false"></script>
+<script>
+window.onerror=function(m,s,l){{document.getElementById('err').innerText='JS Error: '+m+' (line:'+l+')';}}
+</script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={key}&autoload=false"
+  onerror="document.getElementById('err').innerText='SDK 로드 실패: 카카오맵 스크립트를 불러올 수 없습니다.'"></script>
 <script>
 var DATA = {data_json};
-kakao.maps.load(function(){{
+try{{
+  if(typeof kakao==='undefined'){{
+    document.getElementById('err').innerText='kakao 객체 없음 — SDK 로드 실패';
+  }} else {{
+    kakao.maps.load(function(){{
+      try{{
 {map_script}
-}});
+      }}catch(e){{document.getElementById('err').innerText='지도 초기화 에러: '+e.message;}}
+    }});
+  }}
+}}catch(e){{document.getElementById('err').innerText='실행 에러: '+e.message;}}
 </script>
 </body></html>"""
 

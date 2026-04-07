@@ -2,6 +2,7 @@
 from datetime import date
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
@@ -108,7 +109,7 @@ def _render_today():
         if no_coords:
             st.warning(f"지도 미표시 매장 ({len(no_coords)}개): {', '.join(no_coords)} — 개척지도 탭에서 주소를 확인하세요.")
 
-        st.html(route_map_html(visits_for_map, height=420))
+        components.html(route_map_html(visits_for_map, height=420), height=440)
 
         for v in visits_for_map:
             result_text = VISIT_RESULT_LABELS.get(v["result"], "")

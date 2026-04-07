@@ -1,5 +1,6 @@
 """개척지도 탭 — 매장 등록/지도 표시/팔로업"""
 import streamlit as st
+import streamlit.components.v1 as components
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from utils.map_utils import STATUS_LABELS
@@ -52,7 +53,7 @@ def _render_map():
     map_col, list_col = st.columns([7, 3])
     with map_col:
         st.caption(f"전체 {len(shops)}개 | 표시 {len(filtered)}개")
-        st.html(pioneer_map_html(filtered, height=480))
+        components.html(pioneer_map_html(filtered, height=480), height=500)
     with list_col:
         st.caption(f"매장 {len(filtered)}곳")
         STATUS_ICON = {"active": "🟡", "visited": "🔵", "contracted": "🟢", "rejected": "🔴"}
