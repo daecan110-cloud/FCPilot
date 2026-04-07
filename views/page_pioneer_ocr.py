@@ -3,7 +3,7 @@ import streamlit as st
 
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
-from services.geocoding import geocode
+from services.geocoding import geocode, search_keyword
 from utils.helpers import safe_error
 
 CATEGORY_OPTIONS = ["음식점", "카페", "미용실/뷰티", "학원/교육", "병원/약국", "편의점/마트", "의류/패션", "사무실/오피스", "기타"]
@@ -47,15 +47,36 @@ def render_ocr():
     if result:
         st.subheader("추출 결과 (수정 후 등록)")
         shop_name = st.text_input("매장명", value=result.get("shop_name", ""))
-        address = st.text_input("주소", value=result.get("address", ""))
+
+        # 카카오 장소 검색
+        search_query = st.text_input("장소 검색", value=shop_name, placeholder="매장명 또는 주소로 검색")
+        if search_query and st.button("검색", key="kakao_search"):
+            places = search_keyword(search_query)
+            if places:
+                st.session_state.kakao_places = places
+            else:
+                st.warning("검색 결과가 없습니다.")
+
+        places = st.session_state.get("kakao_places", [])
+        if places:
+            options = [f"{p['place_name']} — {p.get('road_address_name') or p.get('address_name', '')}" for p in places]
+            selected = st.radio("검색 결과에서 선택", options, key="place_select")
+            idx = options.index(selected)
+            picked = places[idx]
+            address = st.text_input("주소", value=picked.get("road_address_name") or picked.get("address_name", ""))
+            st.session_state["picked_lat"] = float(picked.get("y", 0))
+            st.session_state["picked_lng"] = float(picked.get("x", 0))
+        else:
+            address = st.text_input("주소", value=result.get("address", ""))
 
         ocr_cat = result.get("category", "")
         cat_idx = next((i for i, c in enumerate(CATEGORY_OPTIONS) if ocr_cat and ocr_cat[:3] in c), len(CATEGORY_OPTIONS) - 1)
         category = st.selectbox("업종", CATEGORY_OPTIONS, index=cat_idx)
 
         if st.button("이 매장 등록", use_container_width=True, type="primary"):
-            lat, lng = None, None
-            if address:
+            lat = st.session_state.pop("picked_lat", None)
+            lng = st.session_state.pop("picked_lng", None)
+            if (not lat or not lng) and address:
                 coords = geocode(address)
                 if coords:
                     lat, lng = coords
@@ -77,6 +98,7 @@ def render_ocr():
                 st.session_state.pop("ocr_result", None)
                 st.session_state.pop("ocr_photo_bytes", None)
                 st.session_state.pop("ocr_photo_ext", None)
+                st.session_state.pop("kakao_places", None)
             except Exception as e:
                 st.error(safe_error("등록", e))
 

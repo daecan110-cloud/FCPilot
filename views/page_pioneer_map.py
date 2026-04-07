@@ -4,7 +4,7 @@ from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from utils.map_utils import STATUS_LABELS
 from utils.kakao_map import pioneer_map_html
-from services.geocoding import geocode
+from services.geocoding import geocode, search_keyword
 from utils.helpers import safe_error
 
 CATEGORY_OPTIONS = ["음식점", "카페", "미용실/뷰티", "학원/교육", "병원/약국", "편의점/마트", "의류/패션", "사무실/오피스", "기타"]
@@ -80,9 +80,32 @@ def _render_map():
 
 def _render_register():
     st.subheader("매장 등록")
+
+    # 카카오 장소 검색
+    search_q = st.text_input("장소 검색", placeholder="매장명 또는 주소로 검색")
+    if search_q and st.button("검색", key="reg_search"):
+        places = search_keyword(search_q)
+        if places:
+            st.session_state.reg_places = places
+        else:
+            st.warning("검색 결과가 없습니다.")
+
+    reg_places = st.session_state.get("reg_places", [])
+    prefill_name, prefill_addr = "", ""
+    prefill_lat, prefill_lng = None, None
+    if reg_places:
+        options = [f"{p['place_name']} — {p.get('road_address_name') or p.get('address_name', '')}" for p in reg_places]
+        selected = st.radio("검색 결과에서 선택", options, key="reg_place_select")
+        idx = options.index(selected)
+        picked = reg_places[idx]
+        prefill_name = picked.get("place_name", "")
+        prefill_addr = picked.get("road_address_name") or picked.get("address_name", "")
+        prefill_lat = float(picked.get("y", 0))
+        prefill_lng = float(picked.get("x", 0))
+
     with st.form("shop_form"):
-        shop_name = st.text_input("매장명 *", placeholder="예: 커피빈 강남점")
-        address = st.text_input("주소", placeholder="예: 서울시 강남구 역삼동 123")
+        shop_name = st.text_input("매장명 *", value=prefill_name, placeholder="예: 커피빈 강남점")
+        address = st.text_input("주소", value=prefill_addr, placeholder="예: 서울시 강남구 역삼동 123")
         category = st.selectbox("업종", CATEGORY_OPTIONS)
         memo = st.text_area("메모", placeholder="특이사항")
 
@@ -90,8 +113,8 @@ def _render_register():
             if not shop_name:
                 st.error("매장명은 필수입니다.")
             else:
-                lat, lng = None, None
-                if address:
+                lat, lng = prefill_lat, prefill_lng
+                if (not lat or not lng) and address:
                     coords = geocode(address)
                     if coords:
                         lat, lng = coords
@@ -109,6 +132,7 @@ def _render_register():
                         "memo": memo.strip(),
                     }).execute()
                     st.success(f"'{shop_name}' 등록 완료!")
+                    st.session_state.pop("reg_places", None)
                 except Exception as e:
                     st.error(safe_error("등록", e))
 
