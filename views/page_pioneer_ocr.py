@@ -38,47 +38,51 @@ def render_ocr():
         if gps_address and not result.get("address"):
             result["address"] = gps_address
 
+        # OCR 결과 저장 + 카카오 자동 검색
         st.session_state.ocr_result = result
         st.session_state.ocr_photo_bytes = img_bytes
         st.session_state.ocr_photo_ext = ext if ext != "jpg" else "jpeg"
-        st.image(img_bytes, width=300)
+
+        if result.get("shop_name"):
+            places = search_keyword(result["shop_name"])
+            st.session_state.kakao_places = places
+        st.rerun()
 
     result = st.session_state.get("ocr_result")
     if result:
+        if st.session_state.get("ocr_photo_bytes"):
+            st.image(st.session_state["ocr_photo_bytes"], width=300)
+
         st.subheader("추출 결과 (수정 후 등록)")
-        shop_name = st.text_input("매장명", value=result.get("shop_name", ""))
+        shop_name = st.text_input("매장명", value=result.get("shop_name", ""), key="ocr_shop_name")
 
-        # 카카오 장소 검색
-        search_query = st.text_input("장소 검색", value=shop_name, placeholder="매장명 또는 주소로 검색")
-        if search_query and st.button("검색", key="kakao_search"):
-            try:
-                places = search_keyword(search_query)
-                if places:
-                    st.session_state.kakao_places = places
-                else:
-                    st.warning("검색 결과가 없습니다.")
-            except Exception as e:
-                st.error(safe_error("장소 검색", e))
-
+        # 카카오 검색 결과 표시
         places = st.session_state.get("kakao_places", [])
+        address = result.get("address", "")
+        picked_lat, picked_lng = None, None
+
         if places:
-            options = [f"{p['place_name']} — {p.get('road_address_name') or p.get('address_name', '')}" for p in places]
-            selected = st.radio("검색 결과에서 선택", options, key="place_select")
-            idx = options.index(selected)
-            picked = places[idx]
-            address = st.text_input("주소", value=picked.get("road_address_name") or picked.get("address_name", ""))
-            st.session_state["picked_lat"] = float(picked.get("y", 0))
-            st.session_state["picked_lng"] = float(picked.get("x", 0))
-        else:
-            address = st.text_input("주소", value=result.get("address", ""))
+            no_select = "직접 입력"
+            options = [no_select] + [
+                f"{p['place_name']} — {p.get('road_address_name') or p.get('address_name', '')}"
+                for p in places
+            ]
+            selected = st.radio("카카오 검색 결과", options, key="ocr_place_select")
+            if selected != no_select:
+                idx = options.index(selected) - 1
+                picked = places[idx]
+                address = picked.get("road_address_name") or picked.get("address_name", "")
+                picked_lat = float(picked.get("y", 0))
+                picked_lng = float(picked.get("x", 0))
+
+        address = st.text_input("주소", value=address, key="ocr_address")
 
         ocr_cat = result.get("category", "")
         cat_idx = next((i for i, c in enumerate(CATEGORY_OPTIONS) if ocr_cat and ocr_cat[:3] in c), len(CATEGORY_OPTIONS) - 1)
-        category = st.selectbox("업종", CATEGORY_OPTIONS, index=cat_idx)
+        category = st.selectbox("업종", CATEGORY_OPTIONS, index=cat_idx, key="ocr_category")
 
         if st.button("이 매장 등록", use_container_width=True, type="primary"):
-            lat = st.session_state.pop("picked_lat", None)
-            lng = st.session_state.pop("picked_lng", None)
+            lat, lng = picked_lat, picked_lng
             if (not lat or not lng) and address:
                 coords = geocode(address)
                 if coords:
