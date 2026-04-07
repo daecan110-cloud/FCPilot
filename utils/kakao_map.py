@@ -80,8 +80,4 @@ def _render(data: list, mode: str, height: int) -> None:
 
     iframe_url = f"/_stcore/static/kakao_map.html#key={key}&mode={mode}&data={encoded}"
 
-    st.markdown(
-        f'<iframe src="{iframe_url}" width="100%" height="{height}" '
-        f'frameborder="0" style="border:none;border-radius:8px"></iframe>',
-        unsafe_allow_html=True,
-    )
+    st.iframe(iframe_url, height=height)
