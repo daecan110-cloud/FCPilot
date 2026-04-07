@@ -1,8 +1,8 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 14 완료 (온보딩+봇분리+RLS확인)**
-- 마지막 세션: 2026-04-04 (Claude Code)
+- Phase: **Sprint 15 완료 (지도 전환+OCR 개선+팔로업 강화)** — 영민 테스트 대기 중
+- 마지막 세션: 2026-04-07 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
 
@@ -160,11 +160,40 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 
 ---
 
+## Sprint 15 — 완료 (2026-04-07)
+
+### 지도 전환
+- [x] 카카오맵 JS SDK → folium+streamlit-folium 전환 (Streamlit iframe sandbox 호환)
+- [x] 개척지도/동선기록/이전기록 모두 folium 기반으로 통합
+- [x] st_folium 중복 key 에러 수정
+
+### 간판 OCR 개선
+- [x] 카카오 장소 검색 연동 — 매장명으로 검색 → 주소/좌표 자동 입력
+- [x] OCR 프롬프트 강화 — 작은 글씨(주소/전화번호) 추출율 개선
+- [x] 비유효 주소 자동 필터 (한국 주소 패턴 체크)
+- [x] OCR 등록 후 화면 리셋 + 성공 메시지
+
+### 간판 사진 저장
+- [x] Supabase Storage `pioneer-photos` 버킷 생성 (public)
+- [x] OCR 등록 시 사진 업로드 → photo_url DB 저장
+- [x] 팔로업 현황에서 간판 사진 표시
+
+### 팔로업 강화
+- [x] 전체 삭제 기능 (2단계 확인)
+
+### 기타
+- [x] Streamlit 정적 파일 서빙 활성화 (config.toml)
+- [x] components.html 지원 중단 대응 (st.iframe 전환)
+- [x] geocoding.py 에러 메시지 표시 추가
+
+---
+
 ## 미완료 항목
 
 | 우선순위 | 항목 | 비고 |
 |----------|------|------|
 | 🟢 LOW | tools/telegram_chat.py | 별도 봇 토큰 설정 완료, 필요 시 사용 |
+| 🟡 MED | 매장 등록 탭 카카오 검색 | 구현됨, 테스트 필요 |
 
 ---
 
@@ -183,12 +212,14 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 | 버킷 | 공개 여부 | 용도 |
 |------|----------|------|
 | analysis-excel | private | 보장분석 Excel 결과물 ({fc_id}/{record_id}.xlsx) |
+| pioneer-photos | public | 간판 사진 ({fc_id}/{uuid}.jpeg) |
 
 ---
 
 ## 알려진 이슈
 
 - Gemini 무료 tier: 분당 2회 제한 → 429 시 자동 재시도 대응 완료
+- Streamlit Cloud `st.html()` height 파라미터 미지원 — folium으로 우회
 
 ---
 
