@@ -1,4 +1,5 @@
 """개척지도 — 간판 OCR 탭"""
+import re
 import streamlit as st
 
 from auth import get_current_user_id
@@ -23,102 +24,126 @@ def render_ocr():
             photo = None
 
     if photo and st.button("간판 분석", type="primary"):
-        from services.ocr_engine import extract_from_sign
-        img_bytes = photo.read()
-        ext = photo.name.rsplit(".", 1)[-1].lower()
-        media = f"image/{ext}"
-        if media == "image/jpg":
-            media = "image/jpeg"
+        _run_ocr(photo)
+        return
 
-        gps_address = _extract_gps_address(img_bytes)
+    ocr = st.session_state.get("ocr_data")
+    if not ocr:
+        return
 
-        with st.spinner("간판 분석 중..."):
-            result = extract_from_sign(img_bytes, media)
+    # 사진 표시
+    if ocr.get("photo_bytes"):
+        st.image(ocr["photo_bytes"], width=300)
 
-        if gps_address and not result.get("address"):
-            result["address"] = gps_address
+    st.subheader("추출 결과 (수정 후 등록)")
 
-        # OCR 결과 저장 + 카카오 자동 검색
-        st.session_state.ocr_result = result
-        st.session_state.ocr_photo_bytes = img_bytes
-        st.session_state.ocr_photo_ext = ext if ext != "jpg" else "jpeg"
+    # 매장명
+    shop_name = st.text_input("매장명", value=ocr.get("shop_name", ""))
 
-        if result.get("shop_name"):
-            places = search_keyword(result["shop_name"])
-            st.session_state.kakao_places = places
-        st.rerun()
+    # 카카오 검색 결과 → selectbox
+    places = ocr.get("places", [])
+    address = ocr.get("address", "")
+    lat, lng = ocr.get("lat"), ocr.get("lng")
 
-    result = st.session_state.get("ocr_result")
-    if result:
-        if st.session_state.get("ocr_photo_bytes"):
-            st.image(st.session_state["ocr_photo_bytes"], width=300)
-
-        st.subheader("추출 결과 (수정 후 등록)")
-        shop_name = st.text_input("매장명", value=result.get("shop_name", ""), key="ocr_shop_name")
-
-        # 카카오 검색 결과 표시
-        places = st.session_state.get("kakao_places", [])
-        ocr_addr = result.get("address", "")
-        if ocr_addr and not _is_korean_address(ocr_addr):
-            ocr_addr = ""
-        picked_lat, picked_lng = None, None
-
-        if places:
-            options = [
-                f"{p['place_name']} — {p.get('road_address_name') or p.get('address_name', '')}"
-                for p in places
-            ]
-            selected_idx = st.radio("카카오 검색 결과", options, key="ocr_place_select", index=0)
-            idx = options.index(selected_idx)
+    if places:
+        place_options = ["직접 입력"] + [
+            f"{p['place_name']} — {p.get('road_address_name') or p.get('address_name', '')}"
+            for p in places
+        ]
+        choice = st.selectbox("카카오 검색 결과", place_options)
+        if choice != "직접 입력":
+            idx = place_options.index(choice) - 1
             picked = places[idx]
-            default_addr = picked.get("road_address_name") or picked.get("address_name", "")
-            picked_lat = float(picked.get("y", 0))
-            picked_lng = float(picked.get("x", 0))
-        else:
-            default_addr = ocr_addr
+            address = picked.get("road_address_name") or picked.get("address_name", "")
+            lat = float(picked.get("y", 0))
+            lng = float(picked.get("x", 0))
 
-        address = st.text_input("주소", value=default_addr, key="ocr_address")
+    address = st.text_input("주소", value=address)
 
-        ocr_cat = result.get("category", "")
-        cat_idx = next((i for i, c in enumerate(CATEGORY_OPTIONS) if ocr_cat and ocr_cat[:3] in c), len(CATEGORY_OPTIONS) - 1)
-        category = st.selectbox("업종", CATEGORY_OPTIONS, index=cat_idx, key="ocr_category")
+    # 업종
+    ocr_cat = ocr.get("category", "")
+    cat_idx = next(
+        (i for i, c in enumerate(CATEGORY_OPTIONS) if ocr_cat and ocr_cat[:3] in c),
+        len(CATEGORY_OPTIONS) - 1,
+    )
+    category = st.selectbox("업종", CATEGORY_OPTIONS, index=cat_idx)
 
-        if st.button("이 매장 등록", use_container_width=True, type="primary"):
-            lat, lng = picked_lat, picked_lng
-            if (not lat or not lng) and address:
+    # 등록
+    if st.button("이 매장 등록", use_container_width=True, type="primary"):
+        if not lat or not lng:
+            if address:
                 coords = geocode(address)
                 if coords:
                     lat, lng = coords
-            try:
-                sb = get_supabase_client()
-                fc_id = get_current_user_id()
-                photo_url = _upload_photo(sb, fc_id, st.session_state.get("ocr_photo_bytes"), st.session_state.get("ocr_photo_ext", "jpeg"))
-                sb.table("pioneer_shops").insert({
-                    "fc_id": fc_id,
-                    "shop_name": shop_name.strip(),
-                    "address": address.strip(),
-                    "lat": lat,
-                    "lng": lng,
-                    "category": category,
-                    "phone": result.get("phone", ""),
-                    "photo_url": photo_url,
-                }).execute()
-                st.success(f"'{shop_name}' 등록 완료!")
-                st.session_state.pop("ocr_result", None)
-                st.session_state.pop("ocr_photo_bytes", None)
-                st.session_state.pop("ocr_photo_ext", None)
-                st.session_state.pop("kakao_places", None)
-            except Exception as e:
-                st.error(safe_error("등록", e))
+        try:
+            sb = get_supabase_client()
+            fc_id = get_current_user_id()
+            photo_url = _upload_photo(
+                fc_id, ocr.get("photo_bytes"), ocr.get("photo_ext", "jpeg"),
+            )
+            sb.table("pioneer_shops").insert({
+                "fc_id": fc_id,
+                "shop_name": shop_name.strip(),
+                "address": address.strip(),
+                "lat": lat,
+                "lng": lng,
+                "category": category,
+                "phone": ocr.get("phone", ""),
+                "photo_url": photo_url,
+            }).execute()
+            st.success(f"'{shop_name}' 등록 완료!")
+            st.session_state.pop("ocr_data", None)
+        except Exception as e:
+            st.error(safe_error("등록", e))
+
+
+def _run_ocr(photo):
+    """OCR 실행 + 카카오 검색 + 결과를 단일 dict로 저장"""
+    from services.ocr_engine import extract_from_sign
+
+    img_bytes = photo.read()
+    ext = photo.name.rsplit(".", 1)[-1].lower()
+    media = f"image/{ext}"
+    if media == "image/jpg":
+        media = "image/jpeg"
+
+    gps_address = _extract_gps_address(img_bytes)
+
+    with st.spinner("간판 분석 중..."):
+        result = extract_from_sign(img_bytes, media)
+
+    # 주소 결정: GPS > OCR (유효한 경우만)
+    address = ""
+    if gps_address:
+        address = gps_address
+    elif result.get("address") and _is_korean_address(result["address"]):
+        address = result["address"]
+
+    # 카카오 자동 검색
+    places = []
+    if result.get("shop_name"):
+        places = search_keyword(result["shop_name"])
+
+    # 단일 dict로 저장
+    st.session_state.ocr_data = {
+        "shop_name": result.get("shop_name", ""),
+        "category": result.get("category", ""),
+        "phone": result.get("phone", ""),
+        "address": address,
+        "lat": None,
+        "lng": None,
+        "places": places,
+        "photo_bytes": img_bytes,
+        "photo_ext": ext if ext != "jpg" else "jpeg",
+    }
+    st.rerun()
 
 
 def _is_korean_address(text: str) -> bool:
-    """한국 주소 패턴인지 간단 체크"""
-    import re
     return bool(re.search(r"(시|군|구|동|읍|면|리|로|길|번지)", text))
 
 
-def _upload_photo(sb, fc_id: str, img_bytes: bytes | None, ext: str) -> str:
+def _upload_photo(fc_id: str, img_bytes: bytes | None, ext: str) -> str:
     """간판 사진을 Supabase Storage에 업로드, public URL 반환"""
     if not img_bytes:
         return ""
@@ -134,8 +159,7 @@ def _upload_photo(sb, fc_id: str, img_bytes: bytes | None, ext: str) -> str:
             filename, img_bytes,
             file_options={"content-type": f"image/{ext}"},
         )
-        url = admin_sb.storage.from_("pioneer-photos").get_public_url(filename)
-        return url
+        return admin_sb.storage.from_("pioneer-photos").get_public_url(filename)
     except Exception:
         return ""
 
@@ -174,9 +198,7 @@ def _extract_gps_address(image_bytes: bytes) -> str:
 
 def _dms_to_decimal(dms, ref) -> float | None:
     try:
-        d = float(dms[0])
-        m = float(dms[1])
-        s = float(dms[2])
+        d, m, s = float(dms[0]), float(dms[1]), float(dms[2])
         decimal = d + m / 60 + s / 3600
         if ref in ("S", "W"):
             decimal = -decimal
