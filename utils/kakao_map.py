@@ -1,11 +1,8 @@
-"""Kakao Maps JavaScript API 기반 지도 컴포넌트 HTML 생성기"""
+"""Kakao Maps — 정적 HTML + postMessage 방식 지도 컴포넌트"""
 import json
+import hashlib
 import streamlit as st
-
-
-def _safe_json(data) -> str:
-    """JSON 직렬화 + HTML 특수문자 이스케이프 (script 태그 인젝션 방지)"""
-    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e")
+import streamlit.components.v1 as components
 
 
 _STATUS_COLORS = {
@@ -36,8 +33,12 @@ def _app_key() -> str:
         return ""
 
 
+def _safe_json(data) -> str:
+    return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e")
+
+
 def route_map_html(visits: list, height: int = 420) -> str:
-    """방문 동선 지도 HTML (번호 마커 + 화살표 폴리라인)"""
+    """방문 동선 지도 (번호 마커 + 폴리라인)"""
     js_data = [
         {
             "order": v.get("order", 0),
@@ -50,11 +51,11 @@ def route_map_html(visits: list, height: int = 420) -> str:
         }
         for v in visits
     ]
-    return _html(_safe_json(js_data), "route", height)
+    return _render(js_data, "route", height)
 
 
 def pioneer_map_html(shops: list, height: int = 500) -> str:
-    """개척 매장 지도 HTML (상태별 색상 마커)"""
+    """개척 매장 지도 (상태별 색상 마커)"""
     js_data = [
         {
             "lat": s.get("lat"),
@@ -68,141 +69,39 @@ def pioneer_map_html(shops: list, height: int = 500) -> str:
         }
         for s in shops
     ]
-    return _html(_safe_json(js_data), "pioneer", height)
+    return _render(js_data, "pioneer", height)
 
 
-def _html(data_json: str, mode: str, height: int) -> str:
+def _render(data: list, mode: str, height: int) -> None:
+    """정적 HTML iframe + postMessage로 지도 데이터 전달"""
     key = _app_key()
-    map_script = _ROUTE_SCRIPT if mode == "route" else _PIONEER_SCRIPT
+    data_json = _safe_json(data)
+    # 데이터 해시로 고유 iframe key 생성 (중복 방지)
+    data_hash = hashlib.md5(data_json.encode()).hexdigest()[:8]
 
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<style>
-  html,body{{margin:0;padding:0;width:100%;height:100%}}
-  #map{{width:100%;height:{height}px;background:#f0f0f0}}
-  #err{{color:red;padding:10px;font-size:14px}}
-  .iw{{padding:10px;font-size:13px;line-height:1.6;min-width:160px;max-width:260px}}
-  .iw b{{font-size:14px;display:block;margin-bottom:2px}}
-  .iw small{{color:#888}}
-</style>
-</head><body>
-<div id="err"></div>
-<div id="map"></div>
-<script>
-window.onerror=function(m,s,l){{document.getElementById('err').innerText='JS Error: '+m+' (line:'+l+')';}}
-</script>
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={key}&autoload=false"
-  onerror="document.getElementById('err').innerText='SDK 로드 실패: 카카오맵 스크립트를 불러올 수 없습니다.'"></script>
-<script>
-var DATA = {data_json};
-try{{
-  if(typeof kakao==='undefined'){{
-    document.getElementById('err').innerText='kakao 객체 없음 — SDK 로드 실패';
-  }} else {{
-    kakao.maps.load(function(){{
-      try{{
-{map_script}
-      }}catch(e){{document.getElementById('err').innerText='지도 초기화 에러: '+e.message;}}
-    }});
-  }}
-}}catch(e){{document.getElementById('err').innerText='실행 에러: '+e.message;}}
-</script>
-</body></html>"""
+    iframe_url = f"/_stcore/static/kakao_map.html#key={key}&mode={mode}"
 
-
-_ESC_JS = "function _e(s){if(!s)return'';var d=document.createElement('div');d.appendChild(document.createTextNode(s));return d.innerHTML;}\n"
-
-_ROUTE_SCRIPT = _ESC_JS + """
-var valid = DATA.filter(function(v){return v.lat && v.lng;});
-var cLat = valid.length ? valid.reduce(function(s,v){return s+v.lat;},0)/valid.length : 37.5665;
-var cLng = valid.length ? valid.reduce(function(s,v){return s+v.lng;},0)/valid.length : 126.9780;
-
-var map = new kakao.maps.Map(document.getElementById('map'), {
-  center: new kakao.maps.LatLng(cLat, cLng),
-  level: 5
-});
-map.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.TOPRIGHT);
-map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
-
-var coords = [];
-valid.forEach(function(v){
-  var pos = new kakao.maps.LatLng(v.lat, v.lng);
-  coords.push(pos);
-
-  var content = '<div style="background:#1E88E5;color:#fff;border-radius:50%;width:30px;height:30px;'+
-    'text-align:center;line-height:30px;font-weight:bold;font-size:14px;border:2px solid #fff;'+
-    'box-shadow:0 2px 6px rgba(0,0,0,.4);position:relative;cursor:pointer">'+v.order+'</div>';
-  var overlay = new kakao.maps.CustomOverlay({
-    position: pos, content: content, yAnchor: 0.5, xAnchor: 0.5
-  });
-  overlay.setMap(map);
-
-  var iwContent = '<div class="iw"><b>#'+v.order+' '+_e(v.name)+'</b>'+
-    (v.result?'결과: '+_e(v.result)+'<br>':'')+
-    (v.memo?_e(v.memo)+'<br>':'')+
-    (v.addr?'<small>'+_e(v.addr)+'</small>':'')+
-    '</div>';
-  var iw = new kakao.maps.InfoWindow({content: iwContent, removable: true});
-
-  var marker = new kakao.maps.Marker({position: pos, map: map, opacity: 0});
-  kakao.maps.event.addListener(marker, 'click', (function(m, w){
-    return function(){ w.open(map, m); };
-  })(marker, iw));
-});
-
-if(coords.length >= 2){
-  new kakao.maps.Polyline({
-    map: map, path: coords,
-    strokeWeight: 4, strokeColor: '#1E88E5', strokeOpacity: 0.8, strokeStyle: 'solid'
-  });
-}
-if(coords.length > 0){
-  var bounds = new kakao.maps.LatLngBounds();
-  coords.forEach(function(c){ bounds.extend(c); });
-  map.setBounds(bounds, 50, 50, 50, 50);
-}
-"""
-
-_PIONEER_SCRIPT = _ESC_JS + """
-var valid = DATA.filter(function(s){return s.lat && s.lng;});
-var cLat = valid.length ? valid.reduce(function(s,v){return s+v.lat;},0)/valid.length : 37.5665;
-var cLng = valid.length ? valid.reduce(function(s,v){return s+v.lng;},0)/valid.length : 126.9780;
-
-var map = new kakao.maps.Map(document.getElementById('map'), {
-  center: new kakao.maps.LatLng(cLat, cLng),
-  level: 6
-});
-map.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.TOPRIGHT);
-map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
-
-DATA.forEach(function(s){
-  if(!s.lat || !s.lng) return;
-  var pos = new kakao.maps.LatLng(s.lat, s.lng);
-
-  var dot = '<div style="background:'+s.color+';width:14px;height:14px;border-radius:50%;'+
-    'border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer"></div>';
-  var overlay = new kakao.maps.CustomOverlay({
-    position: pos, content: dot, yAnchor: 0.5, xAnchor: 0.5
-  });
-  overlay.setMap(map);
-
-  var iwContent = '<div class="iw"><b>'+_e(s.name)+'</b>'+
-    '상태: <span style="color:'+s.color+'">'+_e(s.status)+'</span><br>'+
-    (s.cat?'업종: '+_e(s.cat)+'<br>':'')+
-    (s.addr?'<small>'+_e(s.addr)+'</small>':'')+
-    (s.memo?'<br><small>'+_e(s.memo)+'</small>':'')+
-    '</div>';
-  var iw = new kakao.maps.InfoWindow({content: iwContent, removable: true});
-
-  var marker = new kakao.maps.Marker({position: pos, map: map, opacity: 0});
-  kakao.maps.event.addListener(marker, 'click', (function(m, w){
-    return function(){ w.open(map, m); };
-  })(marker, iw));
-});
-
-if(valid.length > 0){
-  var bounds = new kakao.maps.LatLngBounds();
-  valid.forEach(function(s){ bounds.extend(new kakao.maps.LatLng(s.lat, s.lng)); });
-  map.setBounds(bounds, 50, 50, 50, 50);
-}
-"""
+    # 부모 페이지에서 iframe에 postMessage로 데이터 전달
+    wrapper_html = f"""
+    <iframe id="kakaoMap_{data_hash}" src="{iframe_url}"
+      width="100%" height="{height}" frameborder="0"
+      style="border:none;border-radius:8px"></iframe>
+    <script>
+    (function(){{
+      var iframe = document.getElementById('kakaoMap_{data_hash}');
+      var data = {data_json};
+      function sendData(){{
+        iframe.contentWindow.postMessage({{type:'mapData', items:data}}, '*');
+      }}
+      // SDK 준비 완료 메시지 수신 시 데이터 전송
+      window.addEventListener('message', function(e){{
+        if(e.data && e.data.type === 'mapReady') sendData();
+      }});
+      // iframe 이미 로드된 경우 대비
+      iframe.addEventListener('load', function(){{
+        setTimeout(sendData, 500);
+      }});
+    }})();
+    </script>
+    """
+    components.html(wrapper_html, height=height + 10)

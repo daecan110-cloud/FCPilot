@@ -52,7 +52,7 @@ def _render_map():
     map_col, list_col = st.columns([7, 3])
     with map_col:
         st.caption(f"전체 {len(shops)}개 | 표시 {len(filtered)}개")
-        st.html(pioneer_map_html(filtered, height=480))
+        pioneer_map_html(filtered, height=480)
     with list_col:
         st.caption(f"매장 {len(filtered)}곳")
         STATUS_ICON = {"active": "🟡", "visited": "🔵", "contracted": "🟢", "rejected": "🔴"}
