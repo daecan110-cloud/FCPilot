@@ -65,12 +65,15 @@ def reverse_geocode(lat: float, lng: float) -> str:
 def search_keyword(query: str, size: int = 5) -> list[dict]:
     """카카오 키워드 검색"""
     try:
+        key = st.secrets["kakao"]["rest_key"]
         res = requests.get(
             "https://dapi.kakao.com/v2/local/search/keyword.json",
-            headers={"Authorization": f"KakaoAK {st.secrets['kakao']['rest_key']}"},
+            headers={"Authorization": f"KakaoAK {key}"},
             params={"query": query, "size": size},
             timeout=5,
         )
-        return res.json().get("documents", [])
-    except Exception:
+        data = res.json()
+        return data.get("documents", [])
+    except Exception as e:
+        st.warning(f"검색 API: {e}")
         return []

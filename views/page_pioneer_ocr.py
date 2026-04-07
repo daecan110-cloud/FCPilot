@@ -51,11 +51,14 @@ def render_ocr():
         # 카카오 장소 검색
         search_query = st.text_input("장소 검색", value=shop_name, placeholder="매장명 또는 주소로 검색")
         if search_query and st.button("검색", key="kakao_search"):
-            places = search_keyword(search_query)
-            if places:
-                st.session_state.kakao_places = places
-            else:
-                st.warning("검색 결과가 없습니다.")
+            try:
+                places = search_keyword(search_query)
+                if places:
+                    st.session_state.kakao_places = places
+                else:
+                    st.warning("검색 결과가 없습니다.")
+            except Exception as e:
+                st.error(safe_error("장소 검색", e))
 
         places = st.session_state.get("kakao_places", [])
         if places:
