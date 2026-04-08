@@ -20,6 +20,9 @@ MAX_FILE_SIZE_MB = 10
 # 세션 타임아웃 (초)
 SESSION_TIMEOUT = 60 * 60  # 60분
 
+# 유입경로 기본 카테고리 (단일 소스)
+DEFAULT_SOURCE_CATEGORIES = ["DB고객", "지인", "개척", "소개", "기타"]
+
 # Claude API 설정
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
 CLAUDE_MAX_TOKENS = 4096

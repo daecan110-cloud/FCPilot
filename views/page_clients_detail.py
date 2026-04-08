@@ -53,7 +53,19 @@ def render_detail():
     st.markdown("---")
 
     from views.page_clients_contact import render_contact_logs, render_new_contact
-    tab_contact, tab_remind, tab_analysis, tab_del = st.tabs(["📝 상담이력", "🔔 리마인드", "📊 보장분석", "🗑️ 삭제"])
+    grade = client.get("prospect_grade", "")
+    is_existing_client = grade in ("VIP", "S")
+
+    if is_existing_client:
+        tab_contract, tab_contact, tab_remind, tab_analysis, tab_del = st.tabs(
+            ["📄 계약정보", "📝 상담이력", "🔔 리마인드", "📊 보장분석", "🗑️ 삭제"])
+        with tab_contract:
+            from views.page_clients_contracts import render_contracts
+            render_contracts(sb, client_id)
+    else:
+        tab_contact, tab_remind, tab_analysis, tab_del = st.tabs(
+            ["📝 상담이력", "🔔 리마인드", "📊 보장분석", "🗑️ 삭제"])
+
     with tab_contact:
         render_contact_logs(sb, client_id)
         render_new_contact(sb, client_id)

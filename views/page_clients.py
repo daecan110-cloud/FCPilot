@@ -6,7 +6,7 @@ from services.crypto import encrypt_phone, decrypt_phone, hash_phone_last4
 from utils.helpers import safe_error
 
 TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
-DEFAULT_SOURCE_OPTIONS = ["DB고객", "개인(지인)", "개척", "소개", "기타"]
+from config import DEFAULT_SOURCE_CATEGORIES as DEFAULT_SOURCE_OPTIONS
 
 
 def _get_source_categories(sb, fc_id: str) -> list:

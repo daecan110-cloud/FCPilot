@@ -63,7 +63,7 @@ def render():
     st.caption(f"FCPilot v1.0.0 · {user_id[:8]}... · 역할: {settings.get('role', 'user')}")
 
 
-_DEFAULT_CATEGORIES = ["DB고객", "개인(지인)", "개척", "소개", "기타"]
+from config import DEFAULT_SOURCE_CATEGORIES as _DEFAULT_CATEGORIES
 
 
 def _render_source_categories(sb, user_id: str):

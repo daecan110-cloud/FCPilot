@@ -188,6 +188,34 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 
 ---
 
+## Sprint 16 — 진행 중 (2026-04-08)
+
+### 유입경로 디버깅
+- [x] `config.py`에 `DEFAULT_SOURCE_CATEGORIES` 단일 소스 정의 ("지인"으로 통일)
+- [x] `page_clients.py`, `page_settings.py` 양쪽 중복 제거 → config import
+- [x] `sql/015_normalize_db_source.sql` — 기존 "개인(지인)" 데이터 정규화
+
+### 기계약자 계약 정보 관리
+- [x] `sql/016_client_contracts.sql` — client_contracts 테이블 (RLS 적용)
+- [x] `views/page_clients_contracts.py` — 계약 정보 CRUD UI
+- [x] `page_clients_detail.py` — S/VIP일 때만 "계약정보" 탭 노출
+- [x] 직접 입력 + 상품설계서 PDF 업로드 지원
+
+### 상품설계서 PDF 파싱
+- [x] `services/contract_extractor.py` — pdfplumber 텍스트 추출 + Claude API 구조화
+- [x] 주계약/특약/보험료/보험사/카테고리 자동 추출
+
+### 상품 판매 통계
+- [x] `page_stats.py` — "상품 판매 현황" 섹션 추가
+- [x] 판매 랭킹, 제안 vs 실제 판매, 나이대별 상품, 가격대별 분포
+
+### 영민 액션 필요
+- [ ] `sql/015_normalize_db_source.sql` Supabase SQL Editor 실행
+- [ ] `sql/016_client_contracts.sql` Supabase SQL Editor 실행
+- [ ] 실사용 테스트 (고객 상세 → S/VIP 계약정보 탭, 통계 → 상품 판매 현황)
+
+---
+
 ## 미완료 항목
 
 | 우선순위 | 항목 | 비고 |
@@ -206,6 +234,7 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 | users_settings | status TEXT 추가 | 회원가입 승인 |
 | contact_logs | proposed_product_ids uuid[] 추가 | 제안 상품 연동 |
 | analysis_records | excel_path TEXT 추가 | Excel 파일 Storage 경로 |
+| client_contracts | 신규 생성 + RLS | 기계약자 계약 정보 (S/VIP) |
 
 ## Supabase Storage
 
