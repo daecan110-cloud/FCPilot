@@ -129,6 +129,8 @@ def _render_client_delete(sb, client_id: str):
         col_y, col_n = st.columns(2)
         if col_y.button("삭제 확인", type="primary", use_container_width=True):
             try:
+                sb.table("fp_reminders").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
+                sb.table("client_contracts").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
                 sb.table("contact_logs").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
                 sb.table("clients").delete().eq("id", client_id).eq("fc_id", fc_id).execute()
                 st.session_state.pop(confirm_key, None)

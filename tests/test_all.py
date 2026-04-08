@@ -44,6 +44,23 @@ PAGE_MODULES = [
     "views.page_settings",
 ]
 
+# render() 없이 import만 확인하는 서브 뷰 모듈
+VIEW_SUB_MODULES = [
+    "views.page_home_forms",
+    "views.page_clients_detail",
+    "views.page_clients_contracts",
+    "views.page_clients_contact",
+    "views.page_clients_remind",
+    "views.page_clients_form",
+    "views.page_pioneer_followup",
+    "views.page_pioneer_history",
+    "views.page_pioneer_ocr",
+    "views.page_stats_products",
+    "views.page_settings_products",
+    "views.page_settings_admin",
+    "views.page_analysis_yakwan",
+]
+
 SERVICE_MODULES = [
     "services.analysis_engine",
     "services.excel_generator",
@@ -56,12 +73,16 @@ SERVICE_MODULES = [
     "services.migration",
     "services.crypto",
     "services.pdf_extractor",
+    "services.pdf_extractor_detail",
     "services.item_map",
+    "services.contract_extractor",
+    "services.yakwan_analyzer",
 ]
 
 UTIL_MODULES = [
     "utils.supabase_client",
     "utils.telegram",
+    "utils.telegram_commands",
     "utils.helpers",
     "utils.map_utils",
     "utils.db_admin",
@@ -275,6 +296,7 @@ def run_all_tests() -> TestResult:
 
     print("[5/8] 페이지 모듈 import...")
     test_module_imports(result, PAGE_MODULES, "Page")
+    test_module_imports(result, VIEW_SUB_MODULES, "View")
 
     print("[6/8] 서비스/유틸 모듈 import...")
     test_module_imports(result, SERVICE_MODULES, "Service")

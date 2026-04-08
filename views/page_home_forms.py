@@ -186,7 +186,7 @@ def render_recent_activity(fc_id: str):
     col_title, col_new, col_act = st.columns([3, 1, 1])
     col_title.subheader("최근 활동")
     if col_new.button("고객 추가", use_container_width=True):
-        st.session_state._nav_to = "고객관리"
+        st.session_state._nav_to = "👥 고객관리"
         st.session_state.clients_view = "new"
         st.rerun()
     if col_act.button("활동 추가", use_container_width=True):

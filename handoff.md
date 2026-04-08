@@ -1,8 +1,8 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 15 완료 (지도 전환+OCR 개선+팔로업 강화)** — 영민 테스트 대기 중
-- 마지막 세션: 2026-04-07 (Claude Code)
+- Phase: **Sprint 17 완료 (디버깅+코드 품질 개선)** — 영민 테스트 대기 중
+- 마지막 세션: 2026-04-08 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
 
@@ -188,7 +188,7 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 
 ---
 
-## Sprint 16 — 진행 중 (2026-04-08)
+## Sprint 16 — 완료 (2026-04-08)
 
 ### 유입경로 디버깅
 - [x] `config.py`에 `DEFAULT_SOURCE_CATEGORIES` 단일 소스 정의 ("지인"으로 통일)
@@ -212,7 +212,28 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 ### 영민 액션 필요
 - [ ] `sql/015_normalize_db_source.sql` Supabase SQL Editor 실행
 - [ ] `sql/016_client_contracts.sql` Supabase SQL Editor 실행
-- [ ] 실사용 테스트 (고객 상세 → S/VIP 계약정보 탭, 통계 → 상품 판매 현황)
+
+---
+
+## Sprint 17 — 완료 (2026-04-08)
+
+### 버그 수정
+- [x] BUG-1: 홈 → 고객관리 네비게이션 실패 (`_nav_to "고객관리"` → `"👥 고객관리"`)
+- [x] BUG-2: 고객 삭제 시 fp_reminders/client_contracts 미삭제 (고아 데이터)
+
+### 200줄 초과 파일 분리 (4건)
+- [x] `page_stats.py` 434→244줄 + `page_stats_products.py` 190줄
+- [x] `pdf_extractor.py` 400→221줄 + `pdf_extractor_detail.py` 167줄
+- [x] `telegram.py` 279→141줄 + `telegram_commands.py` 143줄
+- [x] `page_clients.py` 264→181줄 + `page_clients_form.py` 92줄
+
+### 코드 품질
+- [x] `contract_extractor.py`: 미사용 import base64 제거 + get_secret→load_secrets 수정
+- [x] `config.toml`: `ark[theme]` → `[theme]` 오타 수정
+- [x] `test_all.py`: 17개 모듈 추가 (56/56 통과)
+
+### 보안 체크
+- [x] 8항목 전체 통과 (API키/고객데이터/print/bare except/HTML이스케이프/HTTP/gitignore/fc_id)
 
 ---
 
