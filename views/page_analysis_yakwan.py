@@ -168,13 +168,10 @@ def _render_k_column_apply(data: dict, idx: int, result: dict):
             k_column_data[idx] = k_text.strip()
 
         pdf_bytes = st.session_state.get("pdf_bytes")
-        include_review = st.session_state.get("include_review", False)
         if pdf_bytes:
             with st.spinner("엑셀 재생성 중..."):
                 try:
-                    _, excel_files = analyze_and_generate(
-                        pdf_bytes, include_review=include_review, k_column_data=k_column_data,
-                    )
+                    _, excel_files = analyze_and_generate(pdf_bytes)
                     st.session_state.excel_files = excel_files
                     st.success("엑셀 재생성 완료. '보장분석 결과' 탭에서 다운로드하세요.")
                 except Exception as e:

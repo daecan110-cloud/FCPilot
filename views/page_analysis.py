@@ -20,15 +20,10 @@ def render():
     )
 
     section_header("Step 2. 옵션 설정")
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        client_name = st.text_input(
-            "고객명 (선택 - 엑셀에만 표시)",
-            placeholder="예: 홍길동",
-        )
-    with col2:
-        include_review = st.toggle("상세 보장내역 포함", value=False,
-                                    help="갱신구분/보험료변화/리뷰 섹션 포함")
+    client_name = st.text_input(
+        "고객명 (선택 - 엑셀에만 표시)",
+        placeholder="예: 홍길동",
+    )
 
     if uploaded_file is None:
         st.info("PDF 파일을 업로드해주세요.")
@@ -45,9 +40,7 @@ def render():
     if st.button("보장분석 시작", use_container_width=True, type="primary"):
         with st.spinner("PDF에서 보장 내역을 추출하고 있습니다..."):
             try:
-                data, excel_files = analyze_and_generate(
-                    pdf_bytes, include_review=include_review,
-                )
+                data, excel_files = analyze_and_generate(pdf_bytes)
             except Exception as e:
                 st.error(safe_error("분석", e))
                 return
@@ -56,7 +49,7 @@ def render():
             data["고객명"] = client_name
             try:
                 from services.analysis_engine import regenerate_excel
-                excel_files = regenerate_excel(data, include_review=include_review)
+                excel_files = regenerate_excel(data)
             except Exception as e:
                 st.error(safe_error("엑셀 재생성", e))
                 return
@@ -64,7 +57,6 @@ def render():
         st.session_state.analysis_data = data
         st.session_state.excel_files = excel_files
         st.session_state.pdf_bytes = pdf_bytes
-        st.session_state.include_review = include_review
         st.session_state.pop("yakwan_results", None)
         st.session_state.pop("yakwan_selected_idx", None)
 

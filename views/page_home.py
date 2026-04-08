@@ -91,7 +91,7 @@ def render():
     with tab_past:
         from views.page_home_forms import render_past_card
         for r in past:
-            render_past_card(r, _products_map)
+            render_past_card(r, _products_map, fc_id)
         if not past:
             empty_state("📋", "완료/취소된 리마인드가 없습니다")
 

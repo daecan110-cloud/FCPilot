@@ -80,6 +80,7 @@ def render_reminder_section(sb, fc_id: str, client_id: str):
 
     with tab_done:
         if done:
+            from services.fp_reminder_service import delete_reminder
             for r in done:
                 status_icon = "✅" if r.get("status") == "completed" else "❌"
                 rd = r.get("reminder_date") or "미정"
@@ -87,13 +88,29 @@ def render_reminder_section(sb, fc_id: str, client_id: str):
                 completed = (r.get("completed_at") or "")[:10]
                 result_memo = r.get("result_memo", "")
 
+                col_info, col_del = st.columns([5, 1])
                 info = f"{status_icon} {rd} | {r.get('purpose','')}"
                 if result_label:
                     info += f" | {result_label}"
                 if completed:
                     info += f" | 완료: {completed}"
-                st.caption(info)
+                col_info.caption(info)
                 if result_memo:
-                    st.caption(f"   FC 후기: {result_memo}")
+                    col_info.caption(f"   FC 후기: {result_memo}")
+                del_key = f"del_client_{r['id']}"
+                if st.session_state.get(del_key):
+                    c1, c2 = col_del.columns(2)
+                    if c1.button("확인", key=f"cdc_y_{r['id']}", use_container_width=True):
+                        delete_reminder(fc_id, r["id"])
+                        st.session_state.pop(del_key, None)
+                        st.rerun()
+                    if c2.button("취소", key=f"cdc_n_{r['id']}", use_container_width=True):
+                        st.session_state.pop(del_key, None)
+                        st.rerun()
+                else:
+                    def _tog_del(dk):
+                        st.session_state[dk] = True
+                    col_del.button("삭제", key=f"cd_del_{r['id']}",
+                                   use_container_width=True, on_click=_tog_del, args=(del_key,))
         else:
             st.caption("완료/취소된 리마인드가 없습니다.")

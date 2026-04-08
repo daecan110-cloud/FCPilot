@@ -134,6 +134,19 @@ def cancel_reminder(fc_id: str, reminder_id: str) -> bool:
         return False
 
 
+def delete_reminder(fc_id: str, reminder_id: str) -> bool:
+    """리마인드 물리 삭제 (완료/취소된 건만)"""
+    try:
+        get_supabase_client().table("fp_reminders").delete().eq(
+            "id", reminder_id
+        ).eq("fc_id", fc_id).in_(
+            "status", ["completed", "cancelled"]
+        ).execute()
+        return True
+    except Exception:
+        return False
+
+
 def get_past_reminders(fc_id: str, limit: int = 50) -> list[dict]:
     """완료/취소된 리마인드 목록 (최신 완료순)"""
     try:

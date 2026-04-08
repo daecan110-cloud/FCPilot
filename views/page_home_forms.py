@@ -110,8 +110,8 @@ def render_edit_form(r: dict, edit_key: str):
             st.rerun()
 
 
-def render_past_card(r: dict, products_map: dict = None):
-    """완료/취소된 리마인드 카드 — 수정 가능"""
+def render_past_card(r: dict, products_map: dict = None, fc_id: str = ""):
+    """완료/취소된 리마인드 카드 — 수정/삭제 가능"""
     from utils.ui_components import grade_badge as _grade_badge
 
     rid = r["id"]
@@ -160,6 +160,22 @@ def render_past_card(r: dict, products_map: dict = None):
                 st.session_state[ek] = not st.session_state.get(ek, False)
             st.button("수정", key=f"edit_past_btn_{rid}",
                       use_container_width=True, on_click=_toggle_edit, args=(edit_key,))
+            del_key = f"del_past_{rid}"
+            if st.session_state.get(del_key):
+                from services.fp_reminder_service import delete_reminder
+                c1, c2 = st.columns(2)
+                if c1.button("확인", key=f"del_yes_{rid}", type="primary", use_container_width=True):
+                    delete_reminder(fc_id, rid)
+                    st.session_state.pop(del_key, None)
+                    st.rerun()
+                if c2.button("취소", key=f"del_no_{rid}", use_container_width=True):
+                    st.session_state.pop(del_key, None)
+                    st.rerun()
+            else:
+                def _toggle_del(dk):
+                    st.session_state[dk] = True
+                st.button("삭제", key=f"del_past_btn_{rid}",
+                          use_container_width=True, on_click=_toggle_del, args=(del_key,))
 
         if st.session_state.get(edit_key):
             render_edit_form(r, edit_key)

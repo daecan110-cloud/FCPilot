@@ -108,11 +108,23 @@ def _parse_contracts(p3) -> list:
             topay_amt = int(re.sub(r"[^\d]", "", row[13] or "0") or "0") if len(row) > 13 else 0
             period = f"{end_age}만기" if end_age else end_month
 
+            # 납입기간 / 납입횟수 추출
+            pay_info = (row[9] or "").strip() if len(row) > 9 else ""
+            pay_count = (row[10] or "").strip() if len(row) > 10 else ""
+            납입기간 = pay_info.split("/")[-1] if "/" in pay_info else pay_info
+            납입개월 = 0
+            총납입개월 = 0
+            if "/" in pay_count:
+                parts = pay_count.split("/")
+                납입개월 = int(re.sub(r"[^\d]", "", parts[0]) or "0")
+                총납입개월 = int(re.sub(r"[^\d]", "", parts[-1]) or "0")
+
             all_contracts.append({
                 "_idx": idx, "열": col_ltr,
                 "보험사": r0, "상품명": product,
                 "보장나이": period, "월보험료": premium,
                 "가입시기": start, "_paid": paid_amt, "_topay": topay_amt,
+                "_납입기간": 납입기간, "_납입개월": 납입개월, "_총납입개월": 총납입개월,
             })
 
     return all_contracts
