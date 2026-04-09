@@ -149,7 +149,7 @@ st.markdown("""
 
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    header { visibility: hidden; }
+    [data-testid="stToolbar"] { visibility: hidden; }
 
     @media (max-width: 768px) {
         .stButton > button { width: 100%; }
