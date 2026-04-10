@@ -149,7 +149,16 @@ st.markdown("""
 
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    [data-testid="stToolbar"] { visibility: hidden; }
+
+    /* 사이드바 토글 버튼은 반드시 보이게 */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"],
+    button[kind="headerNoPadding"] {
+        visibility: visible !important;
+        display: flex !important;
+        opacity: 1 !important;
+    }
 
     @media (max-width: 768px) {
         .stButton > button { width: 100%; }
