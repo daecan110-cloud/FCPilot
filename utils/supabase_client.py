@@ -16,7 +16,12 @@ def get_supabase_client() -> Client:
     session = st.session_state.get("session")
     if session:
         try:
-            client.auth.set_session(session.access_token, session.refresh_token)
+            res = client.auth.set_session(session.access_token, session.refresh_token)
+            # 갱신된 세션을 session_state에 반영 (refresh 토큰 재사용 방지)
+            if res and res.session:
+                st.session_state.session = res.session
         except Exception:
-            pass
+            # 세션 복구 불가 → 로그아웃 처리
+            st.session_state.pop("session", None)
+            st.session_state.pop("user", None)
     return client
