@@ -126,16 +126,17 @@ def _fill_header(ws, slice_data, cfg):
         col = col_idx.get(c["열"], 3)
         safe_val(ws, 3, col, f"{c.get('상품명', '')}\n({c.get('보험사', '')})")
         safe_val(ws, 4, col, c.get("가입시기", ""))
-        safe_val(ws, 5, col, c.get("_납입기간", "") or c.get("보장나이", ""))
+        납입기간 = c.get("_납입기간", "")
+        coverage_period = c.get("보장나이", "")
+        if 납입기간 and coverage_period:
+            safe_val(ws, 5, col, f"{납입기간}\n({coverage_period})")
+        elif 납입기간:
+            safe_val(ws, 5, col, 납입기간)
+        else:
+            safe_val(ws, 5, col, coverage_period or None)
         paid_m = c.get("_납입개월", 0)
         total_m = c.get("_총납입개월", 0)
-        coverage_period = c.get("보장나이", "")
-        if total_m and coverage_period:
-            safe_val(ws, 6, col, f"{paid_m}/{total_m}\n({coverage_period})")
-        elif total_m:
-            safe_val(ws, 6, col, f"{paid_m}/{total_m}")
-        elif coverage_period:
-            safe_val(ws, 6, col, coverage_period)
+        safe_val(ws, 6, col, f"{paid_m}/{total_m}" if total_m else None)
         safe_val(ws, 7, col, c.get("월보험료", 0))
 
 
@@ -253,7 +254,7 @@ def _final_format(ws, cfg):
                 italic=old.italic if old.italic else False,
                 color=old.color,
             )
-        if r in (3, 6):
+        if r in (3, 5):
             for c in range(3, de + 1):
                 cell = ws.cell(row=r, column=c)
                 if cell.__class__.__name__ != "MergedCell":
