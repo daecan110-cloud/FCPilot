@@ -233,6 +233,8 @@ def _build_review(contract):
 def _final_format(ws, cfg):
     mc = cfg["max_col"]
     de = cfg["data_end"]
+    rs = cfg["review_start"]
+    rc = cfg["review_count"]
     for r in range(1, ws.max_row + 1):
         for c in range(1, mc + 1):
             cell = ws.cell(row=r, column=c)
@@ -256,3 +258,14 @@ def _final_format(ws, cfg):
                         vertical=old_al.vertical or "center",
                         wrap_text=True,
                     )
+    # 주계약 리뷰 영역 — 행간격 및 줄바꿈 정렬
+    for r in range(rs, rs + rc):
+        ws.row_dimensions[r].height = 33
+        for c in range(1, mc + 1):
+            cell = ws.cell(row=r, column=c)
+            if cell.__class__.__name__ != "MergedCell":
+                cell.alignment = Alignment(
+                    horizontal="left" if c <= 2 else "left",
+                    vertical="center",
+                    wrap_text=True,
+                )

@@ -27,8 +27,8 @@ def migrate_clients_csv(csv_bytes: bytes) -> dict:
 
     for i, row in enumerate(reader, start=2):
         try:
-            name = _get(row, ["이름", "name", "고객명"])
-            phone = _get(row, ["전화번호", "phone", "연락처"])
+            name = _get(row, ["이름", "name", "고객명", "First Name", "Last Name", "Display Name"])
+            phone = _get(row, ["전화번호", "phone", "연락처", "Phone 1 - Value", "Phone", "Mobile"])
             age = _get(row, ["나이", "age"])
             gender = _get(row, ["성별", "gender"])
             occupation = _get(row, ["직업", "occupation"])
