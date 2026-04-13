@@ -13,9 +13,6 @@ _TMPL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates"
 TEMPLATE_6 = os.path.join(_TMPL_DIR, "master_template.xlsx")
 TEMPLATE_12 = os.path.join(_TMPL_DIR, "master_template_12.xlsx")
 
-# 템플릿에 보장기간 행(Row 7)이 삽입되어 기존 데이터 행이 +1 이동
-_OFF = 1
-
 
 def safe_val(ws, row, col, value):
     cell = ws.cell(row=row, column=col)
@@ -42,7 +39,7 @@ def _cfg_6():
         "template": TEMPLATE_6, "max": 6,
         "col_idx": COL_IDX, "col_ltrs": COL_LTRS,
         "data_end": 8, "sum_col": 9, "max_col": 9,
-        "review_start": 80 + _OFF, "review_count": 6,
+        "review_start": 80, "review_count": 6,
     }
 
 
@@ -51,7 +48,7 @@ def _cfg_12():
         "template": TEMPLATE_12, "max": 12,
         "col_idx": COL_IDX_12, "col_ltrs": COL_LTRS_12,
         "data_end": 14, "sum_col": 15, "max_col": 15,
-        "review_start": 80 + _OFF, "review_count": 12,
+        "review_start": 80, "review_count": 12,
     }
 
 
@@ -103,11 +100,11 @@ def _clear_values(ws, cfg):
     rc = cfg["review_count"]
     ranges = [
         (1, 1, 1, mc),
-        (3, 3, 8, de),                                  # 헤더 3~8
-        (9 + _OFF, 3, 74 + _OFF, de),                   # 데이터 영역
-        (9 + _OFF, sc, 74 + _OFF, sc),                   # 합계 컬럼
-        (77 + _OFF, 3, 77 + _OFF, mc),                   # 총납입 행
-        (rs, 1, rs + rc - 1, mc),                        # 리뷰 영역
+        (3, 3, 7, de),
+        (9, 3, 74, de),
+        (9, sc, 74, sc),
+        (77, 3, 77, mc),
+        (rs, 1, rs + rc - 1, mc),
     ]
     for r_s, c_s, r_e, c_e in ranges:
         for r in range(r_s, r_e + 1):
@@ -132,10 +129,14 @@ def _fill_header(ws, slice_data, cfg):
         safe_val(ws, 5, col, c.get("_납입기간", "") or c.get("보장나이", ""))
         paid_m = c.get("_납입개월", 0)
         total_m = c.get("_총납입개월", 0)
-        safe_val(ws, 6, col, f"{paid_m}/{total_m}" if total_m else None)
         coverage_period = c.get("보장나이", "")
-        safe_val(ws, 7, col, coverage_period if coverage_period else None)
-        safe_val(ws, 8, col, c.get("월보험료", 0))
+        if total_m and coverage_period:
+            safe_val(ws, 6, col, f"{paid_m}/{total_m}\n({coverage_period})")
+        elif total_m:
+            safe_val(ws, 6, col, f"{paid_m}/{total_m}")
+        elif coverage_period:
+            safe_val(ws, 6, col, coverage_period)
+        safe_val(ws, 7, col, c.get("월보험료", 0))
 
 
 def _fill_coverage(ws, slice_data, cfg):
@@ -147,7 +148,7 @@ def _fill_coverage(ws, slice_data, cfg):
         for row_str, amount in row_data.items():
             row_num = int(row_str)
             if row_num in DATA_ROWS:
-                safe_val(ws, row_num + _OFF, col, amount if amount else None)
+                safe_val(ws, row_num, col, amount if amount else None)
 
 
 def _fill_sums(ws, contracts, cfg):
@@ -157,22 +158,22 @@ def _fill_sums(ws, contracts, cfg):
     for row_num in DATA_ROWS:
         total = 0
         for c in range(col_start, col_end):
-            cell = ws.cell(row=row_num + _OFF, column=c)
+            cell = ws.cell(row=row_num, column=c)
             if cell.__class__.__name__ != "MergedCell":
                 if isinstance(cell.value, (int, float)):
                     total += cell.value
-        safe_val(ws, row_num + _OFF, sc, total if total > 0 else None)
+        safe_val(ws, row_num, sc, total if total > 0 else None)
 
-    # Row 8 월보험료 합계
+    # Row 7 월보험료 합계
     prem_total = 0
     for c in range(col_start, col_end):
-        cell = ws.cell(row=8, column=c)
+        cell = ws.cell(row=7, column=c)
         if cell.__class__.__name__ != "MergedCell":
             if isinstance(cell.value, (int, float)):
                 prem_total += cell.value
-    safe_val(ws, 8, sc, prem_total if prem_total > 0 else None)
+    safe_val(ws, 7, sc, prem_total if prem_total > 0 else None)
 
-    # Row 78 총납입 = 월보험료 × 총납입개월
+    # Row 77 총납입 = 월보험료 × 총납입개월
     col_idx = cfg["col_idx"]
     total_paid = 0
     for ct in contracts:
@@ -181,9 +182,9 @@ def _fill_sums(ws, contracts, cfg):
         months = ct.get("_총납입개월", 0)
         if prem and months:
             val = int(prem * months)
-            safe_val(ws, 77 + _OFF, col, val)
+            safe_val(ws, 77, col, val)
             total_paid += val
-    safe_val(ws, 77 + _OFF, sc, total_paid if total_paid > 0 else None)
+    safe_val(ws, 77, sc, total_paid if total_paid > 0 else None)
 
 
 def _short_name(contract):
@@ -252,7 +253,7 @@ def _final_format(ws, cfg):
                 italic=old.italic if old.italic else False,
                 color=old.color,
             )
-        if r in (3, 7):
+        if r in (3, 6):
             for c in range(3, de + 1):
                 cell = ws.cell(row=r, column=c)
                 if cell.__class__.__name__ != "MergedCell":
