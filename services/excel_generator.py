@@ -154,38 +154,26 @@ def _fill_coverage(ws, slice_data, cfg):
 
 def _fill_sums(ws, contracts, cfg):
     sc = cfg["sum_col"]
-    col_start, col_end = 3, cfg["data_end"] + 1
+    from openpyxl.utils import get_column_letter
+    start_ltr = get_column_letter(3)                    # C
+    end_ltr = get_column_letter(cfg["data_end"])        # H or N
 
+    # 데이터 행 합계 — SUM 수식
     for row_num in DATA_ROWS:
-        total = 0
-        for c in range(col_start, col_end):
-            cell = ws.cell(row=row_num, column=c)
-            if cell.__class__.__name__ != "MergedCell":
-                if isinstance(cell.value, (int, float)):
-                    total += cell.value
-        safe_val(ws, row_num, sc, total if total > 0 else None)
+        safe_val(ws, row_num, sc, f"=SUM({start_ltr}{row_num}:{end_ltr}{row_num})")
 
-    # Row 7 월보험료 합계
-    prem_total = 0
-    for c in range(col_start, col_end):
-        cell = ws.cell(row=7, column=c)
-        if cell.__class__.__name__ != "MergedCell":
-            if isinstance(cell.value, (int, float)):
-                prem_total += cell.value
-    safe_val(ws, 7, sc, prem_total if prem_total > 0 else None)
+    # Row 7 월보험료 합계 — SUM 수식
+    safe_val(ws, 7, sc, f"=SUM({start_ltr}7:{end_ltr}7)")
 
-    # Row 77 총납입 = 월보험료 × 총납입개월
+    # Row 77 총납입 = 월보험료 × 총납입개월 (개별 계산 후 합계는 SUM)
     col_idx = cfg["col_idx"]
-    total_paid = 0
     for ct in contracts:
         col = col_idx.get(ct["열"], 3)
         prem = ct.get("월보험료", 0)
         months = ct.get("_총납입개월", 0)
         if prem and months:
-            val = int(prem * months)
-            safe_val(ws, 77, col, val)
-            total_paid += val
-    safe_val(ws, 77, sc, total_paid if total_paid > 0 else None)
+            safe_val(ws, 77, col, int(prem * months))
+    safe_val(ws, 77, sc, f"=SUM({start_ltr}77:{end_ltr}77)")
 
 
 def _short_name(contract):
