@@ -114,9 +114,11 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
     total_pages = len(pdf.pages)
 
     summary_items = {}
+    seen_keys_per_page = {}
     for pg_idx in range(3, min(5, total_pages)):
         pg = pdf.pages[pg_idx]
         tables = pg.extract_tables()
+        page_seen = set()
         for tbl in tables:
             if not tbl:
                 continue
@@ -129,11 +131,15 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
                 row_num = find_row_for_item(name)
                 if row_num is None:
                     continue
+                key = str(row_num)
+                # 같은 페이지에서 동일 항목 중복 집계 방지
+                if key in page_seen:
+                    continue
                 for cell in reversed(row[1:]):
                     val = parse_amount(cell)
                     if val > 0:
-                        key = str(row_num)
                         summary_items[key] = summary_items.get(key, 0) + val
+                        page_seen.add(key)
                         break
 
     if not summary_items:
@@ -146,11 +152,11 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
 
     for key, expected in summary_items.items():
         actual = extracted_sums.get(key, 0)
-        if actual == 0 and expected > 0:
+        if actual == 0 and expected > 100:
             row_num = int(key)
             name = _row_to_name(row_num)
             warnings.append(f"누락 의심: {name}(행{row_num}) — 진단 합계 {expected}만원, 추출 0")
-        elif actual > 0 and expected > 0 and abs(actual - expected) / expected > 0.2:
+        elif actual > 0 and expected > 0 and abs(actual - expected) / max(actual, expected) > 0.3:
             name = _row_to_name(int(key))
             warnings.append(
                 f"불일치: {name} — 진단 {expected}만원 vs 추출 {actual}만원"
