@@ -207,7 +207,14 @@ def render_recent_activity(fc_id: str):
         return
     for log in logs:
         c = log.get("clients") or {}
-        st.caption(f"{log.get('created_at','')[:10]} | {c.get('name','')} | {log.get('touch_method','')} | {(log.get('memo') or '')[:30]}")
+        memo = (log.get("memo") or "")[:80]
+        with st.container(border=True):
+            st.caption(
+                f"**{c.get('name', '')}** · {log.get('touch_method', '')} · "
+                f"{log.get('created_at', '')[:10]}"
+            )
+            if memo:
+                st.caption(memo)
 
 
 def _render_quick_activity(fc_id: str, sb):
