@@ -94,10 +94,12 @@ def _parse_contracts(p3) -> list:
             if not row or len(row) < 12:
                 continue
             r0 = (row[0] or "").strip()
-            if not any(k in r0 for k in INSURER_KEYWORDS):
+            if not r0 or r0 in ("보험회사", "보험사", "회사명", "구분"):
                 continue
-
             product = (row[1] or "").strip()
+            # 상품명 없거나 헤더행이면 스킵
+            if not product or product in ("상품명", "보험상품명"):
+                continue
 
             idx = len(all_contracts)
             col_ltr = COL_LTRS_EXT[idx] if idx < len(COL_LTRS_EXT) else "L"
