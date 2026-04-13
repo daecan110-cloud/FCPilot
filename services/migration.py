@@ -69,7 +69,7 @@ def migrate_clients_csv(csv_bytes: bytes) -> dict:
                 "occupation": (occupation or "").strip(),
                 "address": (address or "").strip(),
                 "prospect_grade": grade_val,
-                "source": (source or "").strip(),
+                "db_source": (source or "").strip(),
                 "memo": (memo or "").strip(),
             }).execute()
             success += 1
