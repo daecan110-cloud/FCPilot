@@ -101,7 +101,7 @@ def _clear_values(ws, cfg):
     rc = cfg["review_count"]
     ranges = [
         (1, 1, 1, mc),
-        (3, 3, 7, de),
+        (3, 3, 8, de),
         (9, 3, 74, de),
         (9, sc, 74, sc),
         (77, 3, 77, mc),
@@ -131,7 +131,10 @@ def _fill_header(ws, slice_data, cfg):
         paid_m = c.get("_납입개월", 0)
         total_m = c.get("_총납입개월", 0)
         safe_val(ws, 6, col, f"{paid_m}/{total_m}" if total_m else None)
-        safe_val(ws, 7, col, c.get("월보험료", 0))
+        # 보장기간 (종신 / N세만기)
+        coverage_period = c.get("보장나이", "")
+        safe_val(ws, 7, col, coverage_period if coverage_period else None)
+        safe_val(ws, 8, col, c.get("월보험료", 0))
 
 
 def _fill_coverage(ws, slice_data, cfg):
@@ -159,14 +162,14 @@ def _fill_sums(ws, contracts, cfg):
                     total += cell.value
         safe_val(ws, row_num, sc, total if total > 0 else None)
 
-    # Row 7 월보험료 합계
+    # Row 8 월보험료 합계
     prem_total = 0
     for c in range(col_start, col_end):
-        cell = ws.cell(row=7, column=c)
+        cell = ws.cell(row=8, column=c)
         if cell.__class__.__name__ != "MergedCell":
             if isinstance(cell.value, (int, float)):
                 prem_total += cell.value
-    safe_val(ws, 7, sc, prem_total if prem_total > 0 else None)
+    safe_val(ws, 8, sc, prem_total if prem_total > 0 else None)
 
     # Row 77 총납입 = 월보험료 × 총납입개월
     col_idx = cfg["col_idx"]
