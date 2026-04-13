@@ -41,6 +41,9 @@ def migrate_clients_csv(csv_bytes: bytes) -> dict:
                 errors.append(f"행 {i}: 이름 없음")
                 continue
 
+            # 전화번호 정규화 (010-xxx-xxxxx → 010-xxxx-xxxx)
+            phone = _normalize_phone(phone)
+
             # 전화번호 암호화
             phone_enc = encrypt_phone(phone) if phone else ""
             phone_hash = hash_phone_last4(phone) if phone else ""
@@ -81,6 +84,16 @@ def migrate_clients_csv(csv_bytes: bytes) -> dict:
                 errors.append(f"행 {i}: 저장 실패 — 관리자에게 문의하세요.")
 
     return {"success": success, "errors": errors}
+
+
+def _normalize_phone(phone: str) -> str:
+    """전화번호 정규화 → 010-XXXX-XXXX 형식"""
+    if not phone:
+        return ""
+    digits = phone.replace("-", "").replace(" ", "")
+    if len(digits) == 11 and digits.startswith("010"):
+        return f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+    return phone
 
 
 def _get(row: dict, keys: list) -> str:
