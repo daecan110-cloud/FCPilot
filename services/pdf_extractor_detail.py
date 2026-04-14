@@ -99,8 +99,9 @@ def _apply_detail_item(name: str, amount_str: str, contract_idx: int, coverage_r
     if amount_won <= 0:
         return
     amount_man = amount_won // 10000
+    # 만원 변환 시 0이면 → 이미 만원 단위일 가능성 (실비 5,000 등)
     if amount_man <= 0:
-        return
+        amount_man = amount_won
 
     key = str(row_num)
     existing = coverage_raw[contract_idx].get(key, 0)
