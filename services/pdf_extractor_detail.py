@@ -141,6 +141,10 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
                 # 같은 페이지에서 동일 항목 중복 집계 방지
                 if key in page_seen:
                     continue
+                # "미가입" 항목은 건너뛰기 (필요보장만 있고 실제 가입 안됨)
+                row_text = " ".join(str(c or "") for c in row)
+                if "미가입" in row_text:
+                    continue
                 for cell in reversed(row[1:]):
                     val = parse_amount(cell)
                     if val > 0:

@@ -62,6 +62,7 @@ def _fill_workbook(slice_data):
     _fill_header(ws, slice_data)
     _fill_coverage(ws, slice_data)
     _fill_sums(ws, contracts)
+    _fill_renewal(ws, contracts)
     _fill_review(ws, contracts)
     _final_format(ws)
 
@@ -123,7 +124,9 @@ def _fill_header(ws, slice_data):
         # Row 6: 총납입개월 (남은 개월)
         paid_m = c.get("_납입개월", 0)
         total_m = c.get("_총납입개월", 0)
-        safe_val(ws, 6, col, f"{paid_m}/{total_m}" if total_m else None)
+        if total_m:
+            remain = total_m - paid_m
+            safe_val(ws, 6, col, f"{paid_m}/{total_m}\n(남은 {remain}개월)")
         # Row 7: 월보험료
         safe_val(ws, 7, col, c.get("월보험료", 0))
 
@@ -183,6 +186,46 @@ def _fill_sums(ws, contracts):
         col_l = get_column_letter(col)
         safe_val(ws, 77, col, f"={col_l}75+{col_l}76")
     safe_val(ws, 77, SUM_COL, f"=SUM({start_ltr}77:{end_ltr}77)")
+
+
+def _fill_renewal(ws, contracts):
+    """Row 80 갱신 구분, Row 81 보험료 변화 예고"""
+    for i, ct in enumerate(contracts):
+        col = COL_IDX.get(ct["열"], 4)
+        name = ct.get("상품명", "")
+        period = ct.get("보장나이", "")
+        prem = ct.get("월보험료", 0)
+        total_m = ct.get("_총납입개월", 0)
+        paid_m = ct.get("_납입개월", 0)
+
+        # 갱신형 판별
+        if "갱신" in name:
+            renewal = "갱신형 ⚠️"
+        elif total_m and total_m <= 12:
+            renewal = "단기계약\n갱신없음"
+        else:
+            renewal = "비갱신형 ✅"
+        safe_val(ws, 80, col, renewal)
+
+        # 보험료 변화 예고
+        if prem == 0:
+            if paid_m >= total_m and total_m > 0:
+                notice = "납입완료"
+            else:
+                notice = "납입완료"
+        elif "갱신" in name:
+            notice = "갱신 시\n보험료 변동 예상 ⚠️"
+        elif total_m and total_m <= 12:
+            notice = "만기 소멸 예정"
+        else:
+            remain = total_m - paid_m if total_m else 0
+            if remain <= 0:
+                notice = "납입완료 예정"
+            elif remain <= 24:
+                notice = f"약 {remain}개월 후\n납입완료 예정"
+            else:
+                notice = "변동 없음"
+        safe_val(ws, 81, col, notice)
 
 
 def _short_name(contract):
