@@ -42,6 +42,8 @@ def _make_slice(base, contracts, coverage_raw):
         nc["_납입기간"] = c.get("_납입기간", "")
         nc["_납입개월"] = c.get("_납입개월", 0)
         nc["_총납입개월"] = c.get("_총납입개월", 0)
+        nc["_paid"] = c.get("_paid", 0)
+        nc["_topay"] = c.get("_topay", 0)
         data["계약"].append(nc)
         if c["_idx"] in coverage_raw:
             data["보장금액"][col] = coverage_raw[c["_idx"]]
@@ -149,24 +151,30 @@ def _fill_sums(ws, contracts):
     # Row 7 월보험료 합계
     safe_val(ws, 7, SUM_COL, f"=SUM({start_ltr}7:{end_ltr}7)")
 
-    # Row 75 기납입보험료 = 월보험료 × 납입개월
+    # Row 75 기납입보험료 — PDF 추출값 우선, 없으면 계산
     for ct in contracts:
         col = COL_IDX.get(ct["열"], 4)
-        prem = ct.get("월보험료", 0)
-        paid_m = ct.get("_납입개월", 0)
-        if prem and paid_m:
-            safe_val(ws, 75, col, int(prem * paid_m))
+        paid_amt = ct.get("_paid", 0)
+        if not paid_amt:
+            prem = ct.get("월보험료", 0)
+            paid_m = ct.get("_납입개월", 0)
+            paid_amt = int(prem * paid_m) if prem and paid_m else 0
+        if paid_amt:
+            safe_val(ws, 75, col, paid_amt)
     safe_val(ws, 75, SUM_COL, f"=SUM({start_ltr}75:{end_ltr}75)")
 
-    # Row 76 납입할보험료 = 월보험료 × 남은개월
+    # Row 76 납입할보험료 — PDF 추출값 우선, 없으면 계산
     for ct in contracts:
         col = COL_IDX.get(ct["열"], 4)
-        prem = ct.get("월보험료", 0)
-        total_m = ct.get("_총납입개월", 0)
-        paid_m = ct.get("_납입개월", 0)
-        remain = total_m - paid_m
-        if prem and remain > 0:
-            safe_val(ws, 76, col, int(prem * remain))
+        topay_amt = ct.get("_topay", 0)
+        if not topay_amt:
+            prem = ct.get("월보험료", 0)
+            total_m = ct.get("_총납입개월", 0)
+            paid_m = ct.get("_납입개월", 0)
+            remain = total_m - paid_m
+            topay_amt = int(prem * remain) if prem and remain > 0 else 0
+        if topay_amt:
+            safe_val(ws, 76, col, topay_amt)
     safe_val(ws, 76, SUM_COL, f"=SUM({start_ltr}76:{end_ltr}76)")
 
     # Row 77 총납입보험료 = 기납입 + 납입할

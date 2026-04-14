@@ -47,12 +47,17 @@ def _do_extract(pdf) -> dict:
     if m:
         result["고객명"] = m.group(1)
 
-    # Page 3: 계약현황
+    # Page 3(+4): 계약현황 — 다건 계약 시 Page 4까지 연장
     if len(pdf.pages) < 3:
         return result
     p3 = pdf.pages[2]
     p3_text = p3.extract_text() or ""
-    all_contracts = _parse_contracts(p3)
+    extra_pages = []
+    if len(pdf.pages) > 3:
+        p4_text = pdf.pages[3].extract_text() or ""
+        if "계약현황" in p4_text or "보유계약" in p4_text:
+            extra_pages.append(pdf.pages[3])
+    all_contracts = _parse_contracts(p3, extra_pages)
 
     # 성별/나이
     _extract_demographics(result, pdf, p1_text, p3_text)
@@ -83,55 +88,127 @@ def _do_extract(pdf) -> dict:
     return result
 
 
-def _parse_contracts(p3) -> list:
-    """Page 3 테이블에서 계약 파싱 (중복 제거 없음 — 동일 상품 복수 가입 허용)"""
-    tables3 = p3.extract_tables()
+def _parse_contracts(p3, extra_pages=None) -> list:
+    """계약현황 테이블에서 계약 파싱 (다중 페이지, 열 레이아웃 자동 감지)"""
     all_contracts = []
+    pages = [p3] + (extra_pages or [])
 
-    for tbl in tables3:
-        if not tbl or len(tbl) < 4:
-            continue
-        for row in tbl:
-            if not row or len(row) < 12:
+    for pg in pages:
+        tables = pg.extract_tables()
+        for tbl in tables:
+            if not tbl or len(tbl) < 3:
                 continue
-            r0 = (row[0] or "").strip()
-            if not r0 or r0 in ("보험회사", "보험사", "회사명", "구분"):
+            layout = _detect_table_layout(tbl)
+            if not layout:
                 continue
-            product = (row[1] or "").strip()
-            # 상품명 없거나 헤더행이면 스킵
-            if not product or product in ("상품명", "보험상품명"):
-                continue
-
-            idx = len(all_contracts)
-            col_ltr = COL_LTRS_EXT[idx] if idx < len(COL_LTRS_EXT) else "L"
-            start = (row[4] or "").strip() if len(row) > 4 else ""
-            end_age = (row[6] or "").strip() if len(row) > 6 else ""
-            end_month = (row[5] or "").strip() if len(row) > 5 else ""
-            premium = int(re.sub(r"[^\d]", "", row[11] or "0") or "0") if len(row) > 11 else 0
-            paid_amt = int(re.sub(r"[^\d]", "", row[12] or "0") or "0") if len(row) > 12 else 0
-            topay_amt = int(re.sub(r"[^\d]", "", row[13] or "0") or "0") if len(row) > 13 else 0
-            period = f"{end_age}만기" if end_age else end_month
-
-            # 납입기간 / 납입횟수 추출
-            pay_info = (row[9] or "").strip() if len(row) > 9 else ""
-            pay_count = (row[10] or "").strip() if len(row) > 10 else ""
-            납입기간 = pay_info.split("/")[-1] if "/" in pay_info else pay_info
-            납입개월 = 0
-            총납입개월 = 0
-            if "/" in pay_count:
-                parts = pay_count.split("/")
-                납입개월 = int(re.sub(r"[^\d]", "", parts[0]) or "0")
-                총납입개월 = int(re.sub(r"[^\d]", "", parts[-1]) or "0")
-
-            all_contracts.append({
-                "_idx": idx, "열": col_ltr,
-                "보험사": r0, "상품명": product,
-                "보장나이": period, "월보험료": premium,
-                "가입시기": start, "_paid": paid_amt, "_topay": topay_amt,
-                "_납입기간": 납입기간, "_납입개월": 납입개월, "_총납입개월": 총납입개월,
-            })
+            _parse_contract_table(tbl, layout, all_contracts)
 
     return all_contracts
+
+
+def _detect_table_layout(tbl):
+    """헤더 행에서 열 위치 자동 감지"""
+    for row in tbl[:3]:
+        if not row:
+            continue
+        header = [(c or "").strip() for c in row]
+        joined = "".join(header)
+        if "회사명" not in joined and "보험회사" not in joined and "보험사" not in joined:
+            continue
+        ci = pi = si = pmi = pai = toi = pii = pci = None
+        for i, h in enumerate(header):
+            if h in ("회사명", "보험회사", "보험사"):
+                ci = i
+            elif h in ("상품명", "보험상품명"):
+                pi = i
+            elif "계약월" in h or "계약일" in h:
+                si = i
+            elif "보험료" in h:
+                pmi = i
+        if ci is not None and pi is not None:
+            ncols = len(header)
+            return {"company": ci, "product": pi, "ncols": ncols,
+                    "start": si, "premium": pmi}
+    return None
+
+
+def _parse_contract_table(tbl, layout, all_contracts):
+    """감지된 레이아웃으로 계약 행 파싱"""
+    ci_col = layout["company"]
+    pi_col = layout["product"]
+    ncols = layout["ncols"]
+
+    for row in tbl:
+        if not row or len(row) < 6:
+            continue
+        company = (row[ci_col] or "").strip()
+        if not company:
+            continue
+        # 헤더/면책 행 필터
+        if company in ("보험회사", "보험사", "회사명", "구분"):
+            continue
+        if company.startswith("※"):
+            continue
+        product = (row[pi_col] or "").strip()
+        if not product or product in ("상품명", "보험상품명"):
+            continue
+
+        # 열 위치 결정 (16열 vs 12~14열)
+        # 16열: col[1]이 빈 열 → 전체 +1 shift
+        # 12~14열: 동일 레이아웃
+        if ncols >= 16:
+            # 16열: 회사[0] (빈)[1] 상품[2] 상태[3] 계약자[4]
+            #   계약월[5] 만기월[6] 만기나이[7] 납완월[8] 납완나이[9]
+            #   주기/기간[10] 횟수[11] 월보[12] 납입한[13] 납입할[14]
+            start = _cell(row, 5)
+            end_age = _cell(row, 7)
+            end_month = _cell(row, 6)
+            pay_info = _cell(row, 10)
+            pay_count = _cell(row, 11)
+            premium = _parse_int(row, 12)
+            paid_amt = _parse_int(row, 13)
+            topay_amt = _parse_int(row, 14)
+        else:
+            # 12~14열: 회사[0] 상품[1] 상태[2] 계약자[3]
+            #   계약월[4] 만기월[5] 만기나이[6] 납완월[7] 납완나이[8]
+            #   주기/기간[9] 횟수[10] 월보[11] 납입한[12] 납입할[13]
+            start = _cell(row, 4)
+            end_age = _cell(row, 6)
+            end_month = _cell(row, 5)
+            pay_info = _cell(row, 9)
+            pay_count = _cell(row, 10)
+            premium = _parse_int(row, 11)
+            paid_amt = _parse_int(row, 12)
+            topay_amt = _parse_int(row, 13)
+
+        period = f"{end_age}만기" if end_age else end_month
+        납입기간 = pay_info.split("/")[-1] if "/" in pay_info else pay_info
+        납입개월 = 0
+        총납입개월 = 0
+        if "/" in pay_count:
+            parts = pay_count.split("/")
+            납입개월 = int(re.sub(r"[^\d]", "", parts[0]) or "0")
+            총납입개월 = int(re.sub(r"[^\d]", "", parts[-1]) or "0")
+
+        idx = len(all_contracts)
+        col_ltr = COL_LTRS_EXT[idx] if idx < len(COL_LTRS_EXT) else "L"
+        all_contracts.append({
+            "_idx": idx, "열": col_ltr,
+            "보험사": company, "상품명": product,
+            "보장나이": period, "월보험료": premium,
+            "가입시기": start, "_paid": paid_amt, "_topay": topay_amt,
+            "_납입기간": 납입기간, "_납입개월": 납입개월, "_총납입개월": 총납입개월,
+        })
+
+
+def _cell(row, idx):
+    return (row[idx] or "").strip() if idx < len(row) else ""
+
+
+def _parse_int(row, idx):
+    if idx >= len(row):
+        return 0
+    return int(re.sub(r"[^\d]", "", row[idx] or "0") or "0")
 
 
 def _extract_demographics(result: dict, pdf, p1_text: str, p3_text: str):
