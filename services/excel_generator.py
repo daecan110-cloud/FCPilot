@@ -1,17 +1,16 @@
-"""보장분석 엑셀 생성기 — 6/12상품 자동 선택 (2026-04)"""
+"""보장분석 엑셀 생성기 — v10 양식 7상품 (2026-04)"""
 import io
 import os
 import shutil
 import tempfile
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment
-from services.item_map import (
-    COL_IDX, COL_LTRS, COL_IDX_12, COL_LTRS_12, DATA_ROWS,
-)
+from services.item_map import COL_IDX, COL_LTRS, SUM_COL, DATA_ROWS
 
 _TMPL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
-TEMPLATE_6 = os.path.join(_TMPL_DIR, "master_template.xlsx")
-TEMPLATE_12 = os.path.join(_TMPL_DIR, "master_template_12.xlsx")
+TEMPLATE = os.path.join(_TMPL_DIR, "master_template.xlsx")
+
+_FONT_NAME = "KoPubWorld돋움체 Bold"
 
 
 def safe_val(ws, row, col, value):
@@ -25,41 +24,19 @@ def generate_analysis_excel(data: dict, **_kw) -> list[tuple[str, bytes]]:
     coverage_raw = data.get("_coverage_raw", {})
     customer = data.get("고객명", "고객")
 
-    use_12 = len(all_contracts) > 6
-    cfg = _cfg_12() if use_12 else _cfg_6()
-    contracts = all_contracts[:cfg["max"]]
-
-    sd = _make_slice(data, contracts, coverage_raw, cfg)
-    b = _fill_workbook(sd, cfg)
+    contracts = all_contracts[:7]
+    sd = _make_slice(data, contracts, coverage_raw)
+    b = _fill_workbook(sd)
     return [(f"{customer}_보장분석표.xlsx", b)]
 
 
-def _cfg_6():
-    return {
-        "template": TEMPLATE_6, "max": 6,
-        "col_idx": COL_IDX, "col_ltrs": COL_LTRS,
-        "data_end": 8, "sum_col": 9, "max_col": 9,
-        "review_start": 82, "review_count": 6,
-    }
-
-
-def _cfg_12():
-    return {
-        "template": TEMPLATE_12, "max": 12,
-        "col_idx": COL_IDX_12, "col_ltrs": COL_LTRS_12,
-        "data_end": 14, "sum_col": 15, "max_col": 15,
-        "review_start": 82, "review_count": 12,
-    }
-
-
-def _make_slice(base, contracts, coverage_raw, cfg):
-    col_ltrs = cfg["col_ltrs"]
+def _make_slice(base, contracts, coverage_raw):
     data = {
         "고객명": base["고객명"], "성별": base["성별"], "나이": base["나이"],
         "계약": [], "보장금액": {},
     }
     for new_i, c in enumerate(contracts):
-        col = col_ltrs[new_i]
+        col = COL_LTRS[new_i]
         nc = {k: v for k, v in c.items() if not k.startswith("_")}
         nc["열"] = col
         nc["_납입기간"] = c.get("_납입기간", "")
@@ -71,20 +48,20 @@ def _make_slice(base, contracts, coverage_raw, cfg):
     return data
 
 
-def _fill_workbook(slice_data, cfg):
+def _fill_workbook(slice_data):
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp.close()
-    shutil.copy(cfg["template"], tmp.name)
+    shutil.copy(TEMPLATE, tmp.name)
     wb = load_workbook(tmp.name)
     ws = wb.active
 
     contracts = slice_data.get("계약", [])
-    _clear_values(ws, cfg)
-    _fill_header(ws, slice_data, cfg)
-    _fill_coverage(ws, slice_data, cfg)
-    _fill_sums(ws, contracts, cfg)
-    _fill_review(ws, contracts, cfg)
-    _final_format(ws, cfg)
+    _clear_values(ws)
+    _fill_header(ws, slice_data)
+    _fill_coverage(ws, slice_data)
+    _fill_sums(ws, contracts)
+    _fill_review(ws, contracts)
+    _final_format(ws)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -92,19 +69,22 @@ def _fill_workbook(slice_data, cfg):
     return buf.getvalue()
 
 
-def _clear_values(ws, cfg):
-    mc = cfg["max_col"]
-    de = cfg["data_end"]
-    sc = cfg["sum_col"]
-    rs = cfg["review_start"]
-    rc = cfg["review_count"]
+# v10: D~J(col 4~10), K=합계(col 11)
+_DATA_START = 4   # D
+_DATA_END = 10    # J
+_MAX_COL = 11     # K
+_REVIEW_START = 85
+_REVIEW_COUNT = 7
+
+
+def _clear_values(ws):
     ranges = [
-        (1, 1, 1, mc),
-        (3, 3, 7, de),
-        (9, 3, 76, de),
-        (9, sc, 76, sc),
-        (79, 3, 79, mc),
-        (rs, 1, rs + rc - 1, mc),
+        (1, 1, 1, _MAX_COL),           # 제목
+        (3, _DATA_START, 7, _DATA_END), # 상품정보 (Row 3~7, D~J)
+        (9, _DATA_START, 74, _DATA_END),# 보장금액
+        (9, SUM_COL, 74, SUM_COL),      # K열 합계
+        (75, _DATA_START, 77, _MAX_COL),# 보험료
+        (_REVIEW_START, 1, _REVIEW_START + _REVIEW_COUNT - 1, _MAX_COL),
     ]
     for r_s, c_s, r_e, c_e in ranges:
         for r in range(r_s, r_e + 1):
@@ -114,18 +94,22 @@ def _clear_values(ws, cfg):
                     cell.value = None
 
 
-def _fill_header(ws, slice_data, cfg):
+def _fill_header(ws, slice_data):
     customer = slice_data.get("고객명", "고객")
     gender = slice_data.get("성별", "남")
     age = slice_data.get("나이", 0)
     gender_full = "남자" if gender == "남" else "여자"
     safe_val(ws, 1, 1, f"{customer}님 ({gender_full}, {age}세) · 보장 분석표")
 
-    col_idx = cfg["col_idx"]
     for c in slice_data.get("계약", []):
-        col = col_idx.get(c["열"], 3)
-        safe_val(ws, 3, col, f"{c.get('상품명', '')}\n({c.get('보험사', '')})")
+        col = COL_IDX.get(c["열"], 4)
+        # Row 2: 가입회사 (C열 헤더에 이미 있으므로 D~J에 회사명)
+        safe_val(ws, 2, col, c.get("보험사", ""))
+        # Row 3: 상품명
+        safe_val(ws, 3, col, c.get("상품명", ""))
+        # Row 4: 가입년,월
         safe_val(ws, 4, col, c.get("가입시기", ""))
+        # Row 5: 납입기간 (보장기간)
         납입기간 = c.get("_납입기간", "")
         coverage_period = c.get("보장나이", "")
         if 납입기간 and coverage_period:
@@ -134,16 +118,17 @@ def _fill_header(ws, slice_data, cfg):
             safe_val(ws, 5, col, 납입기간)
         else:
             safe_val(ws, 5, col, coverage_period or None)
+        # Row 6: 총납입개월 (남은 개월)
         paid_m = c.get("_납입개월", 0)
         total_m = c.get("_총납입개월", 0)
         safe_val(ws, 6, col, f"{paid_m}/{total_m}" if total_m else None)
+        # Row 7: 월보험료
         safe_val(ws, 7, col, c.get("월보험료", 0))
 
 
-def _fill_coverage(ws, slice_data, cfg):
-    col_idx = cfg["col_idx"]
+def _fill_coverage(ws, slice_data):
     for col_ltr, row_data in slice_data.get("보장금액", {}).items():
-        col = col_idx.get(col_ltr)
+        col = COL_IDX.get(col_ltr)
         if not col:
             continue
         for row_str, amount in row_data.items():
@@ -152,28 +137,44 @@ def _fill_coverage(ws, slice_data, cfg):
                 safe_val(ws, row_num, col, amount if amount else None)
 
 
-def _fill_sums(ws, contracts, cfg):
-    sc = cfg["sum_col"]
+def _fill_sums(ws, contracts):
     from openpyxl.utils import get_column_letter
-    start_ltr = get_column_letter(3)                    # C
-    end_ltr = get_column_letter(cfg["data_end"])        # H or N
+    start_ltr = get_column_letter(_DATA_START)   # D
+    end_ltr = get_column_letter(_DATA_END)        # J
 
-    # 데이터 행 합계 — SUM 수식
+    # 데이터 행 합계
     for row_num in DATA_ROWS:
-        safe_val(ws, row_num, sc, f"=SUM({start_ltr}{row_num}:{end_ltr}{row_num})")
+        safe_val(ws, row_num, SUM_COL, f"=SUM({start_ltr}{row_num}:{end_ltr}{row_num})")
 
-    # Row 7 월보험료 합계 — SUM 수식
-    safe_val(ws, 7, sc, f"=SUM({start_ltr}7:{end_ltr}7)")
+    # Row 7 월보험료 합계
+    safe_val(ws, 7, SUM_COL, f"=SUM({start_ltr}7:{end_ltr}7)")
 
-    # Row 77 총납입 = 월보험료 × 총납입개월 (개별 계산 후 합계는 SUM)
-    col_idx = cfg["col_idx"]
+    # Row 75 기납입보험료 = 월보험료 × 납입개월
     for ct in contracts:
-        col = col_idx.get(ct["열"], 3)
+        col = COL_IDX.get(ct["열"], 4)
         prem = ct.get("월보험료", 0)
-        months = ct.get("_총납입개월", 0)
-        if prem and months:
-            safe_val(ws, 79, col, int(prem * months))
-    safe_val(ws, 79, sc, f"=SUM({start_ltr}79:{end_ltr}79)")
+        paid_m = ct.get("_납입개월", 0)
+        if prem and paid_m:
+            safe_val(ws, 75, col, int(prem * paid_m))
+    safe_val(ws, 75, SUM_COL, f"=SUM({start_ltr}75:{end_ltr}75)")
+
+    # Row 76 납입할보험료 = 월보험료 × 남은개월
+    for ct in contracts:
+        col = COL_IDX.get(ct["열"], 4)
+        prem = ct.get("월보험료", 0)
+        total_m = ct.get("_총납입개월", 0)
+        paid_m = ct.get("_납입개월", 0)
+        remain = total_m - paid_m
+        if prem and remain > 0:
+            safe_val(ws, 76, col, int(prem * remain))
+    safe_val(ws, 76, SUM_COL, f"=SUM({start_ltr}76:{end_ltr}76)")
+
+    # Row 77 총납입보험료 = 기납입 + 납입할
+    for c_ltr in COL_LTRS:
+        col = COL_IDX[c_ltr]
+        col_l = get_column_letter(col)
+        safe_val(ws, 77, col, f"={col_l}75+{col_l}76")
+    safe_val(ws, 77, SUM_COL, f"=SUM({start_ltr}77:{end_ltr}77)")
 
 
 def _short_name(contract):
@@ -187,15 +188,23 @@ def _short_name(contract):
     for full, short in [("삼성생명보험", "삼성생명"), ("한화생명보험", "한화생명"),
                         ("새마을금고중앙회", "새마을금고"), ("현대해상화재보험", "현대해상")]:
         company = company.replace(full, short)
-    return f"{name}\n({company})"
+    return f"{company}\n{name}"
 
 
-def _fill_review(ws, contracts, cfg):
-    rs = cfg["review_start"]
+def _fill_review(ws, contracts):
     for i, c in enumerate(contracts):
-        r = rs + i
+        r = _REVIEW_START + i
+        # A:B 보험사/상품명
         safe_val(ws, r, 1, _short_name(c))
-        safe_val(ws, r, 3, _build_review(c))
+        # C 가입일/만기
+        period = c.get("보장나이", "")
+        start = c.get("가입시기", "")
+        safe_val(ws, r, 3, f"{start}\n({period})" if start else period)
+        # D 월보험료
+        prem = c.get("월보험료", 0)
+        safe_val(ws, r, 4, f"{prem:,.0f}원" if prem else "납입완료")
+        # E:H 주요 체크사항
+        safe_val(ws, r, 5, _build_review(c))
 
 
 def _build_review(contract):
@@ -224,43 +233,33 @@ def _build_review(contract):
     return " / ".join(checks)
 
 
-def _final_format(ws, cfg):
-    mc = cfg["max_col"]
-    de = cfg["data_end"]
-    rs = cfg["review_start"]
-    rc = cfg["review_count"]
+def _final_format(ws):
     for r in range(1, ws.max_row + 1):
-        for c in range(1, mc + 1):
+        for c in range(1, _MAX_COL + 1):
             cell = ws.cell(row=r, column=c)
             if cell.__class__.__name__ == "MergedCell":
                 continue
             old = cell.font
             cell.font = Font(
-                name="Malgun Gothic",
+                name=_FONT_NAME,
                 size=old.size if old.size else 9,
-                bold=old.bold if old.bold else False,
+                bold=True,
                 italic=old.italic if old.italic else False,
                 color=old.color,
             )
+        # Row 3, 5: 상품명/납입기간 — 가운데 정렬 + 줄바꿈
         if r in (3, 5):
-            if r == 5:
-                ws.row_dimensions[5].height = 30
-            for c in range(3, de + 1):
+            for c in range(_DATA_START, _DATA_END + 1):
                 cell = ws.cell(row=r, column=c)
                 if cell.__class__.__name__ != "MergedCell":
                     cell.alignment = Alignment(
-                        horizontal="center",
-                        vertical="center",
-                        wrap_text=True,
+                        horizontal="center", vertical="center", wrap_text=True,
                     )
-    # 주계약 리뷰 영역
-    for r in range(rs, rs + rc):
-        ws.row_dimensions[r].height = 33
-        for c in range(1, mc + 1):
+    # 리뷰 행 서식
+    for r in range(_REVIEW_START, _REVIEW_START + _REVIEW_COUNT):
+        for c in range(1, _MAX_COL + 1):
             cell = ws.cell(row=r, column=c)
             if cell.__class__.__name__ != "MergedCell":
                 cell.alignment = Alignment(
-                    horizontal="left",
-                    vertical="center",
-                    wrap_text=True,
+                    horizontal="left", vertical="center", wrap_text=True,
                 )

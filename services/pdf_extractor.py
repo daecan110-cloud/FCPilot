@@ -3,6 +3,7 @@ import re
 import pdfplumber
 from services.item_map import ITEM_ROW_MAP, INSURER_KEYWORDS, find_row_for_item
 
+# PDF에서 최대 9개 계약 추출, 엑셀에는 최대 7개만 사용
 COL_LTRS_EXT = ["D", "E", "F", "G", "H", "I", "J", "K", "L"]
 
 
