@@ -193,30 +193,40 @@ def _fill_renewal(ws, contracts):
     for i, ct in enumerate(contracts):
         col = COL_IDX.get(ct["열"], 4)
         name = ct.get("상품명", "")
-        period = ct.get("보장나이", "")
+        company = ct.get("보험사", "")
         prem = ct.get("월보험료", 0)
         total_m = ct.get("_총납입개월", 0)
         paid_m = ct.get("_납입개월", 0)
 
-        # 갱신형 판별
-        if "갱신" in name:
+        # 갱신형 판별 (상품명 + 보험사 유형)
+        is_renewal = "갱신" in name
+        is_short = total_m and total_m <= 12
+        # 손해보험 종합/건강보험 → 특약 갱신형 가능성 (부분 갱신형)
+        is_sonhae = any(k in company for k in ["화재", "손해", "해상"])
+        is_comprehensive = any(k in name for k in [
+            "건강", "종합", "케어", "플러스", "훼밀리", "간편",
+            "The", "NEW", "희망", "자녀", "Good",
+        ])
+
+        if is_renewal:
             renewal = "갱신형 ⚠️"
-        elif total_m and total_m <= 12:
+        elif is_short:
             renewal = "단기계약\n갱신없음"
+        elif is_sonhae and is_comprehensive:
+            renewal = "부분 갱신형 ⚠️"
         else:
             renewal = "비갱신형 ✅"
         safe_val(ws, 80, col, renewal)
 
         # 보험료 변화 예고
         if prem == 0:
-            if paid_m >= total_m and total_m > 0:
-                notice = "납입완료"
-            else:
-                notice = "납입완료"
-        elif "갱신" in name:
+            notice = "납입완료"
+        elif is_renewal:
             notice = "갱신 시\n보험료 변동 예상 ⚠️"
-        elif total_m and total_m <= 12:
+        elif is_short:
             notice = "만기 소멸 예정"
+        elif is_sonhae and is_comprehensive:
+            notice = "특약 갱신 시\n일부 변동 가능 ⚠️"
         else:
             remain = total_m - paid_m if total_m else 0
             if remain <= 0:
@@ -298,8 +308,8 @@ def _final_format(ws):
                 italic=old.italic if old.italic else False,
                 color=old.color,
             )
-        # Row 3, 5: 상품명/납입기간 — 가운데 정렬 + 줄바꿈
-        if r in (3, 5):
+        # Row 3, 5, 6: 상품명/납입기간/개월 — 가운데 정렬 + 줄바꿈
+        if r in (3, 5, 6):
             for c in range(_DATA_START, _DATA_END + 1):
                 cell = ws.cell(row=r, column=c)
                 if cell.__class__.__name__ != "MergedCell":
