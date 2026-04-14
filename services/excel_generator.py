@@ -243,6 +243,8 @@ def _final_format(ws, cfg):
                 color=old.color,
             )
         if r in (3, 5):
+            if r == 5:
+                ws.row_dimensions[5].height = 30
             for c in range(3, de + 1):
                 cell = ws.cell(row=r, column=c)
                 if cell.__class__.__name__ != "MergedCell":
