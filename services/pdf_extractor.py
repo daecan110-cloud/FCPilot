@@ -296,14 +296,17 @@ def _parse_coverages(pdf, all_contracts: list) -> tuple[dict, dict]:
                 if left_name:
                     rn = find_row_for_item(left_name)
                     if rn:
-                        seen_rows[ci].add(rn)  # 0이어도 기록
+                        seen_rows[ci].add(rn)
                         if lv:
                             coverage_raw[ci][str(rn)] = lv
                 rv = parse_amount(dr[ri] if ri < len(dr) else "0")
+                # 마지막 pos의 R값이 빈칸이면 col8(overflow) 확인
+                if not rv and ri + 1 < len(dr):
+                    rv = parse_amount(dr[ri + 1] if ri + 1 < len(dr) else "0")
                 if right_name:
                     rn = find_row_for_item(right_name)
                     if rn:
-                        seen_rows[ci].add(rn)  # 0이어도 기록
+                        seen_rows[ci].add(rn)
                         if rv:
                             coverage_raw[ci][str(rn)] = rv
 

@@ -316,6 +316,9 @@ def _final_format(ws):
                     cell.alignment = Alignment(
                         horizontal="center", vertical="center", wrap_text=True,
                     )
+    # Row 5, 6 행 높이 — 2줄 텍스트 표시용
+    ws.row_dimensions[5].height = 30
+    ws.row_dimensions[6].height = 30
     # 리뷰 행 서식
     for r in range(_REVIEW_START, _REVIEW_START + _REVIEW_COUNT):
         for c in range(1, _MAX_COL + 1):
