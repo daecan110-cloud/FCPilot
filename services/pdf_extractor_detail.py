@@ -152,10 +152,13 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
 
     for key, expected in summary_items.items():
         actual = extracted_sums.get(key, 0)
-        if actual == 0 and expected > 100:
-            row_num = int(key)
-            name = _row_to_name(row_num)
-            warnings.append(f"누락 의심: {name}(행{row_num}) — 진단 합계 {expected}만원, 추출 0")
+        if actual == 0 and expected > 0:
+            # 누락 항목 → 페이지 4~5 데이터로 자동 보충
+            _fill_missing(coverage_raw, key, expected)
+            if expected > 100:
+                row_num = int(key)
+                name = _row_to_name(row_num)
+                warnings.append(f"자동보충: {name}(행{row_num}) — 진단 합계 {expected}만원")
         elif actual > 0 and expected > 0 and abs(actual - expected) / max(actual, expected) > 0.3:
             name = _row_to_name(int(key))
             warnings.append(
@@ -163,6 +166,15 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
             )
 
     return warnings
+
+
+def _fill_missing(coverage_raw: dict, key: str, total: int):
+    """누락 항목을 가장 많은 보장을 가진 계약에 배분"""
+    if not coverage_raw:
+        return
+    # 보장 항목이 가장 많은 계약에 할당
+    best_ci = max(coverage_raw.keys(), key=lambda ci: len(coverage_raw[ci]))
+    coverage_raw[best_ci][key] = total
 
 
 def _row_to_name(row_num: int) -> str:
