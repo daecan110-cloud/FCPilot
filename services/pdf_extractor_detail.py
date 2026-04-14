@@ -38,6 +38,7 @@ def _match_detail_to_contract(text: str, all_contracts: list, already_matched: s
     """상세 페이지 텍스트에서 보험사+상품명 매칭 → contract _idx"""
     text_clean = text.replace("\n", " ").replace(" ", "")
 
+    # 1차: 보험사 + 상품명 전체 매칭
     for c in all_contracts:
         ci = c["_idx"]
         if ci in already_matched:
@@ -47,13 +48,17 @@ def _match_detail_to_contract(text: str, all_contracts: list, already_matched: s
         if comp in text_clean and prod in text_clean:
             return ci
 
+    # 2차: 보험사 + 상품명 앞 10자 매칭 (축약된 상품명 대응)
     for c in all_contracts:
         ci = c["_idx"]
         if ci in already_matched:
             continue
         comp = c["보험사"].replace("\n", "").replace(" ", "")
-        if comp in text_clean:
+        prod = c["상품명"].replace("\n", "").replace(" ", "")[:10]
+        if comp in text_clean and prod and prod in text_clean:
             return ci
+
+    # 보험사만으로 매칭하지 않음 — 같은 보험사 다른 상품 오배정 방지
     return None
 
 
