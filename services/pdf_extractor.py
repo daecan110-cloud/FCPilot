@@ -63,11 +63,11 @@ def _do_extract(pdf) -> dict:
     _extract_demographics(result, pdf, p1_text, p3_text)
 
     # 보장금액: Page 6~8 (상품별 보장금액)
-    coverage_raw = _parse_coverages(pdf, all_contracts)
+    coverage_raw, seen_rows = _parse_coverages(pdf, all_contracts)
 
-    # 보완: Page 9~17 (가입상품상세) 파싱
+    # 보완: Page 9~17 (가입상품상세) 파싱 — Page 6에서 0인 항목은 덮어쓰지 않음
     from services.pdf_extractor_detail import parse_detail_pages, verify_coverages
-    parse_detail_pages(pdf, all_contracts, coverage_raw)
+    parse_detail_pages(pdf, all_contracts, coverage_raw, seen_rows)
 
     # 검증: Page 4~5 보장진단 합계와 비교
     warnings = verify_coverages(pdf, coverage_raw)
@@ -230,9 +230,12 @@ def _extract_demographics(result: dict, pdf, p1_text: str, p3_text: str):
             result["성별"] = m_age.group(1)
 
 
-def _parse_coverages(pdf, all_contracts: list) -> dict:
-    """Page 6~8에서 보장금액 추출"""
+def _parse_coverages(pdf, all_contracts: list) -> tuple[dict, dict]:
+    """Page 6~8에서 보장금액 추출. (coverage_raw, seen_rows) 반환.
+    seen_rows: {contract_idx: set(row_nums)} — Page 6에서 확인된 항목 (값 0 포함)
+    """
     coverage_raw = {}
+    seen_rows = {}  # Page 6에서 확인된 행 번호 (0이어도 기록)
     mapped_indices = set()
     total_pages = len(pdf.pages)
 
@@ -285,17 +288,23 @@ def _parse_coverages(pdf, all_contracts: list) -> dict:
             for pos, ci in page_pos_map.items():
                 if ci not in coverage_raw:
                     coverage_raw[ci] = {}
+                if ci not in seen_rows:
+                    seen_rows[ci] = set()
                 li = pos * 2
                 ri = pos * 2 + 1
                 lv = parse_amount(dr[li] if li < len(dr) else "0")
-                if lv and left_name:
+                if left_name:
                     rn = find_row_for_item(left_name)
                     if rn:
-                        coverage_raw[ci][str(rn)] = lv
+                        seen_rows[ci].add(rn)  # 0이어도 기록
+                        if lv:
+                            coverage_raw[ci][str(rn)] = lv
                 rv = parse_amount(dr[ri] if ri < len(dr) else "0")
-                if rv and right_name:
+                if right_name:
                     rn = find_row_for_item(right_name)
                     if rn:
-                        coverage_raw[ci][str(rn)] = rv
+                        seen_rows[ci].add(rn)  # 0이어도 기록
+                        if rv:
+                            coverage_raw[ci][str(rn)] = rv
 
-    return coverage_raw
+    return coverage_raw, seen_rows

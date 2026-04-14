@@ -4,8 +4,13 @@ from services.item_map import ITEM_ROW_MAP, find_row_for_item
 from services.pdf_extractor import parse_amount
 
 
-def parse_detail_pages(pdf, all_contracts: list, coverage_raw: dict):
-    """Page 9~17 가입상품상세에서 누락된 보장금액 보완 (원→만원 변환)"""
+def parse_detail_pages(pdf, all_contracts: list, coverage_raw: dict,
+                       seen_rows: dict = None):
+    """Page 9~17 가입상품상세에서 누락된 보장금액 보완 (원→만원 변환).
+    seen_rows: Page 6~8에서 확인된 항목 (값 0 포함). 여기 있는 항목은 덮어쓰지 않음.
+    """
+    if seen_rows is None:
+        seen_rows = {}
     total_pages = len(pdf.pages)
     if total_pages <= 8:
         return
@@ -27,11 +32,12 @@ def parse_detail_pages(pdf, all_contracts: list, coverage_raw: dict):
         if contract_idx not in coverage_raw:
             coverage_raw[contract_idx] = {}
 
+        contract_seen = seen_rows.get(contract_idx, set())
         tables = pg.extract_tables()
         for tbl in tables:
             if not tbl or len(tbl) < 2:
                 continue
-            _extract_detail_table(tbl, contract_idx, coverage_raw)
+            _extract_detail_table(tbl, contract_idx, coverage_raw, contract_seen)
 
 
 def _match_detail_to_contract(text: str, all_contracts: list, already_matched: set):
@@ -62,8 +68,11 @@ def _match_detail_to_contract(text: str, all_contracts: list, already_matched: s
     return None
 
 
-def _extract_detail_table(tbl: list, contract_idx: int, coverage_raw: dict):
+def _extract_detail_table(tbl: list, contract_idx: int, coverage_raw: dict,
+                          contract_seen: set = None):
     """상세 보장 테이블에서 (보장명, 보장금액) 추출. 원→만원 변환."""
+    if contract_seen is None:
+        contract_seen = set()
     ncols = len(tbl[0]) if tbl[0] else 0
 
     if ncols == 5:
@@ -72,11 +81,11 @@ def _extract_detail_table(tbl: list, contract_idx: int, coverage_raw: dict):
                 continue
             _apply_detail_item(
                 (row[0] or "").strip(), (row[2] or "").strip(),
-                contract_idx, coverage_raw,
+                contract_idx, coverage_raw, contract_seen,
             )
             _apply_detail_item(
                 (row[3] or "").strip(), (row[4] or "").strip(),
-                contract_idx, coverage_raw,
+                contract_idx, coverage_raw, contract_seen,
             )
 
     elif ncols == 2:
@@ -85,12 +94,17 @@ def _extract_detail_table(tbl: list, contract_idx: int, coverage_raw: dict):
                 continue
             _apply_detail_item(
                 (row[0] or "").strip(), (row[1] or "").strip(),
-                contract_idx, coverage_raw,
+                contract_idx, coverage_raw, contract_seen,
             )
 
 
-def _apply_detail_item(name: str, amount_str: str, contract_idx: int, coverage_raw: dict):
-    """보장명+금액(원 단위) → 매핑된 행에 만원 단위로 저장 (누락분만 보완)"""
+def _apply_detail_item(name: str, amount_str: str, contract_idx: int,
+                       coverage_raw: dict, contract_seen: set = None):
+    """보장명+금액(원 단위) → 매핑된 행에 만원 단위로 저장 (누락분만 보완).
+    Page 6에서 이미 확인된(0 포함) 항목은 덮어쓰지 않음.
+    """
+    if contract_seen is None:
+        contract_seen = set()
     if not name or not amount_str:
         return
     if name in ("보장명", "구분", ""):
@@ -98,6 +112,10 @@ def _apply_detail_item(name: str, amount_str: str, contract_idx: int, coverage_r
 
     row_num = find_row_for_item(name)
     if row_num is None:
+        return
+
+    # Page 6에서 이미 확인된 항목(값이 0이어도) → 덮어쓰지 않음
+    if row_num in contract_seen:
         return
 
     amount_won = parse_amount(amount_str)
