@@ -39,7 +39,7 @@ def _cfg_6():
         "template": TEMPLATE_6, "max": 6,
         "col_idx": COL_IDX, "col_ltrs": COL_LTRS,
         "data_end": 8, "sum_col": 9, "max_col": 9,
-        "review_start": 80, "review_count": 6,
+        "review_start": 82, "review_count": 6,
     }
 
 
@@ -48,7 +48,7 @@ def _cfg_12():
         "template": TEMPLATE_12, "max": 12,
         "col_idx": COL_IDX_12, "col_ltrs": COL_LTRS_12,
         "data_end": 14, "sum_col": 15, "max_col": 15,
-        "review_start": 80, "review_count": 12,
+        "review_start": 82, "review_count": 12,
     }
 
 
@@ -101,9 +101,9 @@ def _clear_values(ws, cfg):
     ranges = [
         (1, 1, 1, mc),
         (3, 3, 7, de),
-        (9, 3, 74, de),
-        (9, sc, 74, sc),
-        (77, 3, 77, mc),
+        (9, 3, 76, de),
+        (9, sc, 76, sc),
+        (79, 3, 79, mc),
         (rs, 1, rs + rc - 1, mc),
     ]
     for r_s, c_s, r_e, c_e in ranges:
@@ -172,8 +172,8 @@ def _fill_sums(ws, contracts, cfg):
         prem = ct.get("월보험료", 0)
         months = ct.get("_총납입개월", 0)
         if prem and months:
-            safe_val(ws, 77, col, int(prem * months))
-    safe_val(ws, 77, sc, f"=SUM({start_ltr}77:{end_ltr}77)")
+            safe_val(ws, 79, col, int(prem * months))
+    safe_val(ws, 79, sc, f"=SUM({start_ltr}79:{end_ltr}79)")
 
 
 def _short_name(contract):
