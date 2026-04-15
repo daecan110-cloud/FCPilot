@@ -733,15 +733,18 @@ def _final_format(ws, has_proposal=False):
                 cell.alignment = Alignment(
                     horizontal="center", vertical="center", wrap_text=True,
                 )
-    # Row 5, 6 행 높이 — 2줄 텍스트 표시용
-    ws.row_dimensions[5].height = 30
-    ws.row_dimensions[6].height = 30
-    # Row 30~34 (암 주요치료비), Row 49~53 (특정순환계) — 2줄 텍스트
+    # 행 높이 설정 — A3 인쇄 1페이지 맞춤
+    ws.row_dimensions[1].height = 17    # 제목
+    for r in range(2, 8):
+        ws.row_dimensions[r].height = 13  # 헤더
+    ws.row_dimensions[5].height = 25    # 납입기간 (2줄)
+    ws.row_dimensions[6].height = 25    # 납입개월 (2줄)
+    ws.row_dimensions[8].height = 10    # 빈 구분행
     for r in list(range(30, 35)) + list(range(49, 54)):
-        ws.row_dimensions[r].height = 25
-    # Row 80~82 (보험료)
+        ws.row_dimensions[r].height = 27  # 암주요치료비/특정순환계 (2줄)
     for r in range(80, 83):
-        ws.row_dimensions[r].height = 18
+        ws.row_dimensions[r].height = 18  # 보험료
+    ws.row_dimensions[83].height = 5    # 빈 구분행
     # 리뷰 행 서식
     for r in range(_REVIEW_START, _REVIEW_START + _REVIEW_COUNT):
         for c in range(1, max_c + 1):
@@ -751,7 +754,7 @@ def _final_format(ws, has_proposal=False):
                     horizontal="left", vertical="center", wrap_text=True,
                 )
     # 여백
-    ws.page_margins.top = 0.5
+    ws.page_margins.top = 0.3
     # 인쇄 설정 — "한 페이지에 모든 열 맞추기" + 수동 페이지 나누기
     # fitToWidth=1: 가로를 1페이지에 맞춤 (열 축소)
     # fitToHeight=0: 세로는 제한 없음 (페이지 나누기로 분리)
