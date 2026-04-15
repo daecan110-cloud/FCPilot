@@ -239,7 +239,16 @@ def _parse_coverages(pdf, all_contracts: list) -> tuple[dict, dict]:
     mapped_indices = set()
     total_pages = len(pdf.pages)
 
-    for pg_idx in range(5, min(5 + 3, total_pages)):
+    # 보장금액 페이지: "상품별 보장금액" 테이블이 있는 페이지를 동적 탐색
+    cov_pages = []
+    for pg_idx in range(5, min(total_pages, 15)):
+        text = pdf.pages[pg_idx].extract_text() or ""
+        if "상품별 보장금액" in text or ("보장항목" in text and "진단" in text):
+            cov_pages.append(pg_idx)
+        elif cov_pages and "가입상품상세" in text:
+            break  # 상세 페이지 시작되면 중단
+
+    for pg_idx in (cov_pages or range(5, min(5 + 3, total_pages))):
         pg = pdf.pages[pg_idx]
         tables = pg.extract_tables()
         data_tbl = item_tbl = None

@@ -17,7 +17,7 @@ def parse_detail_pages(pdf, all_contracts: list, coverage_raw: dict,
 
     matched_indices = set()
 
-    for pg_idx in range(8, min(total_pages, 18)):
+    for pg_idx in range(8, min(total_pages, 30)):
         pg = pdf.pages[pg_idx]
         text = pg.extract_text() or ""
 
