@@ -112,23 +112,25 @@ def render():
         # 리뷰 통합 토글 — 엑셀 2개 이상일 때만 표시
         all_contracts = data.get("_all_contracts", data.get("계약", []))
         if len(all_contracts) > 7:
-            review_last = st.toggle(
-                "리뷰/갱신을 마지막 엑셀에 통합",
-                value=st.session_state.get("_review_last", False),
-                help="갱신구분·보험리뷰를 마지막 엑셀에 전체 계약 기준으로 통합합니다",
-                key="review_last_toggle",
-            )
-            if review_last != st.session_state.get("_review_last", False):
-                st.session_state._review_last = review_last
+            def _on_review_toggle():
+                rl = st.session_state.review_last_toggle
                 from services.analysis_engine import regenerate_excel
                 proposal_d = st.session_state.get("proposal_data")
+                d = st.session_state.get("analysis_data", {})
                 try:
                     st.session_state.excel_files = regenerate_excel(
-                        data, proposal=proposal_d, review_last=review_last,
+                        d, proposal=proposal_d, review_last=rl,
                     )
                 except Exception as e:
-                    st.warning(safe_error("엑셀 재생성", e))
-                st.rerun()
+                    pass  # 에러 시 기존 엑셀 유지
+
+            st.toggle(
+                "리뷰/갱신을 마지막 엑셀에 통합",
+                value=False,
+                help="갱신구분·보험리뷰를 마지막 엑셀에 전체 계약 기준으로 통합합니다",
+                key="review_last_toggle",
+                on_change=_on_review_toggle,
+            )
 
         excel_files = st.session_state.get("excel_files", [])
         for idx, (filename, excel_bytes) in enumerate(excel_files):
