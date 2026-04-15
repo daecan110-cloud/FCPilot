@@ -476,7 +476,8 @@ def _detect_silbi_gen(name: str, company: str, start_date: str = "") -> str:
         if year >= 2017:
             return "4세대"
 
-    # 가입시기 기반 (~2009.09=1세대, ~2013.03=2세대, ~2017.03=3세대, ~2026.04=4세대, 2026.05~=5세대)
+    # 가입시기 기반 (금감원 기준)
+    # 1세대: ~2009.09 / 2세대: 2009.10~2012.12 / 3세대: 2013.01~2017.03 / 4세대: 2017.04~ / 5세대: 2026.05~
     if start_date:
         m = re.match(r"(\d{4})-?(\d{2})?", start_date)
         if m:
@@ -487,7 +488,7 @@ def _detect_silbi_gen(name: str, company: str, start_date: str = "") -> str:
                 return "5세대"
             if ym >= 201704:
                 return "4세대"
-            if ym >= 201304:
+            if ym >= 201301:
                 return "3세대"
             if ym >= 200910:
                 return "2세대"
