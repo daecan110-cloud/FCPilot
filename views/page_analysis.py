@@ -36,6 +36,13 @@ def render():
             key="proposal_pdf",
         )
 
+    # --- 리뷰 통합 ---
+    review_last = st.toggle(
+        "리뷰/갱신을 마지막 엑셀에 통합",
+        value=False,
+        help="계약 8개 이상 시 갱신구분·보험리뷰를 2번째 엑셀에 전체 계약 기준으로 몰아넣습니다",
+    )
+
     if uploaded_file is None:
         st.info("PDF 파일을 업로드해주세요.")
         return
@@ -72,11 +79,14 @@ def render():
         else:
             st.session_state.pop("proposal_data", None)
 
-        # 고객명 변경 or 제안 데이터 → 엑셀 재생성
-        if client_name or (proposal_data and proposal_data.get("특약목록")):
+        # 고객명/제안/리뷰통합 옵션 → 엑셀 재생성
+        needs_regen = client_name or review_last or (proposal_data and proposal_data.get("특약목록"))
+        if needs_regen:
             try:
                 from services.analysis_engine import regenerate_excel
-                excel_files = regenerate_excel(data, proposal=proposal_data)
+                excel_files = regenerate_excel(
+                    data, proposal=proposal_data, review_last=review_last,
+                )
             except Exception as e:
                 st.warning(safe_error("엑셀 재생성", e))
 

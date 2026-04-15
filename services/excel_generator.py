@@ -20,19 +20,41 @@ def safe_val(ws, row, col, value):
         cell.value = value
 
 
-def generate_analysis_excel(data: dict, proposal: dict | None = None, **_kw) -> list[tuple[str, bytes]]:
+def generate_analysis_excel(
+    data: dict, proposal: dict | None = None,
+    review_last: bool = False, **_kw,
+) -> list[tuple[str, bytes]]:
     all_contracts = data.get("_all_contracts", data.get("계약", []))
     coverage_raw = data.get("_coverage_raw", {})
     customer = data.get("고객명", "고객")
 
+    chunks = []
+    for start in range(0, len(all_contracts), 7):
+        chunks.append(all_contracts[start:start + 7])
+
+    total_pages = len(chunks)
     results: list[tuple[str, bytes]] = []
-    # 7개씩 분할 — 제안서는 첫 번째 파일에만 포함
-    for page, start in enumerate(range(0, len(all_contracts), 7)):
-        chunk = all_contracts[start:start + 7]
+
+    for page, chunk in enumerate(chunks):
         sd = _make_slice(data, chunk, coverage_raw)
         prop = proposal if page == 0 else None
-        b = _fill_workbook(sd, proposal=prop)
-        suffix = f"_{page + 1}" if len(all_contracts) > 7 else ""
+        is_last = (page == total_pages - 1)
+
+        # review_last=True & 다수 엑셀 → 마지막에만 전체 리뷰, 나머지는 리뷰 생략
+        if review_last and total_pages > 1:
+            if is_last:
+                review_contracts = all_contracts
+            else:
+                review_contracts = []  # 빈 리스트 = 리뷰/갱신 생략
+        else:
+            review_contracts = None  # None = 기본 동작 (해당 슬라이스 계약만)
+
+        b = _fill_workbook(
+            sd, proposal=prop,
+            review_contracts=review_contracts,
+            all_coverage_raw=coverage_raw if review_contracts else None,
+        )
+        suffix = f"_{page + 1}" if total_pages > 1 else ""
         results.append((f"{customer}_보장분석표{suffix}.xlsx", b))
 
     return results
@@ -58,7 +80,7 @@ def _make_slice(base, contracts, coverage_raw):
     return data
 
 
-def _fill_workbook(slice_data, proposal=None):
+def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverage_raw=None):
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp.close()
     shutil.copy(TEMPLATE, tmp.name)
@@ -80,8 +102,22 @@ def _fill_workbook(slice_data, proposal=None):
         _fill_proposal(ws, proposal)
         _format_proposal_cols(ws)
     _fill_sums(ws, contracts, has_proposal=has_proposal, proposal=proposal)
-    _fill_renewal(ws, contracts)
-    _fill_review(ws, contracts, slice_data.get("보장금액", {}))
+
+    if review_contracts is None:
+        # 기본: 현재 슬라이스의 계약으로 갱신/리뷰
+        _fill_renewal(ws, contracts)
+        _fill_review(ws, contracts, slice_data.get("보장금액", {}))
+    elif len(review_contracts) > 0:
+        # review_last 모드: 전체 계약으로 갱신/리뷰 (마지막 엑셀)
+        review_cov = {}
+        if all_coverage_raw:
+            for i, c in enumerate(review_contracts):
+                col = COL_LTRS[i] if i < len(COL_LTRS) else ""
+                if col and c["_idx"] in all_coverage_raw:
+                    review_cov[col] = {str(k): v for k, v in all_coverage_raw[c["_idx"]].items()}
+        _fill_renewal(ws, review_contracts[:7])
+        _fill_review(ws, review_contracts, review_cov)
+    # else: review_contracts == [] → 갱신/리뷰 생략 (빈 상태 유지)
     _final_format(ws, has_proposal=has_proposal)
 
     buf = io.BytesIO()
