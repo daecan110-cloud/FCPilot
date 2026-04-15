@@ -82,7 +82,7 @@ _DATA_START = 4   # D
 _DATA_END = 10    # J
 _MAX_COL = 11     # K (제안 없을 때)
 _MAX_COL_PROP = 13  # M (제안 있을 때)
-_REVIEW_START = 85
+_REVIEW_START = 90   # was 85 (+5)
 _REVIEW_COUNT = 7
 
 
@@ -93,7 +93,7 @@ def _clear_values(ws, has_proposal=False):
         (3, _DATA_START, 7, _DATA_END), # 상품정보 (Row 3~7, D~J)
         (9, _DATA_START, 74, _DATA_END),# 보장금액
         (9, SUM_COL, 74, SUM_COL),      # K열 합계
-        (75, _DATA_START, 77, max_c),   # 보험료
+        (80, _DATA_START, 82, max_c),   # 보험료
         (_REVIEW_START, 1, _REVIEW_START + _REVIEW_COUNT - 1, max_c),
     ]
     if has_proposal:
@@ -198,8 +198,8 @@ def _format_proposal_cols(ws):
     ws.column_dimensions[l_ltr].width = 18
     ws.column_dimensions[m_ltr].width = 18
 
-    # K열 서식을 L, M 열에 복사 (Row 1 ~ 81)
-    for r in range(1, 82):
+    # K열 서식을 L, M 열에 복사 (Row 1 ~ 86)
+    for r in range(1, 87):
         src = ws.cell(row=r, column=SUM_COL)
         if src.__class__.__name__ == "MergedCell":
             continue
@@ -263,7 +263,7 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             safe_val(ws, row_num, TOTAL_COL, f"={k_ltr}{row_num}+{l_ltr}{row_num}")
         safe_val(ws, 7, TOTAL_COL, f"={k_ltr}7+{l_ltr}7")
 
-    # Row 75 기납입보험료 — PDF 추출값 우선, 없으면 계산
+    # Row 80 기납입보험료 (was 75)
     for ct in contracts:
         col = COL_IDX.get(ct["열"], 4)
         paid_amt = ct.get("_paid", 0)
@@ -272,10 +272,10 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             paid_m = ct.get("_납입개월", 0)
             paid_amt = int(prem * paid_m) if prem and paid_m else 0
         if paid_amt:
-            safe_val(ws, 75, col, paid_amt)
-    safe_val(ws, 75, SUM_COL, f"=SUM({start_ltr}75:{end_ltr}75)")
+            safe_val(ws, 80, col, paid_amt)
+    safe_val(ws, 80, SUM_COL, f"=SUM({start_ltr}80:{end_ltr}80)")
 
-    # Row 76 납입할보험료 — PDF 추출값 우선, 없으면 계산
+    # Row 81 납입할보험료 (was 76)
     for ct in contracts:
         col = COL_IDX.get(ct["열"], 4)
         topay_amt = ct.get("_topay", 0)
@@ -286,15 +286,15 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             remain = total_m - paid_m
             topay_amt = int(prem * remain) if prem and remain > 0 else 0
         if topay_amt:
-            safe_val(ws, 76, col, topay_amt)
-    safe_val(ws, 76, SUM_COL, f"=SUM({start_ltr}76:{end_ltr}76)")
+            safe_val(ws, 81, col, topay_amt)
+    safe_val(ws, 81, SUM_COL, f"=SUM({start_ltr}81:{end_ltr}81)")
 
-    # Row 77 총납입보험료 = 기납입 + 납입할
+    # Row 82 총납입보험료 = 기납입 + 납입할 (was 77)
     for c_ltr in COL_LTRS:
         col = COL_IDX[c_ltr]
         col_l = get_column_letter(col)
-        safe_val(ws, 77, col, f"={col_l}75+{col_l}76")
-    safe_val(ws, 77, SUM_COL, f"=SUM({start_ltr}77:{end_ltr}77)")
+        safe_val(ws, 82, col, f"={col_l}80+{col_l}81")
+    safe_val(ws, 82, SUM_COL, f"=SUM({start_ltr}82:{end_ltr}82)")
 
     if has_proposal:
         # L열 납입할보험료 — 월보험료 × 납입개월
@@ -306,16 +306,16 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             total_prem = proposal.get("보험료합계", 0)
             if 납입개월 and total_prem:
                 topay = total_prem * 납입개월
-                safe_val(ws, 76, PROP_COL, topay)
-                safe_val(ws, 77, PROP_COL, topay)  # 기납입 0이므로 총납입 = 납입할
+                safe_val(ws, 81, PROP_COL, topay)
+                safe_val(ws, 82, PROP_COL, topay)
 
-        safe_val(ws, 75, TOTAL_COL, f"={k_ltr}75+{l_ltr}75")
-        safe_val(ws, 76, TOTAL_COL, f"={k_ltr}76+{l_ltr}76")
-        safe_val(ws, 77, TOTAL_COL, f"={k_ltr}77+{l_ltr}77")
+        safe_val(ws, 80, TOTAL_COL, f"={k_ltr}80+{l_ltr}80")
+        safe_val(ws, 81, TOTAL_COL, f"={k_ltr}81+{l_ltr}81")
+        safe_val(ws, 82, TOTAL_COL, f"={k_ltr}82+{l_ltr}82")
 
 
 def _fill_renewal(ws, contracts):
-    """Row 80 갱신 구분, Row 81 보험료 변화 예고"""
+    """Row 85 갱신 구분, Row 86 보험료 변화 예고 (was 80/81)"""
     for i, ct in enumerate(contracts):
         col = COL_IDX.get(ct["열"], 4)
         name = ct.get("상품명", "")
@@ -342,7 +342,7 @@ def _fill_renewal(ws, contracts):
             renewal = "부분 갱신형 ⚠️"
         else:
             renewal = "비갱신형 ✅"
-        safe_val(ws, 80, col, renewal)
+        safe_val(ws, 85, col, renewal)
 
         # 보험료 변화 예고
         if prem == 0:
@@ -361,7 +361,7 @@ def _fill_renewal(ws, contracts):
                 notice = f"약 {remain}개월 후\n납입완료 예정"
             else:
                 notice = "변동 없음"
-        safe_val(ws, 81, col, notice)
+        safe_val(ws, 86, col, notice)
 
 
 def _short_name(contract):
