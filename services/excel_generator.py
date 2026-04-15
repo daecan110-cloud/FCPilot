@@ -108,15 +108,9 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
         _fill_renewal(ws, contracts)
         _fill_review(ws, contracts, slice_data.get("보장금액", {}))
     elif len(review_contracts) > 0:
-        # review_last 모드: 전체 계약으로 갱신/리뷰 (마지막 엑셀)
-        review_cov = {}
-        if all_coverage_raw:
-            for i, c in enumerate(review_contracts):
-                col = COL_LTRS[i] if i < len(COL_LTRS) else ""
-                if col and c["_idx"] in all_coverage_raw:
-                    review_cov[col] = {str(k): v for k, v in all_coverage_raw[c["_idx"]].items()}
-        _fill_renewal(ws, review_contracts[:7])
-        _fill_review(ws, review_contracts, review_cov)
+        # review_last 모드: 전체 계약으로 갱신/리뷰 (동적 행 확장)
+        _fill_renewal_all(ws, review_contracts)
+        _fill_review_all(ws, review_contracts, all_coverage_raw or {})
     # else: review_contracts == [] → 갱신/리뷰 생략 (빈 상태 유지)
     _final_format(ws, has_proposal=has_proposal)
 
@@ -411,6 +405,161 @@ def _fill_renewal(ws, contracts):
             else:
                 notice = "변동 없음"
         safe_val(ws, 86, col, notice)
+
+
+def _fill_renewal_all(ws, all_contracts):
+    """전체 계약에 대해 갱신/보험료변화 행을 7개씩 그룹으로 채움.
+
+    7개 이하: 기존 Row 85-86 사용
+    8개 이상: Row 86 뒤에 그룹당 2행 삽입
+    """
+    import math
+    n_groups = math.ceil(len(all_contracts) / 7)
+
+    # 추가 그룹용 행 삽입 (2행씩) — 삽입 전 하단 병합 해제
+    if n_groups > 1:
+        extra_rows = (n_groups - 1) * 2
+        # Row 87 이후 병합 해제 (insert_rows가 병합을 제대로 밀지 못함)
+        to_remove = [str(mg) for mg in ws.merged_cells.ranges if mg.min_row >= 87]
+        for r in to_remove:
+            ws.merged_cells.ranges = [m for m in ws.merged_cells.ranges if str(m) != r]
+            from openpyxl.utils.cell import range_boundaries
+            mc, mr, xc, xr = range_boundaries(r)
+            for row in range(mr, xr + 1):
+                for col in range(mc, xc + 1):
+                    if (row, col) in ws._cells and ws._cells[(row, col)].__class__.__name__ == "MergedCell":
+                        del ws._cells[(row, col)]
+
+        ws.insert_rows(87, extra_rows)
+
+        # 하단 병합 재생성 (밀린 위치)
+        review_title_row = 88 + extra_rows  # 리뷰 타이틀
+        review_hdr_row = review_title_row + 1
+        ws.merge_cells(f"A{review_title_row}:K{review_title_row}")
+        ws.merge_cells(f"A{review_hdr_row}:B{review_hdr_row}")
+        ws.merge_cells(f"E{review_hdr_row}:H{review_hdr_row}")
+        ws.merge_cells(f"I{review_hdr_row}:K{review_hdr_row}")
+
+        # 리뷰 타이틀/헤더 값 복원
+        safe_val(ws, review_title_row, 1, "📋  현재 유지중인 보험 리뷰")
+        safe_val(ws, review_hdr_row, 1, "보험사 / 상품명")
+        safe_val(ws, review_hdr_row, 3, "가입일 / 만기")
+        ws.row_dimensions[review_title_row].height = 28
+        ws.row_dimensions[review_hdr_row].height = 20
+
+    for g in range(n_groups):
+        chunk = all_contracts[g * 7:(g + 1) * 7]
+        renewal_row = 85 + g * 2
+        notice_row = 86 + g * 2
+
+        for i, ct in enumerate(chunk):
+            col = COL_IDX.get(COL_LTRS[i], 4)
+            name = ct.get("상품명", "")
+            company = ct.get("보험사", "")
+            prem = ct.get("월보험료", 0)
+            total_m = ct.get("_총납입개월", 0)
+            paid_m = ct.get("_납입개월", 0)
+
+            is_renewal = "갱신" in name
+            is_short = total_m and total_m <= 12
+            is_sonhae = any(k in company for k in ["화재", "손해", "해상"])
+            is_comprehensive = any(k in name for k in [
+                "건강", "종합", "케어", "플러스", "훼밀리", "간편",
+                "The", "NEW", "희망", "자녀", "Good",
+            ])
+
+            if is_renewal:
+                renewal = "갱신형 ⚠️"
+            elif is_short:
+                renewal = "단기계약\n갱신없음"
+            elif is_sonhae and is_comprehensive:
+                renewal = "부분 갱신형 ⚠️"
+            else:
+                renewal = "비갱신형 ✅"
+            safe_val(ws, renewal_row, col, renewal)
+
+            if prem == 0:
+                notice = "납입완료"
+            elif is_renewal:
+                notice = "갱신 시\n보험료 변동 예상 ⚠️"
+            elif is_short:
+                notice = "만기 소멸 예정"
+            elif is_sonhae and is_comprehensive:
+                notice = "특약 갱신 시\n일부 변동 가능 ⚠️"
+            else:
+                remain = total_m - paid_m if total_m else 0
+                if remain <= 0:
+                    notice = "납입완료 예정"
+                elif remain <= 24:
+                    notice = f"약 {remain}개월 후\n납입완료 예정"
+                else:
+                    notice = "변동 없음"
+            safe_val(ws, notice_row, col, notice)
+
+        # 행 서식
+        for row in (renewal_row, notice_row):
+            for c in range(_DATA_START, _DATA_END + 1):
+                cell = ws.cell(row=row, column=c)
+                if cell.__class__.__name__ != "MergedCell":
+                    cell.font = Font(name=_FONT_NAME, size=8, bold=True)
+                    cell.alignment = Alignment(
+                        horizontal="center", vertical="center", wrap_text=True,
+                    )
+            ws.row_dimensions[row].height = 26 if row % 2 == 0 else 20
+
+    return (n_groups - 1) * 2  # 삽입한 행 수
+
+
+def _fill_review_all(ws, all_contracts, all_coverage_raw):
+    """전체 계약에 대해 리뷰 행을 채움 (7행 초과 시 동적 확장)."""
+    import math
+    n_groups = math.ceil(len(all_contracts) / 7)
+    extra_renewal = (n_groups - 1) * 2 if n_groups > 1 else 0
+
+    # 리뷰 시작 위치 = 기존 _REVIEW_START + 갱신 추가 행
+    review_start = _REVIEW_START + extra_renewal
+    n_contracts = len(all_contracts)
+    extra_review = max(0, n_contracts - _REVIEW_COUNT)
+
+    # 리뷰 행 부족 시 삽입
+    if extra_review > 0:
+        # 삽입 전 기존 리뷰 행 병합 해제
+        to_remove = [str(mg) for mg in ws.merged_cells.ranges if mg.min_row >= review_start]
+        for r in to_remove:
+            ws.merged_cells.ranges = [m for m in ws.merged_cells.ranges if str(m) != r]
+            from openpyxl.utils.cell import range_boundaries
+            mc, mr, xc, xr = range_boundaries(r)
+            for row in range(mr, xr + 1):
+                for col_n in range(mc, xc + 1):
+                    if (row, col_n) in ws._cells and ws._cells[(row, col_n)].__class__.__name__ == "MergedCell":
+                        del ws._cells[(row, col_n)]
+
+        ws.insert_rows(review_start + _REVIEW_COUNT, extra_review)
+
+    for i, c in enumerate(all_contracts):
+        r = review_start + i
+
+        safe_val(ws, r, 1, _short_name(c))
+        period = c.get("보장나이", "")
+        start = c.get("가입시기", "")
+        safe_val(ws, r, 3, f"{start}\n({period})" if start else period)
+        prem = c.get("월보험료", 0)
+        safe_val(ws, r, 4, f"{prem:,.0f}원" if prem else "납입완료")
+
+        cov_data = {}
+        if c["_idx"] in all_coverage_raw:
+            cov_data = {str(k): v for k, v in all_coverage_raw[c["_idx"]].items()}
+        safe_val(ws, r, 5, _build_review(c, coverage_data=cov_data))
+
+        # 행 서식
+        for col_n in range(1, _MAX_COL + 1):
+            cell = ws.cell(row=r, column=col_n)
+            if cell.__class__.__name__ != "MergedCell":
+                cell.font = Font(name=_FONT_NAME, size=8, bold=True)
+                cell.alignment = Alignment(
+                    horizontal="left", vertical="center", wrap_text=True,
+                )
+        ws.row_dimensions[r].height = 70
 
 
 def _short_name(contract):
