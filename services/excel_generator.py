@@ -758,4 +758,4 @@ def _final_format(ws, has_proposal=False):
     ws.page_setup.scale = None  # fitToPage 모드에서는 scale 자동
     from openpyxl.worksheet.pagebreak import Break
     ws.row_breaks.brk = []
-    ws.row_breaks.append(Break(id=88))  # 갱신 구분까지 1페이지, 리뷰는 2페이지
+    ws.row_breaks.append(Break(id=87))  # 갱신 구분까지 1페이지, 리뷰는 2페이지
