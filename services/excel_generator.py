@@ -65,6 +65,12 @@ def _fill_workbook(slice_data, proposal=None):
     wb = load_workbook(tmp.name)
     ws = wb.active
 
+    # 워크북 기본 폰트 — Normal 스타일 변경으로 모든 PC에서 동일 표시
+    for ns in wb._named_styles:
+        if ns.name == "Normal":
+            ns.font = Font(name=_FONT_NAME, size=10, bold=True)
+            break
+
     has_proposal = proposal and proposal.get("특약목록")
     contracts = slice_data.get("계약", [])
     _clear_values(ws, has_proposal=has_proposal)
