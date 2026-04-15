@@ -467,8 +467,8 @@ def _detect_silbi_gen(name: str, company: str, start_date: str = "") -> str:
     if any(k in combined for k in ["5세대"]):
         return "5세대"
 
-    # 상품명에 연도가 있으면
-    m = re.search(r"(\d{4})", name)
+    # 상품명에 연도가 있으면 (2000~2030 범위만 인식)
+    m = re.search(r"(20[0-2]\d)", name)
     if m:
         year = int(m.group(1))
         if year >= 2026:
