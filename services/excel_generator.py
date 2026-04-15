@@ -75,7 +75,7 @@ def _fill_workbook(slice_data, proposal=None):
         _format_proposal_cols(ws)
     _fill_sums(ws, contracts, has_proposal=has_proposal, proposal=proposal)
     _fill_renewal(ws, contracts)
-    _fill_review(ws, contracts)
+    _fill_review(ws, contracts, slice_data.get("보장금액", {}))
     _final_format(ws, has_proposal=has_proposal)
 
     buf = io.BytesIO()
@@ -385,9 +385,11 @@ def _short_name(contract):
     return f"{company}\n{name}"
 
 
-def _fill_review(ws, contracts):
+def _fill_review(ws, contracts, coverage_map=None):
     for i, c in enumerate(contracts):
         r = _REVIEW_START + i
+        col_ltr = c.get("열", "")
+        cov = (coverage_map or {}).get(col_ltr, {})
         # A:B 보험사/상품명
         safe_val(ws, r, 1, _short_name(c))
         # C 가입일/만기
@@ -398,18 +400,23 @@ def _fill_review(ws, contracts):
         prem = c.get("월보험료", 0)
         safe_val(ws, r, 4, f"{prem:,.0f}원" if prem else "납입완료")
         # E:H 주요 체크사항
-        safe_val(ws, r, 5, _build_review(c))
+        safe_val(ws, r, 5, _build_review(c, coverage_data=cov))
 
 
-def _build_review(contract):
-    combined = contract.get("상품명", "") + contract.get("보험사", "")
+def _build_review(contract, coverage_data=None):
+    name = contract.get("상품명", "")
+    company = contract.get("보험사", "")
+    combined = name + company
     period = contract.get("보장나이", "")
     premium = contract.get("월보험료", 0)
     checks = []
+
     if any(k in combined for k in ["단체", "단기"]):
         checks.append("단체/단기계약 — 퇴직·탈퇴 시 자동 소멸")
     elif any(k in combined for k in ["실손", "의료비"]):
-        checks.append("실손의료비 보험 (갱신형)")
+        start_date = contract.get("가입시기", "")
+        gen = _detect_silbi_gen(name, company, start_date)
+        checks.append(f"실손의료비 {gen} (갱신형)")
     elif any(k in combined for k in ["종신"]) and any(k in combined for k in ["변액", "유니버셜"]):
         checks.append("변액유니버셜종신 — 수익률·적립금 확인 필요")
     elif any(k in combined for k in ["종신"]):
@@ -418,13 +425,87 @@ def _build_review(contract):
         checks.append("운전자보험 — 교통상해/벌금/변호사비 보장")
     elif any(k in combined for k in ["CI"]):
         checks.append("CI보험 — 중대질병 진단 시 보험금 지급")
+    elif any(k in combined for k in ["치아"]):
+        checks.append(f"치아보험 ({period})")
     elif any(k in combined for k in ["건강", "상해", "종합"]):
         checks.append(f"건강/상해 보장 ({period})")
+    elif any(k in combined for k in ["암"]):
+        checks.append(f"암보험 ({period})")
+    elif any(k in combined for k in ["저축", "연금", "적립"]):
+        checks.append(f"저축/연금 ({period})")
     else:
         checks.append(f"보장기간: {period}")
+
     if premium == 0:
         checks.append("납입완료")
+
+    # 보장 내역 요약 (주요 항목 금액)
+    if coverage_data:
+        highlights = _coverage_highlights(coverage_data)
+        if highlights:
+            checks.append(highlights)
+
     return " / ".join(checks)
+
+
+def _detect_silbi_gen(name: str, company: str, start_date: str = "") -> str:
+    """실손의료비 세대 판별 (키워드 → 가입시기 순)"""
+    import re
+    combined = name + company
+
+    # 키워드 기반 (가장 정확)
+    if any(k in combined for k in ["착한", "5세대", "비급여특약"]):
+        return "5세대"
+    if any(k in combined for k in ["4세대", "신실손"]):
+        return "4세대"
+    if any(k in combined for k in ["표준화", "3세대"]):
+        return "3세대"
+    if any(k in combined for k in ["단독", "2세대"]):
+        return "2세대"
+    if any(k in combined for k in ["1세대"]):
+        return "1세대"
+
+    # 상품명에 연도가 있으면
+    m = re.search(r"(\d{4})", name)
+    if m:
+        year = int(m.group(1))
+        if year >= 2021:
+            return "5세대"
+        if year >= 2017:
+            return "4세대"
+
+    # 가입시기 기반 (2009-07 이전=1세대, ~2013-03=2세대, ~2017-03=3세대, ~2021-06=4세대, 이후=5세대)
+    if start_date:
+        m = re.match(r"(\d{4})-?(\d{2})?", start_date)
+        if m:
+            y = int(m.group(1))
+            mo = int(m.group(2) or "1")
+            ym = y * 100 + mo
+            if ym >= 202107:
+                return "5세대"
+            if ym >= 201704:
+                return "4세대"
+            if ym >= 201304:
+                return "3세대"
+            if ym >= 200910:
+                return "2세대"
+            return "1세대"
+
+    return "(세대 확인 필요)"
+
+
+def _coverage_highlights(cov: dict) -> str:
+    """주요 보장 항목 요약 (금액이 있는 것만)"""
+    labels = {
+        "9": "사망", "17": "일반암", "44": "심근경색",
+        "39": "뇌혈관", "76": "실비",
+    }
+    parts = []
+    for row_str, label in labels.items():
+        amt = cov.get(row_str, 0)
+        if amt:
+            parts.append(f"{label} {amt:,}")
+    return " / ".join(parts) if parts else ""
 
 
 def _final_format(ws, has_proposal=False):
