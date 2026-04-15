@@ -25,6 +25,17 @@ def render():
         placeholder="예: 홍길동",
     )
 
+    # --- 신규 상품 제안 ---
+    use_proposal = st.toggle("신규 상품 제안 포함", value=False)
+    proposal_file = None
+    if use_proposal:
+        proposal_file = st.file_uploader(
+            "상품제안서 PDF 업로드",
+            type=["pdf"],
+            help="보험사 상품설명서(제안서) PDF — 특약 목록을 자동으로 읽어옵니다",
+            key="proposal_pdf",
+        )
+
     if uploaded_file is None:
         st.info("PDF 파일을 업로드해주세요.")
         return
@@ -54,6 +65,18 @@ def render():
                 st.error(safe_error("엑셀 재생성", e))
                 return
 
+        # 상품제안서 파싱
+        if use_proposal and proposal_file is not None:
+            from services.proposal_parser import parse_proposal
+            try:
+                proposal_data = parse_proposal(proposal_file.read())
+                st.session_state.proposal_data = proposal_data
+            except Exception as e:
+                st.warning(safe_error("제안서 파싱", e))
+                st.session_state.pop("proposal_data", None)
+        else:
+            st.session_state.pop("proposal_data", None)
+
         st.session_state.analysis_data = data
         st.session_state.excel_files = excel_files
         st.session_state.pdf_bytes = pdf_bytes
@@ -66,9 +89,14 @@ def render():
     if data is None:
         return
 
-    tab_result, tab_yakwan = st.tabs(["보장분석 결과", "약관 분석 + AI 상담"])
+    proposal = st.session_state.get("proposal_data")
+    tab_names = ["보장분석 결과", "약관 분석 + AI 상담"]
+    if proposal:
+        tab_names.append("신규 상품 제안")
 
-    with tab_result:
+    tabs = st.tabs(tab_names)
+
+    with tabs[0]:
         _show_result(data)
 
         warnings = data.get("_warnings", [])
@@ -88,9 +116,13 @@ def render():
                 key=f"dl_{idx}_{filename}",
             )
 
-    with tab_yakwan:
+    with tabs[1]:
         from views.page_analysis_yakwan import render_yakwan_section
         render_yakwan_section(data)
+
+    if proposal and len(tabs) > 2:
+        with tabs[2]:
+            _show_proposal(proposal)
 
 
 def _show_result(data: dict):
@@ -112,6 +144,29 @@ def _show_result(data: dict):
                     f"월 {prem:,}원 | "
                     f"{c.get('보장나이', '')}"
                 )
+
+
+def _show_proposal(proposal: dict):
+    """신규 상품 제안 특약 목록 표시"""
+    st.subheader("제안 상품")
+    st.markdown(f"**{proposal.get('상품명', '-')}**")
+    if proposal.get("보험료합계"):
+        st.metric("월 보험료 합계", f"{proposal['보험료합계']:,}원")
+
+    riders = proposal.get("특약목록", [])
+    if not riders:
+        st.warning("특약을 찾지 못했습니다.")
+        return
+
+    st.markdown(f"**특약 {len(riders)}개**")
+    for r in riders:
+        갱신 = " (갱신형)" if r.get("갱신형") else ""
+        st.markdown(
+            f"- {r['번호']} **{r['특약명'][:50]}**{갱신}  \n"
+            f"  대표지급: **{r['대표지급금액']:,}만원** | "
+            f"{r['보험기간']} | {r['납입기간']} | "
+            f"월 {r['보험료']:,}원"
+        )
 
 
 def _save_to_db(data: dict, silent: bool = False):
