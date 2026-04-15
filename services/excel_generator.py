@@ -747,8 +747,11 @@ def _final_format(ws, has_proposal=False):
                 cell.alignment = Alignment(
                     horizontal="left", vertical="center", wrap_text=True,
                 )
-    # 인쇄 설정 — fitToPage 끄고 수동 페이지 나누기 활성화
+    # 인쇄 설정 — fitToPage 완전 해제, scale + 수동 페이지 나누기
     ws.sheet_properties.pageSetUpPr.fitToPage = False
+    ws.sheet_properties.pageSetUpPr.autoPageBreaks = False
+    ws.page_setup.fitToWidth = 0
+    ws.page_setup.fitToHeight = 0
     ws.page_setup.scale = 65
     from openpyxl.worksheet.pagebreak import Break
     ws.row_breaks.brk = []
