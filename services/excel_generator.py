@@ -753,6 +753,8 @@ def _final_format(ws, has_proposal=False):
                 cell.alignment = Alignment(
                     horizontal="left", vertical="center", wrap_text=True,
                 )
+    # 여백
+    ws.page_margins.top = 0.5
     # 인쇄 설정 — "한 페이지에 모든 열 맞추기" + 수동 페이지 나누기
     # fitToWidth=1: 가로를 1페이지에 맞춤 (열 축소)
     # fitToHeight=0: 세로는 제한 없음 (페이지 나누기로 분리)
