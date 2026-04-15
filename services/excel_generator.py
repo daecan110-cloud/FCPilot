@@ -4,7 +4,8 @@ import os
 import shutil
 import tempfile
 from openpyxl import load_workbook
-from openpyxl.styles import Font, Alignment
+from copy import copy
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from services.item_map import COL_IDX, COL_LTRS, SUM_COL, PROP_COL, TOTAL_COL, DATA_ROWS
 
 _TMPL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
@@ -64,6 +65,7 @@ def _fill_workbook(slice_data, proposal=None):
     _fill_coverage(ws, slice_data)
     if has_proposal:
         _fill_proposal(ws, proposal)
+        _format_proposal_cols(ws)
     _fill_sums(ws, contracts, has_proposal=has_proposal)
     _fill_renewal(ws, contracts)
     _fill_review(ws, contracts)
@@ -158,7 +160,7 @@ def _fill_proposal(ws, proposal):
     from services.proposal_parser import map_riders_to_rows
 
     # 헤더
-    safe_val(ws, 2, PROP_COL, "신한라이프")
+    safe_val(ws, 2, PROP_COL, "신상품 제안")
     safe_val(ws, 3, PROP_COL, proposal.get("상품명", "제안 상품"))
     # Row 7: 월보험료
     total_prem = proposal.get("보험료합계", 0)
@@ -170,6 +172,58 @@ def _fill_proposal(ws, proposal):
     for row_num, amount in row_amounts.items():
         if row_num in DATA_ROWS:
             safe_val(ws, row_num, PROP_COL, amount)
+
+
+def _format_proposal_cols(ws):
+    """K열 서식을 L, M열에 복사 (배경색, 보더, 폰트, 숫자형식, 정렬)"""
+    from openpyxl.utils import get_column_letter
+
+    # 열 너비 설정
+    ws.column_dimensions[get_column_letter(PROP_COL)].width = 18
+    ws.column_dimensions[get_column_letter(TOTAL_COL)].width = 18
+
+    # K열 서식을 L, M 열에 복사 (Row 1 ~ 81)
+    for r in range(1, 82):
+        src = ws.cell(row=r, column=SUM_COL)
+        if src.__class__.__name__ == "MergedCell":
+            continue
+        for col in (PROP_COL, TOTAL_COL):
+            dst = ws.cell(row=r, column=col)
+            if dst.__class__.__name__ == "MergedCell":
+                continue
+            dst.font = copy(src.font)
+            dst.border = copy(src.border)
+            dst.fill = copy(src.fill)
+            dst.number_format = src.number_format
+            dst.alignment = copy(src.alignment)
+
+    # L2 헤더: "신상품 제안" — K2와 동일 서식
+    src2 = ws.cell(row=2, column=SUM_COL)
+    l2 = ws.cell(row=2, column=PROP_COL)
+    l2.font = Font(name=_FONT_NAME, size=9, bold=True)
+    l2.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # M2 헤더: "전체합계"
+    m2 = ws.cell(row=2, column=TOTAL_COL)
+    m2.font = Font(name=_FONT_NAME, size=9, bold=True)
+    m2.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # K2:K6 병합 영역 → L3~L6, M3~M6은 K2 서식 복사
+    _thin = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+    for r in range(3, 7):
+        for col in (PROP_COL, TOTAL_COL):
+            cell = ws.cell(row=r, column=col)
+            if cell.__class__.__name__ != "MergedCell":
+                cell.font = Font(name=_FONT_NAME, size=9, bold=True)
+                cell.fill = copy(src2.fill)
+                cell.border = _thin
+                cell.number_format = "#,##0"
+                cell.alignment = Alignment(
+                    horizontal="center", vertical="center", wrap_text=True,
+                )
 
 
 def _fill_sums(ws, contracts, has_proposal=False):
