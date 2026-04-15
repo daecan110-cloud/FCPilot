@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment
-from services.item_map import COL_IDX, COL_LTRS, SUM_COL, DATA_ROWS
+from services.item_map import COL_IDX, COL_LTRS, SUM_COL, PROP_COL, TOTAL_COL, DATA_ROWS
 
 _TMPL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 TEMPLATE = os.path.join(_TMPL_DIR, "master_template.xlsx")
@@ -19,14 +19,14 @@ def safe_val(ws, row, col, value):
         cell.value = value
 
 
-def generate_analysis_excel(data: dict, **_kw) -> list[tuple[str, bytes]]:
+def generate_analysis_excel(data: dict, proposal: dict | None = None, **_kw) -> list[tuple[str, bytes]]:
     all_contracts = data.get("_all_contracts", data.get("계약", []))
     coverage_raw = data.get("_coverage_raw", {})
     customer = data.get("고객명", "고객")
 
     contracts = all_contracts[:7]
     sd = _make_slice(data, contracts, coverage_raw)
-    b = _fill_workbook(sd)
+    b = _fill_workbook(sd, proposal=proposal)
     return [(f"{customer}_보장분석표.xlsx", b)]
 
 
@@ -50,21 +50,24 @@ def _make_slice(base, contracts, coverage_raw):
     return data
 
 
-def _fill_workbook(slice_data):
+def _fill_workbook(slice_data, proposal=None):
     tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
     tmp.close()
     shutil.copy(TEMPLATE, tmp.name)
     wb = load_workbook(tmp.name)
     ws = wb.active
 
+    has_proposal = proposal and proposal.get("특약목록")
     contracts = slice_data.get("계약", [])
-    _clear_values(ws)
+    _clear_values(ws, has_proposal=has_proposal)
     _fill_header(ws, slice_data)
     _fill_coverage(ws, slice_data)
-    _fill_sums(ws, contracts)
+    if has_proposal:
+        _fill_proposal(ws, proposal)
+    _fill_sums(ws, contracts, has_proposal=has_proposal)
     _fill_renewal(ws, contracts)
     _fill_review(ws, contracts)
-    _final_format(ws)
+    _final_format(ws, has_proposal=has_proposal)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -72,23 +75,31 @@ def _fill_workbook(slice_data):
     return buf.getvalue()
 
 
-# v10: D~J(col 4~10), K=합계(col 11)
+# v10: D~J(col 4~10), K=합계(col 11), L=제안(col 12), M=전체합계(col 13)
 _DATA_START = 4   # D
 _DATA_END = 10    # J
-_MAX_COL = 11     # K
+_MAX_COL = 11     # K (제안 없을 때)
+_MAX_COL_PROP = 13  # M (제안 있을 때)
 _REVIEW_START = 85
 _REVIEW_COUNT = 7
 
 
-def _clear_values(ws):
+def _clear_values(ws, has_proposal=False):
+    max_c = _MAX_COL_PROP if has_proposal else _MAX_COL
     ranges = [
-        (1, 1, 1, _MAX_COL),           # 제목
+        (1, 1, 1, max_c),              # 제목
         (3, _DATA_START, 7, _DATA_END), # 상품정보 (Row 3~7, D~J)
         (9, _DATA_START, 74, _DATA_END),# 보장금액
         (9, SUM_COL, 74, SUM_COL),      # K열 합계
-        (75, _DATA_START, 77, _MAX_COL),# 보험료
-        (_REVIEW_START, 1, _REVIEW_START + _REVIEW_COUNT - 1, _MAX_COL),
+        (75, _DATA_START, 77, max_c),   # 보험료
+        (_REVIEW_START, 1, _REVIEW_START + _REVIEW_COUNT - 1, max_c),
     ]
+    if has_proposal:
+        ranges.append((2, PROP_COL, 7, PROP_COL))      # L열 헤더
+        ranges.append((9, PROP_COL, 74, PROP_COL))      # L열 보장
+        ranges.append((2, TOTAL_COL, 7, TOTAL_COL))     # M열 헤더
+        ranges.append((9, TOTAL_COL, 74, TOTAL_COL))    # M열 합계
+
     for r_s, c_s, r_e, c_e in ranges:
         for r in range(r_s, r_e + 1):
             for c in range(c_s, c_e + 1):
@@ -142,17 +153,45 @@ def _fill_coverage(ws, slice_data):
                 safe_val(ws, row_num, col, amount if amount else None)
 
 
-def _fill_sums(ws, contracts):
+def _fill_proposal(ws, proposal):
+    """L열(col 12)에 신상품 제안 데이터 채우기"""
+    from services.proposal_parser import map_riders_to_rows
+
+    # 헤더
+    safe_val(ws, 2, PROP_COL, "신한라이프")
+    safe_val(ws, 3, PROP_COL, proposal.get("상품명", "제안 상품"))
+    # Row 7: 월보험료
+    total_prem = proposal.get("보험료합계", 0)
+    if total_prem:
+        safe_val(ws, 7, PROP_COL, total_prem)
+
+    # 보장금액 매핑
+    row_amounts = map_riders_to_rows(proposal.get("특약목록", []))
+    for row_num, amount in row_amounts.items():
+        if row_num in DATA_ROWS:
+            safe_val(ws, row_num, PROP_COL, amount)
+
+
+def _fill_sums(ws, contracts, has_proposal=False):
     from openpyxl.utils import get_column_letter
     start_ltr = get_column_letter(_DATA_START)   # D
     end_ltr = get_column_letter(_DATA_END)        # J
+    k_ltr = get_column_letter(SUM_COL)            # K
+    l_ltr = get_column_letter(PROP_COL)           # L
 
-    # 데이터 행 합계
+    # 데이터 행 합계 (K열)
     for row_num in DATA_ROWS:
         safe_val(ws, row_num, SUM_COL, f"=SUM({start_ltr}{row_num}:{end_ltr}{row_num})")
 
-    # Row 7 월보험료 합계
+    # Row 7 월보험료 합계 (K열)
     safe_val(ws, 7, SUM_COL, f"=SUM({start_ltr}7:{end_ltr}7)")
+
+    # 전체합계 M열 (K + L)
+    if has_proposal:
+        safe_val(ws, 2, TOTAL_COL, "전체합계")
+        for row_num in DATA_ROWS:
+            safe_val(ws, row_num, TOTAL_COL, f"={k_ltr}{row_num}+{l_ltr}{row_num}")
+        safe_val(ws, 7, TOTAL_COL, f"={k_ltr}7+{l_ltr}7")
 
     # Row 75 기납입보험료 — PDF 추출값 우선, 없으면 계산
     for ct in contracts:
@@ -186,6 +225,11 @@ def _fill_sums(ws, contracts):
         col_l = get_column_letter(col)
         safe_val(ws, 77, col, f"={col_l}75+{col_l}76")
     safe_val(ws, 77, SUM_COL, f"=SUM({start_ltr}77:{end_ltr}77)")
+
+    if has_proposal:
+        safe_val(ws, 75, TOTAL_COL, f"={k_ltr}75+{l_ltr}75")
+        safe_val(ws, 76, TOTAL_COL, f"={k_ltr}76+{l_ltr}76")
+        safe_val(ws, 77, TOTAL_COL, f"={k_ltr}77+{l_ltr}77")
 
 
 def _fill_renewal(ws, contracts):
@@ -294,9 +338,10 @@ def _build_review(contract):
     return " / ".join(checks)
 
 
-def _final_format(ws):
+def _final_format(ws, has_proposal=False):
+    max_c = _MAX_COL_PROP if has_proposal else _MAX_COL
     for r in range(1, ws.max_row + 1):
-        for c in range(1, _MAX_COL + 1):
+        for c in range(1, max_c + 1):
             cell = ws.cell(row=r, column=c)
             if cell.__class__.__name__ == "MergedCell":
                 continue
@@ -316,12 +361,20 @@ def _final_format(ws):
                     cell.alignment = Alignment(
                         horizontal="center", vertical="center", wrap_text=True,
                     )
+    # L열(제안) 상품명도 줄바꿈
+    if has_proposal:
+        for r in (3, 5, 6):
+            cell = ws.cell(row=r, column=PROP_COL)
+            if cell.__class__.__name__ != "MergedCell":
+                cell.alignment = Alignment(
+                    horizontal="center", vertical="center", wrap_text=True,
+                )
     # Row 5, 6 행 높이 — 2줄 텍스트 표시용
     ws.row_dimensions[5].height = 30
     ws.row_dimensions[6].height = 30
     # 리뷰 행 서식
     for r in range(_REVIEW_START, _REVIEW_START + _REVIEW_COUNT):
-        for c in range(1, _MAX_COL + 1):
+        for c in range(1, max_c + 1):
             cell = ws.cell(row=r, column=c)
             if cell.__class__.__name__ != "MergedCell":
                 cell.alignment = Alignment(

@@ -19,7 +19,9 @@ INSURER_KEYWORDS = [
 # ── v10 양식: 7상품 D~J, 합계 K(col 11) ──
 COL_IDX = {"D": 4, "E": 5, "F": 6, "G": 7, "H": 8, "I": 9, "J": 10}
 COL_LTRS = ["D", "E", "F", "G", "H", "I", "J"]
-SUM_COL = 11  # K열
+SUM_COL = 11   # K열 (기존 합계)
+PROP_COL = 12  # L열 (신상품 제안)
+TOTAL_COL = 13 # M열 (전체합계 = K + L)
 
 # 데이터 행 범위 (v10 양식 기준)
 DATA_ROWS = (

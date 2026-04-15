@@ -177,6 +177,83 @@ def _find_won_in_row(row: list) -> int:
     return 0
 
 
+# ── 제안서 특약명 → 템플릿 행 매핑 (긴 키워드 우선) ──
+_PROPOSAL_KW_MAP = [
+    # (keyword, row) — 긴 것부터 매칭
+    ("상급종합병원", 30),          # 상급병원암주요치료비
+    ("표적항암약물허가치료", 22),
+    ("카티", 23), ("CAR-T", 23),
+    ("항암세기조절방사선", 25),
+    ("항암양성자방사선", 26), ("항암양성자", 26),
+    ("항암중입자방사선", 27), ("항암중입자", 27),
+    ("항암방사선치료", 24),
+    ("항암약물치료", 21),
+    ("특정순환계", None),           # 하위 분류 필요
+    ("사망보험금", 9), ("사망", 9),
+]
+
+_CIRCULATORY_SUB = {
+    "수술": 46,        # 허혈심장수술
+    "혈전치료": 43,     # 허혈심장질환진단
+    "중환자실": 61,     # 중환자실입원비
+}
+
+
+def map_riders_to_rows(riders: list[dict]) -> dict[int, int]:
+    """제안서 특약 목록 → {row: 대표지급금액(만원)} 매핑.
+
+    같은 행에 여러 특약이 매핑되면 합산한다 (1-5종수술 등).
+    """
+    from services.item_map import SURGERY_TYPE_MAP
+    row_amounts: dict[int, int] = {}
+
+    for r in riders:
+        name = r["특약명"]
+        amount = r["대표지급금액"]
+        if not amount:
+            continue
+
+        row = _match_proposal_row(name)
+        if row is None:
+            continue
+
+        # 같은 행이면 큰 값 유지 (1-5종수술은 각 종별 최대값)
+        if row in row_amounts:
+            row_amounts[row] = max(row_amounts[row], amount)
+        else:
+            row_amounts[row] = amount
+
+    return row_amounts
+
+
+def _match_proposal_row(name: str) -> int | None:
+    """특약명에서 행 번호를 찾는다."""
+    from services.item_map import SURGERY_TYPE_MAP
+
+    # 1-5종수술 처리
+    for stype, row in SURGERY_TYPE_MAP.items():
+        if stype in name and "수술" in name:
+            return row
+
+    # 특정순환계 하위분류
+    if "특정순환계" in name:
+        for sub, row in _CIRCULATORY_SUB.items():
+            if sub in name:
+                return row
+        return None
+
+    # 키워드 매칭 (리스트 순서 = 우선순위)
+    for kw, row in _PROPOSAL_KW_MAP:
+        if kw in name:
+            return row
+
+    # 주계약(보험 상품명) → 사망보험금(Row 9)으로 간주
+    if "보험" in name and "특약" not in name:
+        return 9
+
+    return None
+
+
 def _clean_name(raw: str) -> str:
     """특약명 정리 — 줄바꿈 제거, 공백 정규화"""
     name = raw.replace("\n", " ").strip()

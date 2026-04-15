@@ -18,6 +18,6 @@ def analyze_and_generate(
     return data, excel_files
 
 
-def regenerate_excel(data: dict, **_kw) -> list[tuple[str, bytes]]:
+def regenerate_excel(data: dict, proposal: dict | None = None, **_kw) -> list[tuple[str, bytes]]:
     """기존 분석 데이터로 엑셀만 재생성 (PDF 재분석 없이)"""
-    return generate_analysis_excel(data)
+    return generate_analysis_excel(data, proposal=proposal)

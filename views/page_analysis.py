@@ -58,14 +58,9 @@ def render():
 
         if client_name:
             data["고객명"] = client_name
-            try:
-                from services.analysis_engine import regenerate_excel
-                excel_files = regenerate_excel(data)
-            except Exception as e:
-                st.error(safe_error("엑셀 재생성", e))
-                return
 
         # 상품제안서 파싱
+        proposal_data = None
         if use_proposal and proposal_file is not None:
             from services.proposal_parser import parse_proposal
             try:
@@ -76,6 +71,14 @@ def render():
                 st.session_state.pop("proposal_data", None)
         else:
             st.session_state.pop("proposal_data", None)
+
+        # 고객명 변경 or 제안 데이터 → 엑셀 재생성
+        if client_name or (proposal_data and proposal_data.get("특약목록")):
+            try:
+                from services.analysis_engine import regenerate_excel
+                excel_files = regenerate_excel(data, proposal=proposal_data)
+            except Exception as e:
+                st.warning(safe_error("엑셀 재생성", e))
 
         st.session_state.analysis_data = data
         st.session_state.excel_files = excel_files
