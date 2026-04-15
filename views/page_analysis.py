@@ -112,6 +112,10 @@ def render():
         # 리뷰 통합 토글 — 엑셀 2개 이상일 때만 표시
         all_contracts = data.get("_all_contracts", data.get("계약", []))
         if len(all_contracts) > 7:
+            # key 초기값 설정 (최초 1회)
+            if "review_last_toggle" not in st.session_state:
+                st.session_state.review_last_toggle = False
+
             def _on_review_toggle():
                 rl = st.session_state.review_last_toggle
                 from services.analysis_engine import regenerate_excel
@@ -122,11 +126,10 @@ def render():
                         d, proposal=proposal_d, review_last=rl,
                     )
                 except Exception as e:
-                    pass  # 에러 시 기존 엑셀 유지
+                    pass
 
             st.toggle(
                 "리뷰/갱신을 마지막 엑셀에 통합",
-                value=False,
                 help="갱신구분·보험리뷰를 마지막 엑셀에 전체 계약 기준으로 통합합니다",
                 key="review_last_toggle",
                 on_change=_on_review_toggle,
