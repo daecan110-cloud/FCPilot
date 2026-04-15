@@ -80,6 +80,20 @@ def get_current_user_id() -> str:
     return user.id if user else ""
 
 
+def get_current_user_email() -> str:
+    user = st.session_state.get("user")
+    return user.email if user else ""
+
+
+# Claude API 사용 허용 이메일
+_ADMIN_EMAILS = {"japanstudy1205@gmail.com"}
+
+
+def is_api_allowed() -> bool:
+    """Claude API 기능 사용 가능 여부 (관리자 이메일만 허용)"""
+    return get_current_user_email() in _ADMIN_EMAILS
+
+
 def get_user_status() -> str:
     """users_settings.status 반환 — session_state 캐싱으로 매 렌더 DB 조회 방지"""
     if "cached_user_status" in st.session_state:

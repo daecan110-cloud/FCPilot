@@ -2,13 +2,18 @@
 import streamlit as st
 from config import CLAUDE_MODEL
 from services.yakwan_engine import analyze_yakwan, format_display
-from auth import get_current_user_id
+from auth import get_current_user_id, is_api_allowed
 from utils.supabase_client import get_supabase_client
 from utils.helpers import safe_error
 
 
 def render_yakwan_section(data: dict):
     st.subheader("약관 분석")
+
+    if not is_api_allowed():
+        st.info("약관 분석 기능은 관리자만 사용할 수 있습니다.")
+        return
+
     st.caption("계약을 선택하고 약관 PDF를 업로드 → 면책/특이사항 분석 + AI 상담으로 K열 내용 확정")
 
     contracts = data.get("_all_contracts", data.get("계약", []))
