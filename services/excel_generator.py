@@ -66,7 +66,7 @@ def _fill_workbook(slice_data, proposal=None):
     if has_proposal:
         _fill_proposal(ws, proposal)
         _format_proposal_cols(ws)
-    _fill_sums(ws, contracts, has_proposal=has_proposal)
+    _fill_sums(ws, contracts, has_proposal=has_proposal, proposal=proposal)
     _fill_renewal(ws, contracts)
     _fill_review(ws, contracts)
     _final_format(ws, has_proposal=has_proposal)
@@ -159,28 +159,44 @@ def _fill_proposal(ws, proposal):
     """L열(col 12)에 신상품 제안 데이터 채우기"""
     from services.proposal_parser import map_riders_to_rows
 
-    # 헤더
+    riders = proposal.get("특약목록", [])
+    주계약 = riders[0] if riders else {}
+
+    # Row 2: 헤더 (병합 전 값)
     safe_val(ws, 2, PROP_COL, "신상품 제안")
+    # Row 3: 상품명 (L3:L4 병합 예정)
     safe_val(ws, 3, PROP_COL, proposal.get("상품명", "제안 상품"))
+    # Row 5: 납입기간 (보장기간) (L5:L6 병합 예정)
+    납입 = 주계약.get("납입기간", "")
+    보장 = 주계약.get("보험기간", "")
+    if 납입 and 보장:
+        safe_val(ws, 5, PROP_COL, f"{납입}\n({보장})")
+    elif 납입:
+        safe_val(ws, 5, PROP_COL, 납입)
+    else:
+        safe_val(ws, 5, PROP_COL, 보장)
     # Row 7: 월보험료
     total_prem = proposal.get("보험료합계", 0)
     if total_prem:
         safe_val(ws, 7, PROP_COL, total_prem)
 
     # 보장금액 매핑
-    row_amounts = map_riders_to_rows(proposal.get("특약목록", []))
+    row_amounts = map_riders_to_rows(riders)
     for row_num, amount in row_amounts.items():
         if row_num in DATA_ROWS:
             safe_val(ws, row_num, PROP_COL, amount)
 
 
 def _format_proposal_cols(ws):
-    """K열 서식을 L, M열에 복사 (배경색, 보더, 폰트, 숫자형식, 정렬)"""
+    """K열 서식을 L, M열에 복사 + 셀 병합"""
     from openpyxl.utils import get_column_letter
 
+    l_ltr = get_column_letter(PROP_COL)    # L
+    m_ltr = get_column_letter(TOTAL_COL)   # M
+
     # 열 너비 설정
-    ws.column_dimensions[get_column_letter(PROP_COL)].width = 18
-    ws.column_dimensions[get_column_letter(TOTAL_COL)].width = 18
+    ws.column_dimensions[l_ltr].width = 18
+    ws.column_dimensions[m_ltr].width = 18
 
     # K열 서식을 L, M 열에 복사 (Row 1 ~ 81)
     for r in range(1, 82):
@@ -197,36 +213,36 @@ def _format_proposal_cols(ws):
             dst.number_format = src.number_format
             dst.alignment = copy(src.alignment)
 
-    # L2 헤더: "신상품 제안" — K2와 동일 서식
+    # 병합 전에 Row 2~6 서식을 먼저 적용
     src2 = ws.cell(row=2, column=SUM_COL)
-    l2 = ws.cell(row=2, column=PROP_COL)
-    l2.font = Font(name=_FONT_NAME, size=9, bold=True)
-    l2.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    # M2 헤더: "전체합계"
-    m2 = ws.cell(row=2, column=TOTAL_COL)
-    m2.font = Font(name=_FONT_NAME, size=9, bold=True)
-    m2.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    # K2:K6 병합 영역 → L3~L6, M3~M6은 K2 서식 복사
     _thin = Border(
         left=Side(style="thin"), right=Side(style="thin"),
         top=Side(style="thin"), bottom=Side(style="thin"),
     )
-    for r in range(3, 7):
+    _hdr_style = {
+        "font": Font(name=_FONT_NAME, size=9, bold=True),
+        "fill": copy(src2.fill),
+        "border": _thin,
+        "number_format": "#,##0",
+        "alignment": Alignment(horizontal="center", vertical="center", wrap_text=True),
+    }
+    for r in range(2, 7):
         for col in (PROP_COL, TOTAL_COL):
             cell = ws.cell(row=r, column=col)
             if cell.__class__.__name__ != "MergedCell":
-                cell.font = Font(name=_FONT_NAME, size=9, bold=True)
-                cell.fill = copy(src2.fill)
-                cell.border = _thin
-                cell.number_format = "#,##0"
-                cell.alignment = Alignment(
-                    horizontal="center", vertical="center", wrap_text=True,
-                )
+                for attr, val in _hdr_style.items():
+                    setattr(cell, attr, copy(val) if attr != "number_format" else val)
+
+    # ── 셀 병합 ──
+    # L3:L4 — 상품명
+    ws.merge_cells(f"{l_ltr}3:{l_ltr}4")
+    # L5:L6 — 납입기간(보장기간)
+    ws.merge_cells(f"{l_ltr}5:{l_ltr}6")
+    # M2:M6 — "전체합계"
+    ws.merge_cells(f"{m_ltr}2:{m_ltr}6")
 
 
-def _fill_sums(ws, contracts, has_proposal=False):
+def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
     from openpyxl.utils import get_column_letter
     start_ltr = get_column_letter(_DATA_START)   # D
     end_ltr = get_column_letter(_DATA_END)        # J
@@ -281,6 +297,18 @@ def _fill_sums(ws, contracts, has_proposal=False):
     safe_val(ws, 77, SUM_COL, f"=SUM({start_ltr}77:{end_ltr}77)")
 
     if has_proposal:
+        # L열 납입할보험료 — 월보험료 × 납입개월
+        from services.proposal_parser import _parse_납입개월
+        if proposal:
+            riders = proposal.get("특약목록", [])
+            주계약 = riders[0] if riders else {}
+            납입개월 = _parse_납입개월(주계약.get("납입기간", ""))
+            total_prem = proposal.get("보험료합계", 0)
+            if 납입개월 and total_prem:
+                topay = total_prem * 납입개월
+                safe_val(ws, 76, PROP_COL, topay)
+                safe_val(ws, 77, PROP_COL, topay)  # 기납입 0이므로 총납입 = 납입할
+
         safe_val(ws, 75, TOTAL_COL, f"={k_ltr}75+{l_ltr}75")
         safe_val(ws, 76, TOTAL_COL, f"={k_ltr}76+{l_ltr}76")
         safe_val(ws, 77, TOTAL_COL, f"={k_ltr}77+{l_ltr}77")

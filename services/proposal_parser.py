@@ -254,6 +254,17 @@ def _match_proposal_row(name: str) -> int | None:
     return None
 
 
+def _parse_납입개월(납입기간: str) -> int:
+    """'20년납' → 240, '10년납' → 120"""
+    m = re.search(r"(\d+)\s*년", 납입기간)
+    if m:
+        return int(m.group(1)) * 12
+    m = re.search(r"(\d+)\s*개월", 납입기간)
+    if m:
+        return int(m.group(1))
+    return 0
+
+
 def _clean_name(raw: str) -> str:
     """특약명 정리 — 줄바꿈 제거, 공백 정규화"""
     name = raw.replace("\n", " ").strip()
