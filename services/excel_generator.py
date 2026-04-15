@@ -454,6 +454,9 @@ def _final_format(ws, has_proposal=False):
     # Row 5, 6 행 높이 — 2줄 텍스트 표시용
     ws.row_dimensions[5].height = 30
     ws.row_dimensions[6].height = 30
+    # Row 49~53 (특정순환계) — 2줄 텍스트
+    for r in range(49, 54):
+        ws.row_dimensions[r].height = 30
     # 리뷰 행 서식
     for r in range(_REVIEW_START, _REVIEW_START + _REVIEW_COUNT):
         for c in range(1, max_c + 1):
