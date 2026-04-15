@@ -747,7 +747,9 @@ def _final_format(ws, has_proposal=False):
                 cell.alignment = Alignment(
                     horizontal="left", vertical="center", wrap_text=True,
                 )
-    # 페이지 나누기 — 보장금액과 갱신/리뷰 사이
+    # 인쇄 설정 — fitToPage 끄고 수동 페이지 나누기 활성화
+    ws.sheet_properties.pageSetUpPr.fitToPage = False
+    ws.page_setup.scale = 65
     from openpyxl.worksheet.pagebreak import Break
     ws.row_breaks.brk = []
     ws.row_breaks.append(Break(id=84))
