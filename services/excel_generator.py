@@ -25,10 +25,17 @@ def generate_analysis_excel(data: dict, proposal: dict | None = None, **_kw) -> 
     coverage_raw = data.get("_coverage_raw", {})
     customer = data.get("고객명", "고객")
 
-    contracts = all_contracts[:7]
-    sd = _make_slice(data, contracts, coverage_raw)
-    b = _fill_workbook(sd, proposal=proposal)
-    return [(f"{customer}_보장분석표.xlsx", b)]
+    results: list[tuple[str, bytes]] = []
+    # 7개씩 분할 — 제안서는 첫 번째 파일에만 포함
+    for page, start in enumerate(range(0, len(all_contracts), 7)):
+        chunk = all_contracts[start:start + 7]
+        sd = _make_slice(data, chunk, coverage_raw)
+        prop = proposal if page == 0 else None
+        b = _fill_workbook(sd, proposal=prop)
+        suffix = f"_{page + 1}" if len(all_contracts) > 7 else ""
+        results.append((f"{customer}_보장분석표{suffix}.xlsx", b))
+
+    return results
 
 
 def _make_slice(base, contracts, coverage_raw):
