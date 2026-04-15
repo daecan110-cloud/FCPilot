@@ -736,12 +736,9 @@ def _final_format(ws, has_proposal=False):
     # Row 5, 6 행 높이 — 2줄 텍스트 표시용
     ws.row_dimensions[5].height = 30
     ws.row_dimensions[6].height = 30
-    # Row 30~34 (암 주요치료비) — 2줄 텍스트
-    for r in range(30, 35):
-        ws.row_dimensions[r].height = 20
-    # Row 49~53 (특정순환계) — 2줄 텍스트
-    for r in range(49, 54):
-        ws.row_dimensions[r].height = 20
+    # Row 30~34 (암 주요치료비), Row 49~53 (특정순환계) — 2줄 텍스트
+    for r in list(range(30, 35)) + list(range(49, 54)):
+        ws.row_dimensions[r].height = 25
     # Row 80~82 (보험료)
     for r in range(80, 83):
         ws.row_dimensions[r].height = 18
