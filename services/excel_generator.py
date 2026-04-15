@@ -454,8 +454,8 @@ def _detect_silbi_gen(name: str, company: str, start_date: str = "") -> str:
     combined = name + company
 
     # 키워드 기반 (가장 정확)
-    if any(k in combined for k in ["착한", "5세대", "비급여특약"]):
-        return "5세대"
+    if any(k in combined for k in ["착한", "비급여특약"]):
+        return "4세대"
     if any(k in combined for k in ["4세대", "신실손"]):
         return "4세대"
     if any(k in combined for k in ["표준화", "3세대"]):
@@ -464,24 +464,26 @@ def _detect_silbi_gen(name: str, company: str, start_date: str = "") -> str:
         return "2세대"
     if any(k in combined for k in ["1세대"]):
         return "1세대"
+    if any(k in combined for k in ["5세대"]):
+        return "5세대"
 
     # 상품명에 연도가 있으면
     m = re.search(r"(\d{4})", name)
     if m:
         year = int(m.group(1))
-        if year >= 2021:
+        if year >= 2026:
             return "5세대"
         if year >= 2017:
             return "4세대"
 
-    # 가입시기 기반 (2009-07 이전=1세대, ~2013-03=2세대, ~2017-03=3세대, ~2021-06=4세대, 이후=5세대)
+    # 가입시기 기반 (~2009.09=1세대, ~2013.03=2세대, ~2017.03=3세대, ~2026.04=4세대, 2026.05~=5세대)
     if start_date:
         m = re.match(r"(\d{4})-?(\d{2})?", start_date)
         if m:
             y = int(m.group(1))
             mo = int(m.group(2) or "1")
             ym = y * 100 + mo
-            if ym >= 202107:
+            if ym >= 202605:
                 return "5세대"
             if ym >= 201704:
                 return "4세대"
