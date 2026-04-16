@@ -3,6 +3,15 @@ import re
 from services.item_map import ITEM_ROW_MAP, find_row_for_item
 from services.pdf_extractor import parse_amount
 
+# 동일 이름(truncated)이 N회 반복되면 각 subtype 행으로 순차 분배
+# "특정순환계질환주요치료비특약..."가 5회 반복 → Row 49~53
+# "상급종합병원(...)암주요치..."가 4회 반복 → Row 30~33
+# 키: 이름에 포함되어야 할 서브스트링 / 값: 순차 분배할 행 리스트
+_EXPAND_GROUPS = [
+    ("특정순환계", [49, 50, 51, 52, 53]),
+    ("암주요치", [30, 31, 32, 33]),  # "상급종합병원...암주요치" truncated
+]
+
 
 def parse_detail_pages(pdf, all_contracts: list, coverage_raw: dict,
                        seen_rows: dict = None):
@@ -70,38 +79,88 @@ def _match_detail_to_contract(text: str, all_contracts: list, already_matched: s
 
 def _extract_detail_table(tbl: list, contract_idx: int, coverage_raw: dict,
                           contract_seen: set = None):
-    """상세 보장 테이블에서 (보장명, 보장금액) 추출. 원→만원 변환."""
+    """상세 보장 테이블에서 (보장명, 보장금액) 추출. 원→만원 변환.
+
+    중요: 동일 truncated 이름이 N회 반복되면 _EXPAND_GROUPS 규칙으로
+    Row 49~53(특정순환계) 또는 Row 30~33(암주요치)에 순차 분배.
+    """
     if contract_seen is None:
         contract_seen = set()
     ncols = len(tbl[0]) if tbl[0] else 0
 
+    # 1단계: (name, amount_str) 쌍을 읽는 순서대로 수집
+    pairs: list[tuple[str, str]] = []
     if ncols == 5:
         for row in tbl:
             if not row:
                 continue
-            _apply_detail_item(
-                (row[0] or "").strip(), (row[2] or "").strip(),
-                contract_idx, coverage_raw, contract_seen,
-            )
-            _apply_detail_item(
-                (row[3] or "").strip(), (row[4] or "").strip(),
-                contract_idx, coverage_raw, contract_seen,
-            )
-
+            name1 = (row[0] or "").strip()
+            amt1 = (row[2] or "").strip()
+            name2 = (row[3] or "").strip()
+            amt2 = (row[4] or "").strip()
+            if name1 and amt1:
+                pairs.append((name1, amt1))
+            if name2 and amt2:
+                pairs.append((name2, amt2))
     elif ncols == 2:
         for row in tbl:
             if not row:
                 continue
-            _apply_detail_item(
-                (row[0] or "").strip(), (row[1] or "").strip(),
-                contract_idx, coverage_raw, contract_seen,
-            )
+            name = (row[0] or "").strip()
+            amt = (row[1] or "").strip()
+            if name and amt:
+                pairs.append((name, amt))
+
+    # 2단계: 동일 키워드 그룹 묶어서 분배 (선순위: _EXPAND_GROUPS)
+    used_indices: set[int] = set()
+    for kw, rows in _EXPAND_GROUPS:
+        # "비급여암주요치료"는 Row 34 단독 처리 대상 — 그룹 분배에서 제외
+        group_idxs = [
+            i for i, (n, _) in enumerate(pairs)
+            if kw in n and i not in used_indices and "비급여" not in n
+        ]
+        if not group_idxs:
+            continue
+
+        # 단일 항목 + 상급종합병원 암주요치: Row 30~33 모든 subtype에 동일 금액 복제
+        # (신한/교보 특약은 통상 1회 지급이나 subtype 전체 대상이므로 합계 왜곡 방지 위해 복제)
+        if kw == "암주요치" and len(group_idxs) == 1:
+            idx = group_idxs[0]
+            name, amt = pairs[idx]
+            if "상급종합병원" in name or "상급병원" in name:
+                for r in rows:  # 30, 31, 32, 33
+                    _apply_detail_item(
+                        name, amt, contract_idx, coverage_raw, contract_seen,
+                        row_override=r,
+                    )
+                used_indices.add(idx)
+                continue
+
+        # N개 순차 분배 (N개 → rows[0]~rows[N-1])
+        if len(group_idxs) >= 2:
+            for seq, idx in enumerate(group_idxs):
+                if seq >= len(rows):
+                    break
+                name, amt = pairs[idx]
+                _apply_detail_item(
+                    name, amt, contract_idx, coverage_raw, contract_seen,
+                    row_override=rows[seq],
+                )
+                used_indices.add(idx)
+
+    # 3단계: 나머지는 기존 키워드 매칭 로직
+    for i, (name, amt) in enumerate(pairs):
+        if i in used_indices:
+            continue
+        _apply_detail_item(name, amt, contract_idx, coverage_raw, contract_seen)
 
 
 def _apply_detail_item(name: str, amount_str: str, contract_idx: int,
-                       coverage_raw: dict, contract_seen: set = None):
+                       coverage_raw: dict, contract_seen: set = None,
+                       row_override: int = None):
     """보장명+금액(원 단위) → 매핑된 행에 만원 단위로 저장 (누락분만 보완).
     Page 6에서 이미 확인된(0 포함) 항목은 덮어쓰지 않음.
+    row_override 지정 시 ITEM_ROW_MAP 매칭 무시하고 지정 행에 저장 (분배 용도).
     """
     if contract_seen is None:
         contract_seen = set()
@@ -110,12 +169,16 @@ def _apply_detail_item(name: str, amount_str: str, contract_idx: int,
     if name in ("보장명", "구분", ""):
         return
 
-    row_num = find_row_for_item(name)
+    if row_override is not None:
+        row_num = row_override
+    else:
+        row_num = find_row_for_item(name)
     if row_num is None:
         return
 
     # Page 6에서 이미 확인된 항목(값이 0이어도) → 덮어쓰지 않음
-    if row_num in contract_seen:
+    # (row_override 는 특약 분배 용도라서 contract_seen 검사 생략 — 특약 상세가 우선)
+    if row_override is None and row_num in contract_seen:
         return
 
     amount_won = parse_amount(amount_str)

@@ -511,7 +511,12 @@ def _fill_renewal_all(ws, all_contracts):
 
 
 def _fill_review_all(ws, all_contracts, all_coverage_raw):
-    """전체 계약에 대해 리뷰 행을 채움 (7행 초과 시 동적 확장)."""
+    """전체 계약에 대해 리뷰 행을 채움 (7행 초과 시 동적 확장).
+
+    중요: insert_rows 후 데이터 행(review_start ~ review_start+n-1) 별로
+    A:B(보험사/상품명), E:H(체크사항), I:K(특이사항) 병합을 재생성해야 함.
+    A열은 hidden이므로 병합이 없으면 값이 사라진 것처럼 보임.
+    """
     import math
     n_groups = math.ceil(len(all_contracts) / 7)
     extra_renewal = (n_groups - 1) * 2 if n_groups > 1 else 0
@@ -535,6 +540,28 @@ def _fill_review_all(ws, all_contracts, all_coverage_raw):
                         del ws._cells[(row, col_n)]
 
         ws.insert_rows(review_start + _REVIEW_COUNT, extra_review)
+
+    # 헤더 행 병합 재생성 (타이틀 + 컬럼 헤더)
+    title_row = review_start - 2  # "📋 현재 유지중인 보험 리뷰"
+    header_row = review_start - 1  # "보험사/상품명 | 가입일/만기 | 월보험료 | ..."
+    _safe_merge(ws, f"A{title_row}:K{title_row}")
+    _safe_merge(ws, f"A{header_row}:B{header_row}")
+    _safe_merge(ws, f"E{header_row}:H{header_row}")
+    _safe_merge(ws, f"I{header_row}:K{header_row}")
+    # 헤더 타이틀/라벨 값 복원
+    safe_val(ws, title_row, 1, "📋  현재 유지중인 보험 리뷰")
+    safe_val(ws, header_row, 1, "보험사 / 상품명")
+    safe_val(ws, header_row, 3, "가입일 / 만기")
+    safe_val(ws, header_row, 4, "월 보험료")
+    safe_val(ws, header_row, 5, "주요 체크사항")
+    safe_val(ws, header_row, 9, "특이사항 (면책기간, 보장범위 등)")
+
+    # 데이터 행 병합 재생성 (A:B, E:H, I:K) — 값 쓰기 전에 먼저 병합
+    for i in range(n_contracts):
+        r = review_start + i
+        _safe_merge(ws, f"A{r}:B{r}")
+        _safe_merge(ws, f"E{r}:H{r}")
+        _safe_merge(ws, f"I{r}:K{r}")
 
     for i, c in enumerate(all_contracts):
         r = review_start + i
@@ -560,6 +587,16 @@ def _fill_review_all(ws, all_contracts, all_coverage_raw):
                     horizontal="left", vertical="center", wrap_text=True,
                 )
         ws.row_dimensions[r].height = 70
+
+
+def _safe_merge(ws, range_str: str):
+    """이미 존재하는 병합이면 무시, 없으면 생성."""
+    existing = {str(m) for m in ws.merged_cells.ranges}
+    if range_str not in existing:
+        try:
+            ws.merge_cells(range_str)
+        except Exception:
+            pass
 
 
 def _short_name(contract):

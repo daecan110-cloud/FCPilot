@@ -1,8 +1,8 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 17 완료 (디버깅+코드 품질 개선)** — 영민 테스트 대기 중
-- 마지막 세션: 2026-04-08 (Claude Code)
+- Phase: **Sprint 18 완료 (보장분석 파싱/서식 디버깅)** — 영민 테스트 대기 중
+- 마지막 세션: 2026-04-16 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
 
@@ -234,6 +234,26 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 
 ### 보안 체크
 - [x] 8항목 전체 통과 (API키/고객데이터/print/bare except/HTML이스케이프/HTTP/gitignore/fc_id)
+
+---
+
+## Sprint 18 — 완료 (2026-04-16)
+
+### 보장분석 엑셀 서식 복구
+- [x] `_fill_review_all` 병합 재생성 — review_last=True + 계약 8개+ 시 insert_rows 후 A:B/E:H/I:K 병합이 해제만 되고 복구 안 되던 문제 해결
+- [x] A열 hidden인데 병합 없으면 보험사/상품명이 보이지 않던 현상 수정
+- [x] 헤더 타이틀/라벨(월 보험료, 주요 체크사항, 특이사항) 값 복원
+
+### PDF 특약 파싱 개선
+- [x] `item_map.py` 키워드 추가 — `상급종합병원암주요치료`, `비급여암주요치료`, `암주요치료특약`, `특정순환계질환주요치료비특약`
+- [x] `pdf_extractor_detail.py` 동일 truncated 이름 분배 로직 — N회 반복 시 Row 30~33/49~53 순차 분배
+- [x] 상급종합병원 암주요치 단일 entry 시 Row 30~33 복제 (신한/교보 rider 특성)
+- [x] `row_override` 파라미터 — 특약 상세 우선 순위로 요약 페이지 덮어쓰기
+
+### 검증 (Downloads)
+- [x] 김영민 Contract 1 특정순환계 Row 49-52 (2000/2000/2000/1000) ✅
+- [x] 김영민 Contract 2 암주요치료 Row 30-33 (1000 복제) ✅
+- [x] YEXIANG 2번 파일 Row 92~105 A:B/E:H/I:K 병합 전부 복구 ✅
 
 ---
 
