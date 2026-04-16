@@ -432,6 +432,15 @@ def _fill_renewal_all(ws, all_contracts):
 
         ws.insert_rows(87, extra_rows)
 
+        # 삽입된 빈 행(87 ~ 86+extra_rows)에 Row 85-86 서식 복사 (fill/border/font)
+        for i in range(extra_rows):
+            r_new = 87 + i
+            r_src = 85 + (i % 2)  # 85(갱신) ↔ 86(보험료변화) 순환
+            _copy_row_style(ws, r_src, r_new, cols=range(1, _MAX_COL_PROP + 1))
+            src_h = ws.row_dimensions[r_src].height if ws.row_dimensions.get(r_src) else None
+            if src_h:
+                ws.row_dimensions[r_new].height = src_h
+
         # 하단 병합 재생성 (밀린 위치)
         review_title_row = 88 + extra_rows  # 리뷰 타이틀
         review_hdr_row = review_title_row + 1
@@ -541,6 +550,14 @@ def _fill_review_all(ws, all_contracts, all_coverage_raw):
 
         ws.insert_rows(review_start + _REVIEW_COUNT, extra_review)
 
+        # 삽입된 빈 리뷰 행에 기존 템플릿 리뷰 5행(review_start~review_start+4) 서식 복사
+        # (템플릿엔 5가지 파스텔 색상 — EBF3FB/FFF8E7/F5F0FA/F0FAFA/F5F5F0 — 순환)
+        for i in range(extra_review):
+            r_new = review_start + _REVIEW_COUNT + i
+            r_src = review_start + ((_REVIEW_COUNT + i) % 5)  # 5색 순환
+            _copy_row_style(ws, r_src, r_new, cols=range(1, _MAX_COL_PROP + 1))
+            ws.row_dimensions[r_new].height = 70
+
     # 헤더 행 병합 재생성 (타이틀 + 컬럼 헤더)
     title_row = review_start - 2  # "📋 현재 유지중인 보험 리뷰"
     header_row = review_start - 1  # "보험사/상품명 | 가입일/만기 | 월보험료 | ..."
@@ -597,6 +614,24 @@ def _safe_merge(ws, range_str: str):
             ws.merge_cells(range_str)
         except Exception:
             pass
+
+
+def _copy_row_style(ws, src_row: int, dst_row: int, cols):
+    """src_row의 셀 서식(fill, border, font, alignment, number_format)을 dst_row로 복사.
+    insert_rows 로 생긴 빈 행은 기본 서식이라 템플릿 색상/테두리가 사라지는 것을 보완.
+    """
+    for c in cols:
+        src = ws.cell(row=src_row, column=c)
+        dst = ws.cell(row=dst_row, column=c)
+        if dst.__class__.__name__ == "MergedCell":
+            continue
+        if src.__class__.__name__ == "MergedCell":
+            continue
+        dst.fill = copy(src.fill)
+        dst.border = copy(src.border)
+        dst.font = copy(src.font)
+        dst.alignment = copy(src.alignment)
+        dst.number_format = src.number_format
 
 
 def _short_name(contract):
