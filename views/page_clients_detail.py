@@ -128,37 +128,51 @@ def _render_analysis_history(sb, fc_id: str, client_name: str):
 
 
 def _render_client_delete_confirm(sb, client_id: str, fc_id: str):
-    """삭제 확인 다이얼로그. 고객 + FK 참조 레코드 순차 삭제."""
+    """삭제 확인 다이얼로그. 고객 + FK 참조 레코드 순차 삭제.
+    참조 테이블이 DB에 없는 경우(마이그레이션 미적용) PGRST205 에러는 무시하고 진행.
+    """
     confirm_key = f"confirm_del_client_{client_id}"
     st.warning("고객 정보와 모든 상담 이력, 리마인드, 계약, 보장분석 이력이 삭제됩니다. 계속하시겠습니까?")
     col_y, col_n = st.columns(2)
     if col_y.button("삭제 확인", type="primary", use_container_width=True, key=f"del_yes_{client_id}"):
+        # RPC 우선 — 트랜잭션 원자성 보장 (017 마이그레이션 적용 시)
         try:
-            # RPC 우선 — 트랜잭션 원자성 보장 (017 마이그레이션 적용 시)
-            # 미적용 환경 대응 fallback: 명시적 순차 delete (FK CASCADE 있어도 안전하게)
+            sb.rpc("delete_client", {
+                "p_client_id": client_id,
+                "p_fc_id": fc_id,
+            }).execute()
+        except Exception as rpc_err:
+            # RPC 미등록/권한실패/참조테이블 미생성 → 직접 순차 delete로 폴백
+            print(f"[delete_client RPC 실패, 직접 삭제] {rpc_err}")
+            for tbl in ("fp_reminders", "client_contracts", "contact_logs"):
+                _safe_table_delete(sb, tbl, "client_id", client_id, fc_id)
+            # 마지막으로 clients 본체 삭제
             try:
-                sb.rpc("delete_client", {
-                    "p_client_id": client_id,
-                    "p_fc_id": fc_id,
-                }).execute()
-            except Exception as rpc_err:
-                # RPC 미등록 또는 권한 실패 → 직접 삭제로 폴백
-                print(f"[delete_client RPC 실패, 직접 삭제 시도] {rpc_err}")
-                sb.table("fp_reminders").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
-                sb.table("client_contracts").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
-                sb.table("contact_logs").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
                 sb.table("clients").delete().eq("id", client_id).eq("fc_id", fc_id).execute()
-            st.session_state.pop(confirm_key, None)
-            st.session_state.clients_view = "list"
-            st.rerun()
-        except Exception as e:
-            print(f"[고객 삭제 오류] client_id={client_id} fc_id={fc_id} err={e}")
-            st.error(safe_error("삭제", e))
-            # 디버깅: 실제 에러 내용 표시 (임시)
-            st.code(f"{type(e).__name__}: {e}")
+            except Exception as e:
+                print(f"[clients 삭제 오류] {e}")
+                st.error(safe_error("삭제", e))
+                st.code(f"{type(e).__name__}: {e}")
+                return
+        st.session_state.pop(confirm_key, None)
+        st.session_state.clients_view = "list"
+        st.rerun()
     if col_n.button("취소", use_container_width=True, key=f"del_no_{client_id}"):
         st.session_state.pop(confirm_key, None)
         st.rerun()
+
+
+def _safe_table_delete(sb, table: str, key_col: str, key_val: str, fc_id: str):
+    """테이블 존재하면 삭제, 없으면(PGRST205) 무시."""
+    try:
+        sb.table(table).delete().eq(key_col, key_val).eq("fc_id", fc_id).execute()
+    except Exception as e:
+        err_str = str(e)
+        if "PGRST205" in err_str or "Could not find the table" in err_str:
+            print(f"[{table} 미생성 — 건너뜀]")
+        else:
+            # 다른 에러는 경고만 찍고 계속 (부분 삭제 허용)
+            print(f"[{table} 삭제 실패 — 계속 진행] {e}")
 
 
 
