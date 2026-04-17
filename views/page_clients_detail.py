@@ -154,6 +154,8 @@ def _render_client_delete_confirm(sb, client_id: str, fc_id: str):
         except Exception as e:
             print(f"[고객 삭제 오류] client_id={client_id} fc_id={fc_id} err={e}")
             st.error(safe_error("삭제", e))
+            # 디버깅: 실제 에러 내용 표시 (임시)
+            st.code(f"{type(e).__name__}: {e}")
     if col_n.button("취소", use_container_width=True, key=f"del_no_{client_id}"):
         st.session_state.pop(confirm_key, None)
         st.rerun()
