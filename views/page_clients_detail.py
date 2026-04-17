@@ -152,7 +152,6 @@ def _render_client_delete_confirm(sb, client_id: str, fc_id: str):
             except Exception as e:
                 print(f"[clients 삭제 오류] {e}")
                 st.error(safe_error("삭제", e))
-                st.code(f"{type(e).__name__}: {e}")
                 return
         st.session_state.pop(confirm_key, None)
         st.session_state.clients_view = "list"
