@@ -10,5 +10,7 @@ maxUploadSize = 10
 enableStaticServing = true
 
 [client]
-toolbarMode = "minimal"
+toolbarMode = "viewer"
 showSidebarNavigation = false
+# 프로덕션: 에러 스택 트레이스 숨김 (개발자 모드로 들어가도 내부 에러 코드 노출 방지)
+showErrorDetails = false
