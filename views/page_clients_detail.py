@@ -1,4 +1,4 @@
-"""고객 상세 — 기본 정보 + 탭 (상담이력/리마인드/보장분석/삭제)"""
+"""고객 상세 — 기본 정보 + 탭 (상담이력/리마인드/보장분석)"""
 import streamlit as st
 from auth import get_current_user_id
 from services.crypto import decrypt_phone
@@ -45,10 +45,18 @@ def render_detail():
     if client.get("memo"):
         st.text(f"메모: {client['memo']}")
 
-    if st.button("수정", use_container_width=True):
+    col_edit, col_del = st.columns(2)
+    if col_edit.button("수정", use_container_width=True):
         st.session_state.clients_view = "edit"
         st.session_state.edit_client = client
         st.rerun()
+    if col_del.button("고객 삭제", use_container_width=True):
+        st.session_state[f"confirm_del_client_{client_id}"] = True
+        st.rerun()
+
+    # 삭제 확인 다이얼로그 (버튼 아래 인라인)
+    if st.session_state.get(f"confirm_del_client_{client_id}"):
+        _render_client_delete_confirm(sb, client_id, fc_id)
 
     st.markdown("---")
 
@@ -57,14 +65,14 @@ def render_detail():
     is_existing_client = grade in ("VIP", "S")
 
     if is_existing_client:
-        tab_contract, tab_contact, tab_remind, tab_analysis, tab_del = st.tabs(
-            ["📄 계약정보", "📝 상담이력", "🔔 리마인드", "📊 보장분석", "🗑️ 삭제"])
+        tab_contract, tab_contact, tab_remind, tab_analysis = st.tabs(
+            ["📄 계약정보", "📝 상담이력", "🔔 리마인드", "📊 보장분석"])
         with tab_contract:
             from views.page_clients_contracts import render_contracts
             render_contracts(sb, client_id)
     else:
-        tab_contact, tab_remind, tab_analysis, tab_del = st.tabs(
-            ["📝 상담이력", "🔔 리마인드", "📊 보장분석", "🗑️ 삭제"])
+        tab_contact, tab_remind, tab_analysis = st.tabs(
+            ["📝 상담이력", "🔔 리마인드", "📊 보장분석"])
 
     with tab_contact:
         render_contact_logs(sb, client_id)
@@ -74,8 +82,6 @@ def render_detail():
         render_reminder_section(sb, fc_id=fc_id, client_id=client_id)
     with tab_analysis:
         _render_analysis_history(sb, fc_id, client["name"])
-    with tab_del:
-        _render_client_delete(sb, client_id)
 
 
 def _render_analysis_history(sb, fc_id: str, client_name: str):
@@ -121,30 +127,36 @@ def _render_analysis_history(sb, fc_id: str, client_name: str):
                 st.rerun()
 
 
-def _render_client_delete(sb, client_id: str):
-    fc_id = get_current_user_id()
+def _render_client_delete_confirm(sb, client_id: str, fc_id: str):
+    """삭제 확인 다이얼로그. 고객 + FK 참조 레코드 순차 삭제."""
     confirm_key = f"confirm_del_client_{client_id}"
-    if st.session_state.get(confirm_key):
-        st.warning("고객 정보와 모든 상담 이력이 삭제됩니다. 계속하시겠습니까?")
-        col_y, col_n = st.columns(2)
-        if col_y.button("삭제 확인", type="primary", use_container_width=True):
+    st.warning("고객 정보와 모든 상담 이력, 리마인드, 계약, 보장분석 이력이 삭제됩니다. 계속하시겠습니까?")
+    col_y, col_n = st.columns(2)
+    if col_y.button("삭제 확인", type="primary", use_container_width=True, key=f"del_yes_{client_id}"):
+        try:
+            # RPC 우선 — 트랜잭션 원자성 보장 (017 마이그레이션 적용 시)
+            # 미적용 환경 대응 fallback: 명시적 순차 delete (FK CASCADE 있어도 안전하게)
             try:
                 sb.rpc("delete_client", {
                     "p_client_id": client_id,
                     "p_fc_id": fc_id,
                 }).execute()
-                st.session_state.pop(confirm_key, None)
-                st.session_state.clients_view = "list"
-                st.rerun()
-            except Exception as e:
-                st.error(safe_error("삭제", e))
-        if col_n.button("취소", use_container_width=True):
+            except Exception as rpc_err:
+                # RPC 미등록 또는 권한 실패 → 직접 삭제로 폴백
+                print(f"[delete_client RPC 실패, 직접 삭제 시도] {rpc_err}")
+                sb.table("fp_reminders").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
+                sb.table("client_contracts").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
+                sb.table("contact_logs").delete().eq("client_id", client_id).eq("fc_id", fc_id).execute()
+                sb.table("clients").delete().eq("id", client_id).eq("fc_id", fc_id).execute()
             st.session_state.pop(confirm_key, None)
+            st.session_state.clients_view = "list"
             st.rerun()
-    else:
-        if st.button("고객 삭제", use_container_width=True):
-            st.session_state[confirm_key] = True
-            st.rerun()
+        except Exception as e:
+            print(f"[고객 삭제 오류] client_id={client_id} fc_id={fc_id} err={e}")
+            st.error(safe_error("삭제", e))
+    if col_n.button("취소", use_container_width=True, key=f"del_no_{client_id}"):
+        st.session_state.pop(confirm_key, None)
+        st.rerun()
 
 
 

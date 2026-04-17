@@ -94,7 +94,7 @@ def render_new_contact(sb, client_id: str):
         products = []
     prod_map = {p["name"]: p["id"] for p in products}
 
-    with st.form("new_contact"):
+    with st.form("new_contact", clear_on_submit=True):
         touch_method = st.selectbox("연락 방식", TOUCH_OPTIONS)
         memo = st.text_area("상담 내용", placeholder="상담 내용을 입력하세요")
         if products:
