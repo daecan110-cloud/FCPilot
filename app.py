@@ -150,22 +150,23 @@ st.markdown("""
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
 
-    /* Streamlit Cloud "앱 관리" / "Manage app" / "Deploy" 버튼 강제 숨김 (일반 사용자 노출 방지) */
+    /* Streamlit Cloud "앱 관리" / Deploy / Share 버튼만 숨김 (stToolbar 자체는 유지 — 사이드바 토글 보존) */
     [data-testid="stStatusWidget"],
     [data-testid="stDeployButton"],
-    [data-testid="stToolbar"],
-    [data-testid="stToolbarActions"],
     .stDeployButton,
     .viewerBadge_container__1QSob,
     .viewerBadge_link__1S137,
     .styles_viewerBadge__1yB5_,
     div[class*="viewerBadge"],
     div[class*="_terminalButton_"],
-    div[class*="stActionButton"],
     a[href*="streamlit.io/cloud"],
     a[href*="share.streamlit.io"] {
         display: none !important;
         visibility: hidden !important;
+    }
+    /* 툴바 내 액션 버튼(Share/Fork/Source) 숨김 — 사이드바 토글은 유지 */
+    [data-testid="stToolbarActions"] {
+        display: none !important;
     }
 
     /* 사이드바 토글 버튼은 반드시 보이게 */
