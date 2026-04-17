@@ -196,16 +196,18 @@ def render_recent_activity(fc_id: str):
     if st.session_state.get("home_act_open"):
         _render_quick_activity(fc_id, sb)
 
+    show_count = st.session_state.get("recent_activity_count", 5)
     try:
         logs = (sb.table("contact_logs").select("*, clients(name)")
                 .eq("fc_id", fc_id).order("created_at", desc=True)
-                .limit(5).execute().data or [])
+                .limit(show_count + 1).execute().data or [])
     except Exception:
         logs = []
     if not logs:
         st.info("최근 활동 기록이 없습니다.")
         return
-    for log in logs:
+    has_more = len(logs) > show_count
+    for log in logs[:show_count]:
         c = log.get("clients") or {}
         memo = (log.get("memo") or "")[:80]
         with st.container(border=True):
@@ -215,6 +217,10 @@ def render_recent_activity(fc_id: str):
             )
             if memo:
                 st.caption(memo)
+    if has_more:
+        if st.button("더보기", key="recent_act_more", use_container_width=True):
+            st.session_state.recent_activity_count = show_count + 5
+            st.rerun()
 
 
 def _render_quick_activity(fc_id: str, sb):
