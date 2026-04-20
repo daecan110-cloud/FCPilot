@@ -14,19 +14,19 @@ _DATA_START = 4
 _DATA_END = 10
 _MAX_COL = 11
 _MAX_COL_PROP = 13
-_REVIEW_START = 90
+_REVIEW_START = 92
 _REVIEW_COUNT = 7
 
 
 # ── 갱신 구분 ────────────────────────────────────────────
 
 def fill_renewal(ws, contracts):
-    """Row 85 갱신 구분, Row 86 보험료 변화 예고"""
+    """Row 87 갱신 구분, Row 88 보험료 변화 예고"""
     for ct in contracts:
         col = COL_IDX.get(ct["열"], 4)
         renewal, notice = classify_renewal(ct)
-        safe_val(ws, 85, col, renewal)
-        safe_val(ws, 86, col, notice)
+        safe_val(ws, 87, col, renewal)
+        safe_val(ws, 88, col, notice)
 
 
 def fill_renewal_all(ws, all_contracts):
@@ -35,18 +35,18 @@ def fill_renewal_all(ws, all_contracts):
 
     if n_groups > 1:
         extra_rows = (n_groups - 1) * 2
-        _unmerge_from_row(ws, 87)
-        ws.insert_rows(87, extra_rows)
+        _unmerge_from_row(ws, 89)
+        ws.insert_rows(89, extra_rows)
 
         for i in range(extra_rows):
-            r_new = 87 + i
-            r_src = 85 + (i % 2)
+            r_new = 89 + i
+            r_src = 87 + (i % 2)
             copy_row_style(ws, r_src, r_new, cols=range(1, _MAX_COL_PROP + 1))
             src_h = ws.row_dimensions[r_src].height if ws.row_dimensions.get(r_src) else None
             if src_h:
                 ws.row_dimensions[r_new].height = src_h
 
-        review_title_row = 88 + extra_rows
+        review_title_row = 90 + extra_rows
         review_hdr_row = review_title_row + 1
         ws.merge_cells(f"A{review_title_row}:K{review_title_row}")
         ws.merge_cells(f"A{review_hdr_row}:B{review_hdr_row}")
@@ -61,8 +61,8 @@ def fill_renewal_all(ws, all_contracts):
 
     for g in range(n_groups):
         chunk = all_contracts[g * 7:(g + 1) * 7]
-        renewal_row = 85 + g * 2
-        notice_row = 86 + g * 2
+        renewal_row = 87 + g * 2
+        notice_row = 88 + g * 2
 
         for i, ct in enumerate(chunk):
             col = COL_IDX.get(COL_LTRS[i], 4)
@@ -252,7 +252,7 @@ def _coverage_highlights(cov: dict) -> str:
     """주요 보장 항목 요약"""
     labels = {
         "9": "사망", "17": "일반암", "44": "심근경색",
-        "39": "뇌혈관", "76": "실비",
+        "39": "뇌혈관", "78": "실비",
     }
     parts = []
     for row_str, label in labels.items():

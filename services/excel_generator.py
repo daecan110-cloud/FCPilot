@@ -23,7 +23,7 @@ _DATA_START = 4
 _DATA_END = 10
 _MAX_COL = 11
 _MAX_COL_PROP = 13
-_REVIEW_START = 90
+_REVIEW_START = 92
 _REVIEW_COUNT = 7
 
 
@@ -124,7 +124,7 @@ def _clear_values(ws, has_proposal=False):
         (3, _DATA_START, 7, _DATA_END),
         (9, _DATA_START, 74, _DATA_END),
         (9, SUM_COL, 74, SUM_COL),
-        (80, _DATA_START, 82, max_c),
+        (82, _DATA_START, 84, max_c),
         (_REVIEW_START, 1, _REVIEW_START + _REVIEW_COUNT - 1, max_c),
     ]
     if has_proposal:
@@ -276,8 +276,8 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             paid_m = ct.get("_납입개월", 0)
             paid_amt = int(prem * paid_m) if prem and paid_m else 0
         if paid_amt:
-            safe_val(ws, 80, col, paid_amt)
-    safe_val(ws, 80, SUM_COL, f"=SUM({start_ltr}80:{end_ltr}80)")
+            safe_val(ws, 82, col, paid_amt)
+    safe_val(ws, 82, SUM_COL, f"=SUM({start_ltr}80:{end_ltr}80)")
 
     for ct in contracts:
         col = COL_IDX.get(ct["열"], 4)
@@ -289,14 +289,14 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             remain = total_m - paid_m
             topay_amt = int(prem * remain) if prem and remain > 0 else 0
         if topay_amt:
-            safe_val(ws, 81, col, topay_amt)
-    safe_val(ws, 81, SUM_COL, f"=SUM({start_ltr}81:{end_ltr}81)")
+            safe_val(ws, 83, col, topay_amt)
+    safe_val(ws, 83, SUM_COL, f"=SUM({start_ltr}81:{end_ltr}81)")
 
     for c_ltr in COL_LTRS:
         col = COL_IDX[c_ltr]
         col_l = get_column_letter(col)
-        safe_val(ws, 82, col, f"={col_l}80+{col_l}81")
-    safe_val(ws, 82, SUM_COL, f"=SUM({start_ltr}82:{end_ltr}82)")
+        safe_val(ws, 84, col, f"={col_l}82+{col_l}83")
+    safe_val(ws, 84, SUM_COL, f"=SUM({start_ltr}82:{end_ltr}82)")
 
     if has_proposal:
         from services.proposal_parser import _parse_납입개월
@@ -307,12 +307,12 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             total_prem = proposal.get("보험료합계", 0)
             if 납입개월 and total_prem:
                 topay = total_prem * 납입개월
-                safe_val(ws, 81, PROP_COL, topay)
-                safe_val(ws, 82, PROP_COL, topay)
+                safe_val(ws, 83, PROP_COL, topay)
+                safe_val(ws, 84, PROP_COL, topay)
 
-        safe_val(ws, 80, TOTAL_COL, f"={k_ltr}80+{l_ltr}80")
-        safe_val(ws, 81, TOTAL_COL, f"={k_ltr}81+{l_ltr}81")
         safe_val(ws, 82, TOTAL_COL, f"={k_ltr}82+{l_ltr}82")
+        safe_val(ws, 83, TOTAL_COL, f"={k_ltr}83+{l_ltr}83")
+        safe_val(ws, 84, TOTAL_COL, f"={k_ltr}84+{l_ltr}84")
 
 
 def _final_format(ws, has_proposal=False):
@@ -347,7 +347,7 @@ def _final_format(ws, has_proposal=False):
     ws.row_dimensions[5].height = 30
     ws.row_dimensions[6].height = 30
     ws.row_dimensions[8].height = 10
-    ws.row_dimensions[83].height = 5
+    ws.row_dimensions[85].height = 5
     for r in range(_REVIEW_START, _REVIEW_START + _REVIEW_COUNT):
         for c in range(1, max_c + 1):
             cell = ws.cell(row=r, column=c)
@@ -362,4 +362,4 @@ def _final_format(ws, has_proposal=False):
     ws.page_setup.fitToHeight = 0
     ws.page_setup.scale = None
     ws.row_breaks.brk = []
-    ws.row_breaks.append(Break(id=83))
+    ws.row_breaks.append(Break(id=85))
