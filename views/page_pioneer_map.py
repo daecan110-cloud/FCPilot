@@ -11,7 +11,9 @@ from utils.helpers import safe_error
 
 def render():
     st.header("개척지도")
-    tab_map, tab_followup, tab_register, tab_ocr = st.tabs(["지도", "팔로업", "매장 등록", "간판 OCR"])
+    tab_map, tab_followup, tab_register, tab_excel, tab_share, tab_ocr = st.tabs(
+        ["지도", "팔로업", "매장 등록", "엑셀 등록", "팀 공유", "간판 OCR"]
+    )
 
     with tab_map:
         _render_map()
@@ -20,6 +22,12 @@ def render():
         render_followup()
     with tab_register:
         _render_register()
+    with tab_excel:
+        from views.page_pioneer_excel import render_excel_import
+        render_excel_import()
+    with tab_share:
+        from views.page_pioneer_share import render_team_share
+        render_team_share()
     with tab_ocr:
         from views.page_pioneer_ocr import render_ocr
         render_ocr()
@@ -36,9 +44,30 @@ def _render_map():
         st.error(safe_error("매장 조회", e))
         return
 
-    if not shops:
+    # 공유받은 매장도 함께 표시
+    from services.pioneer_share import get_shared_shops
+    from views.page_pioneer_share import _get_user_names
+    shared_by_owner = get_shared_shops(sb, fc_id)
+    user_names = _get_user_names(sb, list(shared_by_owner.keys()))
+    shared_all = []
+    for oid, owner_shops in shared_by_owner.items():
+        name = user_names.get(oid, "팀원")
+        for s in owner_shops:
+            s["_shared_from"] = name
+            shared_all.append(s)
+
+    all_shops = shops + shared_all
+
+    if not all_shops:
         st.info("등록된 매장이 없습니다. '매장 등록' 탭에서 추가하세요.")
         return
+
+    # 내 매장 / 공유 매장 토글
+    show_shared = False
+    if shared_all:
+        show_shared = st.checkbox(f"팀원 공유 매장도 표시 ({len(shared_all)}건)", value=True)
+
+    display_shops = shops + (shared_all if show_shared else [])
 
     status_filter = st.multiselect(
         "상태 필터",
@@ -46,35 +75,46 @@ def _render_map():
         default=list(STATUS_LABELS.keys()),
         format_func=lambda x: STATUS_LABELS[x],
     )
-    filtered = [s for s in shops if s.get("status") in status_filter]
+    filtered = [s for s in display_shops if s.get("status") in status_filter]
 
     map_col, list_col = st.columns([7, 3])
     with map_col:
-        st.caption(f"전체 {len(shops)}개 | 표시 {len(filtered)}개")
+        mine_count = len([s for s in filtered if s.get("fc_id") == fc_id])
+        shared_count = len(filtered) - mine_count
+        caption = f"내 매장 {mine_count}개"
+        if shared_count > 0:
+            caption += f" + 공유 {shared_count}개"
+        st.caption(caption)
         pioneer_map_html(filtered, height=480)
     with list_col:
         st.caption(f"매장 {len(filtered)}곳")
         STATUS_ICON = {"active": "🟡", "visited": "🔵", "contracted": "🟢", "rejected": "🔴"}
-        for s in filtered[:20]:
+        for s in filtered[:30]:
             icon = STATUS_ICON.get(s.get("status", ""), "⚪")
+            is_shared = s.get("_shared_from")
             with st.container(border=True):
-                st.markdown(f"{icon} **{s.get('shop_name', '')}**")
+                label = f"{icon} **{s.get('shop_name', '')}**"
+                if is_shared:
+                    label += f"  `{is_shared}`"
+                st.markdown(label)
                 st.caption(s.get("address", ""))
-                new_status = st.selectbox(
-                    "상태",
-                    options=list(STATUS_LABELS.keys()),
-                    index=list(STATUS_LABELS.keys()).index(s.get("status", "active")) if s.get("status", "active") in STATUS_LABELS else 0,
-                    format_func=lambda x: STATUS_LABELS.get(x, x),
-                    key=f"status_{s['id']}",
-                    label_visibility="collapsed",
-                )
-                if new_status != s.get("status"):
-                    if st.button("변경", key=f"change_{s['id']}", use_container_width=True):
-                        try:
-                            sb.table("pioneer_shops").update({"status": new_status}).eq("id", s["id"]).eq("fc_id", fc_id).execute()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(safe_error("변경", e))
+                # 내 매장만 상태 변경 가능
+                if not is_shared:
+                    new_status = st.selectbox(
+                        "상태",
+                        options=list(STATUS_LABELS.keys()),
+                        index=list(STATUS_LABELS.keys()).index(s.get("status", "active")) if s.get("status", "active") in STATUS_LABELS else 0,
+                        format_func=lambda x: STATUS_LABELS.get(x, x),
+                        key=f"status_{s['id']}",
+                        label_visibility="collapsed",
+                    )
+                    if new_status != s.get("status"):
+                        if st.button("변경", key=f"change_{s['id']}", use_container_width=True):
+                            try:
+                                sb.table("pioneer_shops").update({"status": new_status}).eq("id", s["id"]).eq("fc_id", fc_id).execute()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(safe_error("변경", e))
 
 
 def _render_register():
@@ -134,5 +174,3 @@ def _render_register():
                     st.session_state.pop("reg_places", None)
                 except Exception as e:
                     st.error(safe_error("등록", e))
-
-

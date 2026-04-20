@@ -6,6 +6,7 @@ from config import SESSION_TIMEOUT
 
 _COOKIE_ACCESS = "fp_access"
 _COOKIE_REFRESH = "fp_refresh"
+_COOKIE_EMAIL = "fp_remember_email"
 _COOKIE_MAX_AGE = 30 * 24 * 3600  # 30일
 
 
@@ -150,14 +151,18 @@ def show_login_page():
     tab_login, tab_signup, tab_reset = st.tabs(["로그인", "회원가입", "비밀번호 찾기"])
 
     with tab_login:
+        # 쿠키에서 저장된 이메일 복원
+        saved_email = _get_saved_email()
         with st.form("login_form"):
-            email = st.text_input("이메일")
+            email = st.text_input("이메일", value=saved_email)
             password = st.text_input("비밀번호", type="password")
+            remember = st.checkbox("아이디 기억하기", value=bool(saved_email))
             submitted = st.form_submit_button("로그인", use_container_width=True)
             if submitted:
                 if not email or not password:
                     st.error("이메일과 비밀번호를 입력해주세요.")
                     return
+                _save_email_cookie(email.strip() if remember else "")
                 _do_login(email, password)
 
     with tab_reset:
@@ -181,6 +186,31 @@ def show_login_page():
                     st.error("비밀번호가 일치하지 않습니다.")
                     return
                 _do_signup(new_email, new_password, display_name)
+
+
+# ── 아이디 기억하기 ───────────────────────────────────────
+
+def _get_saved_email() -> str:
+    ctrl = _ctrl()
+    if ctrl is None:
+        return ""
+    try:
+        return ctrl.get(_COOKIE_EMAIL) or ""
+    except Exception:
+        return ""
+
+
+def _save_email_cookie(email: str):
+    ctrl = _ctrl()
+    if ctrl is None:
+        return
+    try:
+        if email:
+            ctrl.set(_COOKIE_EMAIL, email, max_age=_COOKIE_MAX_AGE)
+        else:
+            ctrl.remove(_COOKIE_EMAIL)
+    except Exception:
+        pass
 
 
 # ── 로그인 / 로그아웃 처리 ────────────────────────────────
