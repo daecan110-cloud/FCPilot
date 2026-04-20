@@ -38,6 +38,10 @@ def render():
     with st.expander("유입경로 관리"):
         _render_source_categories(sb, user_id)
 
+    with st.expander("👥 개척 팀 공유"):
+        from views.page_pioneer_share import render_team_share
+        render_team_share()
+
     with st.expander("💾 데이터 관리"):
         st.caption("고객 데이터를 CSV로 가져오거나 내보낼 수 있습니다.")
         csv_file = st.file_uploader("CSV 가져오기", type=["csv"], key="settings_csv")
