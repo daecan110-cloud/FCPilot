@@ -43,6 +43,17 @@ sql/ → 마이그레이션 / templates/ → 정적 파일
 "캡처 N장 봐줘" → 최신순 정렬 후 지정 장수만큼 읽기
 장수 미지정 시 먼저 물어보기
 
+## 보장분석 양식 변경 규칙 (절대 위반 금지)
+- `insert_rows` / `delete_rows` 절대 사용 금지 (수식/병합 깨짐)
+- 최신 안정 백업(`master_template_v12_backup.xlsx`)에서 시작
+- 아래→위 순서로 셀 수동 복사 (밀기)
+- K열 `=SUM(D:J)` 수식 전체 재작성
+- 병합 전체 해제 후 재생성
+- `item_map.py` DATA_ROWS + ITEM_ROW_MAP 행 번호 전체 반영
+- `excel_generator.py` / `excel_review.py` 행 번호 상수 전체 반영
+- 변경 후 검증 스크립트로 모든 행의 값/수식/병합 출력해서 확인
+- 완료 후 새 백업 생성: `master_template_vNN_backup.xlsx`
+
 ## 상세 규칙 참조
 - DB/보안/텔레그램/작업쪼개기/Sprint완료 → `docs/RULES_DETAIL.md`
 - 보안 체크리스트 → `SECURITY.md`
