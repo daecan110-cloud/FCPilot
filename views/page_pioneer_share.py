@@ -43,7 +43,7 @@ def render_team_share():
     # ── 새 팀원 공유 ──
     st.divider()
     st.markdown("#### 팀원 추가 공유")
-    all_users = get_all_users(sb, fc_id)
+    all_users = get_all_users(fc_id)
     already_shared = set(shared_ids)
     available = [u for u in all_users if u["id"] not in already_shared]
 
@@ -93,11 +93,13 @@ def render_team_share():
 
 
 def _get_user_names(sb, user_ids: list[str]) -> dict[str, str]:
-    """user_id → display_name 매핑"""
+    """user_id → display_name 매핑 (RLS 우회)"""
     if not user_ids:
         return {}
     try:
-        res = sb.table("users_settings").select("id, display_name").in_("id", user_ids).execute()
+        from utils.db_admin import get_admin_client
+        admin = get_admin_client()
+        res = admin.table("users_settings").select("id, display_name").in_("id", user_ids).execute()
         return {r["id"]: r.get("display_name") or "팀원" for r in (res.data or [])}
     except Exception:
         return {}

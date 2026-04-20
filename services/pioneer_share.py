@@ -2,11 +2,14 @@
 from utils.helpers import safe_error
 
 
-def get_all_users(supabase, my_id: str) -> list[dict]:
-    """공유 대상으로 선택 가능한 사용자 목록 (본인 제외)"""
+def get_all_users(my_id: str) -> list[dict]:
+    """공유 대상으로 선택 가능한 사용자 목록 (본인 제외, RLS 우회)"""
     try:
-        res = (supabase.table("users_settings")
+        from utils.db_admin import get_admin_client
+        admin = get_admin_client()
+        res = (admin.table("users_settings")
                .select("id, display_name")
+               .eq("status", "approved")
                .neq("id", my_id)
                .order("display_name")
                .execute())
