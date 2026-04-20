@@ -69,13 +69,22 @@ def _render_map():
 
     display_shops = shops + (shared_all if show_shared else [])
 
-    status_filter = st.multiselect(
-        "상태 필터",
-        options=list(STATUS_LABELS.keys()),
-        default=list(STATUS_LABELS.keys()),
-        format_func=lambda x: STATUS_LABELS[x],
-    )
-    filtered = [s for s in display_shops if s.get("status") in status_filter]
+    filter_col1, filter_col2 = st.columns(2)
+    with filter_col1:
+        status_filter = st.multiselect(
+            "상태 필터",
+            options=list(STATUS_LABELS.keys()),
+            default=list(STATUS_LABELS.keys()),
+            format_func=lambda x: STATUS_LABELS[x],
+        )
+    with filter_col2:
+        all_cats = sorted({s.get("category", "기타") for s in display_shops})
+        cat_filter = st.multiselect("업종 필터", options=all_cats, default=all_cats)
+
+    filtered = [
+        s for s in display_shops
+        if s.get("status") in status_filter and s.get("category", "기타") in cat_filter
+    ]
 
     map_col, list_col = st.columns([7, 3])
     with map_col:
