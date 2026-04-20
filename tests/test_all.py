@@ -76,7 +76,6 @@ SERVICE_MODULES = [
     "services.pdf_extractor_detail",
     "services.item_map",
     "services.contract_extractor",
-    "services.yakwan_analyzer",
 ]
 
 UTIL_MODULES = [

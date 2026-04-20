@@ -3,7 +3,6 @@ import streamlit as st
 
 # 앱 정보
 APP_NAME = "FCPilot"
-APP_VERSION = "1.0.0"
 
 # 페이지 설정
 PAGE_CONFIG = {
@@ -14,7 +13,6 @@ PAGE_CONFIG = {
 }
 
 # 파일 업로드 제한
-ALLOWED_FILE_TYPES = ["pdf", "jpg", "jpeg", "png"]
 MAX_FILE_SIZE_MB = 10
 
 # 세션 타임아웃 (초)
@@ -22,6 +20,22 @@ SESSION_TIMEOUT = 60 * 60  # 60분
 
 # 유입경로 기본 카테고리 (단일 소스)
 DEFAULT_SOURCE_CATEGORIES = ["DB고객", "지인", "개척", "소개", "기타"]
+
+# 연락 방식
+TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
+
+# 개척 업종
+CATEGORY_OPTIONS = [
+    "음식점", "카페", "미용실/뷰티", "학원/교육", "병원/약국",
+    "편의점/마트", "의류/패션", "사무실/오피스", "기타",
+]
+
+# 보험 상품 카테고리
+INSURANCE_CATEGORIES = ["종신보험", "건강보험", "연금보험", "저축보험", "변액보험", "기타"]
+INSURANCE_CAT_ICON = {
+    "종신보험": "🔵", "건강보험": "🟢", "연금보험": "🟡",
+    "저축보험": "🟠", "변액보험": "🟣", "기타": "⚪",
+}
 
 # Claude API 설정
 CLAUDE_MODEL = "claude-sonnet-4-20250514"

@@ -13,8 +13,6 @@ from utils.calendar_render import render_monthly_calendar
 from utils.supabase_client import get_supabase_client
 from utils.ui_components import grade_badge as _grade_badge, empty_state
 
-_TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
-
 
 def render():
     col_h1, col_h2 = st.columns([3, 1])
@@ -181,7 +179,7 @@ def _render_complete_form(r: dict, complete_key: str):
                 st.session_state.pop(complete_key, None)
                 st.rerun()
             else:
-                st.error(f"저장 실패: {res}")
+                st.error("저장에 실패했습니다. 다시 시도해주세요.")
         if c2.form_submit_button("취소", use_container_width=True):
             st.session_state.pop(complete_key, None)
             st.rerun()

@@ -5,9 +5,8 @@ import streamlit as st
 from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from services.geocoding import geocode, search_keyword
+from config import CATEGORY_OPTIONS
 from utils.helpers import safe_error
-
-CATEGORY_OPTIONS = ["음식점", "카페", "미용실/뷰티", "학원/교육", "병원/약국", "편의점/마트", "의류/패션", "사무실/오피스", "기타"]
 
 
 def render_ocr():
@@ -169,11 +168,8 @@ def _upload_photo(fc_id: str, img_bytes: bytes | None, ext: str) -> str:
         return ""
     try:
         import uuid
-        from supabase import create_client
-        admin_sb = create_client(
-            st.secrets["supabase"]["url"],
-            st.secrets["supabase"]["service_role_key"],
-        )
+        from utils.db_admin import get_admin_client
+        admin_sb = get_admin_client()
         filename = f"{fc_id}/{uuid.uuid4().hex}.{ext}"
         admin_sb.storage.from_("pioneer-photos").upload(
             filename, img_bytes,

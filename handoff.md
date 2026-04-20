@@ -1,14 +1,14 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 18 완료 (보장분석 파싱/서식 디버깅)** — 영민 테스트 대기 중
-- 마지막 세션: 2026-04-16 (Claude Code)
+- Phase: **Sprint 19 완료 (보안 강화 + 코드 품질 전면 점검)** — 영민 테스트 대기 중
+- 마지막 세션: 2026-04-20 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
 
 ---
 
-## Sprint 1~9 — 완료 (상세는 git log 참조)
+## Sprint 1~18 — 완료 (상세는 git log 참조)
 
 주요 완료 항목 요약:
 - 보장분석 + 약관분석 AI (Claude API)
@@ -28,232 +28,60 @@
 
 ---
 
-## Sprint 10 — 완료 (2026-03-31)
+## Sprint 19 — 완료 (2026-04-20)
 
-### Round 1
-- [x] 매장 수정 + 삭제 (pioneer_shops) — 팔로업 탭에서 수정/삭제 CRUD
-- [x] 동선기록 달력 하이라이트 — 이전 기록 탭 최근 90일 방문 날짜 요약 표시
+### 보안 강화
+- [x] `utils/security.py` 신규 — brute force 차단(5회/5분, 10분 잠금) + 입력 검증(SQL injection/XSS 패턴) + Storage 경로 검증(path traversal 차단)
+- [x] `auth.py` 로그인 brute force 차단 적용
+- [x] `auth.py` fail-open → fail-closed (DB 장애 시 approved → pending)
+- [x] `auth.py` 비밀번호 찾기(재설정) 기능 추가 (Supabase reset_password_email)
+- [x] `db_migrate.py` exec_sql RPC anon/authenticated 권한 차단 마이그레이션 추가
+- [x] `page_clients_detail.py` Storage 다운로드 경로 검증 (validate_storage_path)
+- [x] `page_pioneer_ocr.py` create_client 직접 호출 → get_admin_client 통합
+- [x] `migration.py` DB 에러 원문 노출 차단
+- [x] DB: 12/12 테이블 RLS 활성화 (bot_sessions service_role_only 포함)
+- [x] DB: exec_sql 함수 anon/authenticated 실행 권한 차단
 
-### Round 2
-- [x] 보장분석 Excel 영구 저장 — Supabase Storage `analysis-excel` 버킷
-- [x] DB 컬럼 버그 수정 (`analysis_result`→`result_summary`, `pdf_filename` 제거)
-- [x] 고객 상세 보장분석 이력 → 📥 엑셀 다운로드 버튼
-- [x] analysis_records에 `excel_path TEXT` 컬럼 추가 (sql/010)
+### 보안 수정 (에러 노출 + XSS)
+- [x] `page_clients_remind.py:57` DB 에러 원문 → 안전한 메시지
+- [x] `page_home.py:184` DB 에러 원문 → 안전한 메시지
+- [x] `page_home_forms.py:107` DB 에러 원문 → 안전한 메시지
+- [x] `geocoding.py:78` API 에러 객체 → 안전한 메시지
+- [x] `calendar_render.py:149` DB값 esc() 적용 (XSS 차단)
 
-### 텔레그램 리마인드 버그 수정
-- [x] fp_reminders 미조회 버그 — `remind_trigger.py`가 구형 `reminder.py`만 사용하던 문제 수정
-- [x] 개척 팔로업 매장명 누락 — `p["shop"]["shop_name"]` 올바르게 참조
-- [x] 알림 포맷 개선 — "💬 상담 리마인드" / "🗺️ 개척 팔로업" 섹션 분리
+### 데드 파일 삭제
+- [x] `services/yakwan_analyzer.py` 삭제 (yakwan_engine.py로 대체됨)
+- [x] `utils/naver_map.py` 삭제 (kakao_map.py로 대체됨)
 
----
+### 데드코드 제거
+- [x] `helpers.py` mask_name, mask_phone 미사용 함수 제거
+- [x] `telegram.py` notify_sprint_complete 외 3개 미사용 함수 제거
+- [x] `kakao_map.py` PolyLineTextPath 미사용 import 제거
+- [x] `map_utils.py` create_map, create_route_map 미사용 함수 제거
+- [x] `db_admin.py` table_exists, run_sql* 등 5개 미사용 함수 제거
+- [x] `config.py` APP_VERSION, ALLOWED_FILE_TYPES 미사용 상수 제거
+- [x] `page_analysis_yakwan.py` k_column_data 미사용 변수 제거
 
-## 개발환경 자동화 — 완료 (2026-03-31)
+### 중복 상수 통합 → config.py
+- [x] TOUCH_OPTIONS (4곳 → config.py 1곳)
+- [x] CATEGORY_OPTIONS (3곳 → config.py 1곳)
+- [x] INSURANCE_CATEGORIES + INSURANCE_CAT_ICON (2곳 → config.py 1곳)
 
-- [x] `.claude/agents/code-reviewer.md` — bare except/API키/개인정보 print/200줄/컬럼명 점검
-- [x] `.claude/agents/codebase-explorer.md` — 구조 분석, 호출 관계, 영향 범위 파악
-- [x] `.claude/agents/test-runner.md` — 테스트 실행 + 결과 분석
-- [x] `CLAUDE.md` 서브에이전트 한국어 별칭 등록 (리뷰/분석/테스트)
-- [x] `.claude/settings.json` hooks 설정
-  - `SessionStart`: git pull + 보안 스캔 (API키/bare except/데이터파일)
-  - `SessionEnd`: 자동 commit + push
-  - `PreToolUse`: 민감 파일 수정/읽기 차단, 위험 명령 차단
-  - `PostToolUse`: py_compile 구문 검사, 개인정보 print 경고, API키 하드코딩 차단
-  - `UserPromptSubmit`: 최근 변경 diff 표시
+### excel_generator.py 리팩터링 (724줄 → 365줄)
+- [x] `services/excel_helpers.py` 신규 (110줄) — safe_val, 병합, 서식 복사, classify_renewal
+- [x] `services/excel_review.py` 신규 (277줄) — 갱신/리뷰 섹션, build_review, 실손 세대 판별
+- [x] `_fill_renewal`/`_fill_renewal_all` 중복 로직 → `classify_renewal()` 통합
 
----
-
-## Sprint 11-1 — 완료 (2026-04-01)
-
-### UI 리뉴얼
-- [x] 다크 네이비 사이드바 + 흰색 텍스트
-- [x] 메트릭/카드 흰색 배경 + 그림자 + 둥근 모서리(12px)
-- [x] Primary 색상 인디고(#4f46e5)로 변경
-- [x] Pretendard 폰트 유지
-
-### 홈 UX 개선
-- [x] 리마인드 4섹션 → 탭 방식 변경 (오늘/이번주/이번달/미정)
-- [x] 캘린더 디자인 개선 + 오늘 버튼 추가
-- [x] 리마인드 버튼 on_click 콜백 (더블클릭 문제 해결)
-
-### 버그 수정
-- [x] remind_trigger KeyError 'overdue' 수정
-- [x] 고객 등급 VIP/S 저장 실패 → DB constraint 확장
-- [x] 등급순 정렬 VIP→S→A→B→C→D 순서 수정
-- [x] 리마인드 텔레그램 중복 발송 → DB 기반 하루 1회 제한
+### 성능 최적화
+- [x] `page_stats_products.py` O(N²) → O(N) 집계 (단일 패스로 premium_sum 누적)
+- [x] `page_clients.py` contact_logs 풀 로드 → in_("client_id", ids) 범위 한정
 
 ### 기타
-- [x] sprint-done 스킬: 테스트 실패 시 텔레그램 알림 추가
-- [x] CLAUDE.md: sprint-done 자동 실행 규칙 추가
-- [x] plan.md: 백로그 + Sprint 로드맵 업데이트
-- [x] 텔레그램 Claude 챗봇 스크립트 (tools/telegram_chat.py)
-
----
-
-## 보안 점검 (2026-04-01)
-
-### 수정 완료
-- [x] 6개 파일에서 하드코딩 키 제거 (service_role_key, 봇 토큰, DB 비밀번호, FC_ID)
-- [x] `utils/secrets_loader.py` 공용 모듈 생성 — CLI 스크립트용 secrets.toml 파서
-- [x] hook 보안 스캔 패턴 강화 (JWT/봇토큰/Claude키/Gemini키 실제 포맷 정규식)
-
-### 텔레그램 봇 분리 완료
-- [x] `[telegram_dev]` — claudeFC_bot: 작업 알림 (Sprint, 에러, 테스트)
-- [x] `[telegram_user]` — FCPilot 봇: 사용자 기능 (고객 조회/등록, 리마인드, Claude 챗)
-- [x] Edge Function 환경변수명 변경 (TELEGRAM_USER_BOT_TOKEN)
-
-### 영민 액션 필요
-- [x] Supabase service_role 키 재생성
-- [x] DB 비밀번호 변경
-- [x] BotFather 봇 토큰 2개 재발급
-- [x] secrets.toml 전체 업데이트
-- [x] exec_sql RPC role 제한 SQL 실행
-- [x] **Supabase Edge Function 환경변수** 업데이트 (2026-04-02 완료)
-- [x] **Streamlit Cloud secrets** 업데이트 (2026-04-02 완료, telegram_dev/telegram_user 구조)
-
-### 근본 원인
-Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키 하드코딩으로 우회한 것 (Sprint 5~7 설계 실수)
-
----
-
-## Sprint 12 — 완료 (2026-04-01)
-
-- [x] 네이버 지도 → 카카오맵 전환 (utils/kakao_map.py + services/geocoding.py)
-- [x] 카카오 지오코딩 + 역지오코딩 연동
-- [x] page_clients.py 560줄 → 3파일 분리 (263+175+126)
-- [x] 미사용 create_route_map 호출 제거
-
----
-
-## Sprint 13 — 완료 (2026-04-02)
-
-### 기타 이슈 수정
-- [x] 캘린더 중복 렌더링 수정 — HTML 캘린더 제거, st.button 통일 + 뱃지 표시
-- [x] 구형 `services/reminder.py` 삭제 — 미사용 확인, fp_reminders로 대체됨
-
-### 테스트 수정
-- [x] `services.reminder` → `services.fp_reminder_service` 변경
-- [x] `fp_` 접두사 검사 allowlist 추가 (DB 테이블명/쿠키명 오탐 해소)
-- [x] 테스트 결과 텔레그램 발송 제거
-
-### 파일 분리 (전 파일 200줄 이하)
-- [x] `page_analysis.py` (343줄) → `page_analysis.py` (158) + `page_analysis_yakwan.py` (186)
-- [x] `page_home.py` (294줄) → `page_home.py` (145) + `page_home_forms.py` (155)
-- [x] `page_pioneer_map.py` (350줄) → `page_pioneer_map.py` (116) + `page_pioneer_followup.py` (134) + `page_pioneer_ocr.py` (118)
-- [x] `page_pioneer_route.py` (239줄) → `page_pioneer_route.py` (120) + `page_pioneer_history.py` (120)
-
-### 버그 수정
-- [x] `page_pioneer_route.py:200` 미사용 `create_route_map()` 호출 제거
-
-### 코드 품질 개선
-- [x] 에러 메시지 보안 — `page_settings.py`, `page_settings_admin.py` safe_error 적용
-- [x] `page_clients.py` 고객 저장 시 로딩 표시 추가
-- [x] `page_home_forms.py` 활동 추가 시 로딩 표시 추가
-- [x] AI 응답 실패 시 safe_error 사용으로 변경
-
----
-
-## Sprint 14 — 완료 (2026-04-04)
-
-- [x] 동료 FC 온보딩 확인 — 기존 Sprint에서 구현 완료 확인 (회원가입 승인, Admin UI, 텔레그램 알림)
-- [x] 텔레그램 봇 분리 (#15) 확인 — dev/user 분리 완료 확인
-- [x] RLS + fc_id 보안 전 테이블 확인
-
----
-
-## Sprint 15 — 완료 (2026-04-07)
-
-### 지도 전환
-- [x] 카카오맵 JS SDK → folium+streamlit-folium 전환 (Streamlit iframe sandbox 호환)
-- [x] 개척지도/동선기록/이전기록 모두 folium 기반으로 통합
-- [x] st_folium 중복 key 에러 수정
-
-### 간판 OCR 개선
-- [x] 카카오 장소 검색 연동 — 매장명으로 검색 → 주소/좌표 자동 입력
-- [x] OCR 프롬프트 강화 — 작은 글씨(주소/전화번호) 추출율 개선
-- [x] 비유효 주소 자동 필터 (한국 주소 패턴 체크)
-- [x] OCR 등록 후 화면 리셋 + 성공 메시지
-
-### 간판 사진 저장
-- [x] Supabase Storage `pioneer-photos` 버킷 생성 (public)
-- [x] OCR 등록 시 사진 업로드 → photo_url DB 저장
-- [x] 팔로업 현황에서 간판 사진 표시
-
-### 팔로업 강화
-- [x] 전체 삭제 기능 (2단계 확인)
-
-### 기타
-- [x] Streamlit 정적 파일 서빙 활성화 (config.toml)
-- [x] components.html 지원 중단 대응 (st.iframe 전환)
-- [x] geocoding.py 에러 메시지 표시 추가
-
----
-
-## Sprint 16 — 완료 (2026-04-08)
-
-### 유입경로 디버깅
-- [x] `config.py`에 `DEFAULT_SOURCE_CATEGORIES` 단일 소스 정의 ("지인"으로 통일)
-- [x] `page_clients.py`, `page_settings.py` 양쪽 중복 제거 → config import
-- [x] `sql/015_normalize_db_source.sql` — 기존 "개인(지인)" 데이터 정규화
-
-### 기계약자 계약 정보 관리
-- [x] `sql/016_client_contracts.sql` — client_contracts 테이블 (RLS 적용)
-- [x] `views/page_clients_contracts.py` — 계약 정보 CRUD UI
-- [x] `page_clients_detail.py` — S/VIP일 때만 "계약정보" 탭 노출
-- [x] 직접 입력 + 상품설계서 PDF 업로드 지원
-
-### 상품설계서 PDF 파싱
-- [x] `services/contract_extractor.py` — pdfplumber 텍스트 추출 + Claude API 구조화
-- [x] 주계약/특약/보험료/보험사/카테고리 자동 추출
-
-### 상품 판매 통계
-- [x] `page_stats.py` — "상품 판매 현황" 섹션 추가
-- [x] 판매 랭킹, 제안 vs 실제 판매, 나이대별 상품, 가격대별 분포
-
-### 영민 액션 필요
-- [ ] `sql/015_normalize_db_source.sql` Supabase SQL Editor 실행
-- [ ] `sql/016_client_contracts.sql` Supabase SQL Editor 실행
-
----
-
-## Sprint 17 — 완료 (2026-04-08)
-
-### 버그 수정
-- [x] BUG-1: 홈 → 고객관리 네비게이션 실패 (`_nav_to "고객관리"` → `"👥 고객관리"`)
-- [x] BUG-2: 고객 삭제 시 fp_reminders/client_contracts 미삭제 (고아 데이터)
-
-### 200줄 초과 파일 분리 (4건)
-- [x] `page_stats.py` 434→244줄 + `page_stats_products.py` 190줄
-- [x] `pdf_extractor.py` 400→221줄 + `pdf_extractor_detail.py` 167줄
-- [x] `telegram.py` 279→141줄 + `telegram_commands.py` 143줄
-- [x] `page_clients.py` 264→181줄 + `page_clients_form.py` 92줄
-
-### 코드 품질
-- [x] `contract_extractor.py`: 미사용 import base64 제거 + get_secret→load_secrets 수정
-- [x] `config.toml`: `ark[theme]` → `[theme]` 오타 수정
-- [x] `test_all.py`: 17개 모듈 추가 (56/56 통과)
-
-### 보안 체크
-- [x] 8항목 전체 통과 (API키/고객데이터/print/bare except/HTML이스케이프/HTTP/gitignore/fc_id)
-
----
-
-## Sprint 18 — 완료 (2026-04-16)
-
-### 보장분석 엑셀 서식 복구
-- [x] `_fill_review_all` 병합 재생성 — review_last=True + 계약 8개+ 시 insert_rows 후 A:B/E:H/I:K 병합이 해제만 되고 복구 안 되던 문제 해결
-- [x] A열 hidden인데 병합 없으면 보험사/상품명이 보이지 않던 현상 수정
-- [x] 헤더 타이틀/라벨(월 보험료, 주요 체크사항, 특이사항) 값 복원
-
-### PDF 특약 파싱 개선
-- [x] `item_map.py` 키워드 추가 — `상급종합병원암주요치료`, `비급여암주요치료`, `암주요치료특약`, `특정순환계질환주요치료비특약`
-- [x] `pdf_extractor_detail.py` 동일 truncated 이름 분배 로직 — N회 반복 시 Row 30~33/49~53 순차 분배
-- [x] 상급종합병원 암주요치 단일 entry 시 Row 30~33 복제 (신한/교보 rider 특성)
-- [x] `row_override` 파라미터 — 특약 상세 우선 순위로 요약 페이지 덮어쓰기
-
-### 검증 (Downloads)
-- [x] 김영민 Contract 1 특정순환계 Row 49-52 (2000/2000/2000/1000) ✅
-- [x] 김영민 Contract 2 암주요치료 Row 30-33 (1000 복제) ✅
-- [x] YEXIANG 2번 파일 Row 92~105 A:B/E:H/I:K 병합 전부 복구 ✅
+- [x] `app.py` __import__("html").escape → esc() 교체
+- [x] `app.py` except Exception: pass → logging 추가
+- [x] `page_clients.py` import 순서 정리
+- [x] `page_clients_detail.py` print 4곳 → logging 교체
+- [x] `tests/test_all.py` 삭제된 yakwan_analyzer 참조 제거
 
 ---
 
@@ -283,6 +111,18 @@ Streamlit 외부 CLI 스크립트에서 `st.secrets`를 못 쓰는 문제를 키
 |------|----------|------|
 | analysis-excel | private | 보장분석 Excel 결과물 ({fc_id}/{record_id}.xlsx) |
 | pioneer-photos | public | 간판 사진 ({fc_id}/{uuid}.jpeg) |
+
+## 보안 현황 (Sprint 19 기준)
+
+| 항목 | 상태 |
+|------|------|
+| RLS | 12/12 테이블 활성화 |
+| exec_sql | anon/authenticated 차단 |
+| Brute force | 5회/5분 + 10분 잠금 |
+| XSS | esc() 전면 적용 |
+| 에러 노출 | safe_error 전면 적용 |
+| Path traversal | validate_storage_path 적용 |
+| 보안 등급 | **A** |
 
 ---
 

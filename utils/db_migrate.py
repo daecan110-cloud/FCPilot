@@ -14,6 +14,10 @@ _MIGRATIONS = [
         BEGIN EXECUTE query; RETURN 'OK'; END;
         $$
     """),
+    ("exec_sql 권한 제한", """
+        REVOKE EXECUTE ON FUNCTION exec_sql(text) FROM anon, authenticated;
+        GRANT EXECUTE ON FUNCTION exec_sql(text) TO service_role
+    """),
 ]
 
 

@@ -1,9 +1,9 @@
 """상담이력 CRUD + 새 상담 기록"""
 import streamlit as st
-from auth import get_current_user_id
-from utils.helpers import safe_error
 
-TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
+from auth import get_current_user_id
+from config import TOUCH_OPTIONS
+from utils.helpers import safe_error
 
 
 def render_contact_logs(sb, client_id: str):

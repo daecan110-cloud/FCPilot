@@ -171,12 +171,6 @@ def _render_k_column_apply(data: dict, idx: int, result: dict):
 
     if st.button("이 내용으로 엑셀 재생성", use_container_width=True, type="primary"):
         from services.analysis_engine import analyze_and_generate
-        yakwan_results = st.session_state.get("yakwan_results", {})
-        k_column_data = {}
-        for i, r in yakwan_results.items():
-            k_column_data[i] = r.get("k_column", "")
-        if k_text.strip():
-            k_column_data[idx] = k_text.strip()
 
         pdf_bytes = st.session_state.get("pdf_bytes")
         if pdf_bytes:

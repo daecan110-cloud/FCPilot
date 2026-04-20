@@ -7,21 +7,6 @@ def esc(text: str) -> str:
     return _html.escape(str(text)) if text else ""
 
 
-def mask_name(name: str) -> str:
-    """김영민 → 김**"""
-    if not name or len(name) < 2:
-        return "***"
-    return name[0] + "*" * (len(name) - 1)
-
-
-def mask_phone(phone: str) -> str:
-    """010-1234-5678 → ***-****-5678"""
-    if not phone:
-        return "***"
-    parts = phone.replace("-", "")
-    return f"***-****-{parts[-4:]}"
-
-
 def safe_error(action: str, e: Exception) -> str:
     """사용자에게 보여줄 안전한 에러 메시지 (DB 스키마/내부 정보 숨김)"""
     err = str(e)

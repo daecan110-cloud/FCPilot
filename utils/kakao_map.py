@@ -1,6 +1,5 @@
 """지도 컴포넌트 — folium + streamlit-folium 기반"""
 import folium
-from folium.plugins import PolyLineTextPath
 import streamlit as st
 from streamlit_folium import st_folium
 

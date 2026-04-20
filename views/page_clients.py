@@ -1,11 +1,10 @@
 """고객관리 탭 — 라우터 + 목록 + 등록/수정 폼"""
 import streamlit as st
+
 from auth import get_current_user_id
+from config import DEFAULT_SOURCE_CATEGORIES as DEFAULT_SOURCE_OPTIONS
 from utils.supabase_client import get_supabase_client
 from utils.helpers import safe_error
-
-TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
-from config import DEFAULT_SOURCE_CATEGORIES as DEFAULT_SOURCE_OPTIONS
 
 
 def _get_source_categories(sb, fc_id: str) -> list:
@@ -130,9 +129,22 @@ def _render_list():
 
     if contact_filter != "전체" or sort_by == "최근 상담순":
         try:
-            logs_res = sb.table("contact_logs").select("client_id, created_at").eq("fc_id", fc_id).order("created_at", desc=True).execute()
-            logs_data = logs_res.data or []
-            has_logs = {r["client_id"] for r in logs_data}
+            # client_id별 최신 상담일만 조회 (풀 로드 대신 필요한 컬럼만)
+            client_ids = [c["id"] for c in clients]
+            latest_contact: dict = {}
+            has_logs: set = set()
+            if client_ids:
+                logs_res = (sb.table("contact_logs")
+                            .select("client_id, created_at")
+                            .eq("fc_id", fc_id)
+                            .in_("client_id", client_ids)
+                            .order("created_at", desc=True)
+                            .execute())
+                for log in (logs_res.data or []):
+                    cid = log["client_id"]
+                    has_logs.add(cid)
+                    if cid not in latest_contact:
+                        latest_contact[cid] = log["created_at"]
 
             if contact_filter == "있음":
                 clients = [c for c in clients if c["id"] in has_logs]
@@ -140,11 +152,6 @@ def _render_list():
                 clients = [c for c in clients if c["id"] not in has_logs]
 
             if sort_by == "최근 상담순":
-                latest_contact = {}
-                for log in logs_data:
-                    cid = log["client_id"]
-                    if cid not in latest_contact:
-                        latest_contact[cid] = log["created_at"]
                 clients.sort(key=lambda c: latest_contact.get(c["id"], ""), reverse=True)
         except Exception:
             pass

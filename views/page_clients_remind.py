@@ -54,7 +54,7 @@ def render_reminder_section(sb, fc_id: str, client_id: str):
                                 st.session_state.pop(complete_key, None)
                                 st.rerun()
                             else:
-                                st.error(f"저장 실패: {res}")
+                                st.error("저장에 실패했습니다. 다시 시도해주세요.")
                         if c2.form_submit_button("취소", use_container_width=True):
                             st.session_state.pop(complete_key, None)
                             st.rerun()

@@ -3,21 +3,28 @@ import io
 import os
 import shutil
 import tempfile
-from openpyxl import load_workbook
 from copy import copy
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+
+from openpyxl import load_workbook
+from openpyxl.styles import Font, Alignment, Border, Side
+from openpyxl.worksheet.pagebreak import Break
+
 from services.item_map import COL_IDX, COL_LTRS, SUM_COL, PROP_COL, TOTAL_COL, DATA_ROWS
+from services.excel_helpers import safe_val, clear_values, _FONT_NAME
+from services.excel_review import (
+    fill_renewal, fill_renewal_all, fill_review, fill_review_all,
+)
 
 _TMPL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 TEMPLATE = os.path.join(_TMPL_DIR, "master_template.xlsx")
 
-_FONT_NAME = "KoPubWorld돋움체 Bold"
-
-
-def safe_val(ws, row, col, value):
-    cell = ws.cell(row=row, column=col)
-    if cell.__class__.__name__ != "MergedCell":
-        cell.value = value
+# v10: D~J(col 4~10), K=합계(col 11), L=제안(col 12), M=전체합계(col 13)
+_DATA_START = 4
+_DATA_END = 10
+_MAX_COL = 11
+_MAX_COL_PROP = 13
+_REVIEW_START = 90
+_REVIEW_COUNT = 7
 
 
 def generate_analysis_excel(
@@ -28,10 +35,7 @@ def generate_analysis_excel(
     coverage_raw = data.get("_coverage_raw", {})
     customer = data.get("고객명", "고객")
 
-    chunks = []
-    for start in range(0, len(all_contracts), 7):
-        chunks.append(all_contracts[start:start + 7])
-
+    chunks = [all_contracts[i:i + 7] for i in range(0, len(all_contracts), 7)]
     total_pages = len(chunks)
     results: list[tuple[str, bytes]] = []
 
@@ -40,14 +44,10 @@ def generate_analysis_excel(
         prop = proposal if page == 0 else None
         is_last = (page == total_pages - 1)
 
-        # review_last=True & 다수 엑셀 → 마지막에만 전체 리뷰, 나머지는 리뷰 생략
         if review_last and total_pages > 1:
-            if is_last:
-                review_contracts = all_contracts
-            else:
-                review_contracts = []  # 빈 리스트 = 리뷰/갱신 생략
+            review_contracts = all_contracts if is_last else []
         else:
-            review_contracts = None  # None = 기본 동작 (해당 슬라이스 계약만)
+            review_contracts = None
 
         b = _fill_workbook(
             sd, proposal=prop,
@@ -87,7 +87,6 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
     wb = load_workbook(tmp.name)
     ws = wb.active
 
-    # 워크북 기본 폰트 — Normal 스타일 변경으로 모든 PC에서 동일 표시
     for ns in wb._named_styles:
         if ns.name == "Normal":
             ns.font = Font(name=_FONT_NAME, size=10, bold=True)
@@ -104,14 +103,12 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
     _fill_sums(ws, contracts, has_proposal=has_proposal, proposal=proposal)
 
     if review_contracts is None:
-        # 기본: 현재 슬라이스의 계약으로 갱신/리뷰
-        _fill_renewal(ws, contracts)
-        _fill_review(ws, contracts, slice_data.get("보장금액", {}))
+        fill_renewal(ws, contracts)
+        fill_review(ws, contracts, slice_data.get("보장금액", {}))
     elif len(review_contracts) > 0:
-        # review_last 모드: 전체 계약으로 갱신/리뷰 (동적 행 확장)
-        _fill_renewal_all(ws, review_contracts)
-        _fill_review_all(ws, review_contracts, all_coverage_raw or {})
-    # else: review_contracts == [] → 갱신/리뷰 생략 (빈 상태 유지)
+        fill_renewal_all(ws, review_contracts)
+        fill_review_all(ws, review_contracts, all_coverage_raw or {})
+
     _final_format(ws, has_proposal=has_proposal)
 
     buf = io.BytesIO()
@@ -120,37 +117,24 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
     return buf.getvalue()
 
 
-# v10: D~J(col 4~10), K=합계(col 11), L=제안(col 12), M=전체합계(col 13)
-_DATA_START = 4   # D
-_DATA_END = 10    # J
-_MAX_COL = 11     # K (제안 없을 때)
-_MAX_COL_PROP = 13  # M (제안 있을 때)
-_REVIEW_START = 90   # was 85 (+5)
-_REVIEW_COUNT = 7
-
-
 def _clear_values(ws, has_proposal=False):
     max_c = _MAX_COL_PROP if has_proposal else _MAX_COL
     ranges = [
-        (1, 1, 1, max_c),              # 제목
-        (3, _DATA_START, 7, _DATA_END), # 상품정보 (Row 3~7, D~J)
-        (9, _DATA_START, 74, _DATA_END),# 보장금액
-        (9, SUM_COL, 74, SUM_COL),      # K열 합계
-        (80, _DATA_START, 82, max_c),   # 보험료
+        (1, 1, 1, max_c),
+        (3, _DATA_START, 7, _DATA_END),
+        (9, _DATA_START, 74, _DATA_END),
+        (9, SUM_COL, 74, SUM_COL),
+        (80, _DATA_START, 82, max_c),
         (_REVIEW_START, 1, _REVIEW_START + _REVIEW_COUNT - 1, max_c),
     ]
     if has_proposal:
-        ranges.append((2, PROP_COL, 7, PROP_COL))      # L열 헤더
-        ranges.append((9, PROP_COL, 74, PROP_COL))      # L열 보장
-        ranges.append((2, TOTAL_COL, 7, TOTAL_COL))     # M열 헤더
-        ranges.append((9, TOTAL_COL, 74, TOTAL_COL))    # M열 합계
-
-    for r_s, c_s, r_e, c_e in ranges:
-        for r in range(r_s, r_e + 1):
-            for c in range(c_s, c_e + 1):
-                cell = ws.cell(row=r, column=c)
-                if cell.__class__.__name__ != "MergedCell":
-                    cell.value = None
+        ranges += [
+            (2, PROP_COL, 7, PROP_COL),
+            (9, PROP_COL, 74, PROP_COL),
+            (2, TOTAL_COL, 7, TOTAL_COL),
+            (9, TOTAL_COL, 74, TOTAL_COL),
+        ]
+    clear_values(ws, ranges)
 
 
 def _fill_header(ws, slice_data):
@@ -162,13 +146,9 @@ def _fill_header(ws, slice_data):
 
     for c in slice_data.get("계약", []):
         col = COL_IDX.get(c["열"], 4)
-        # Row 2: 가입회사 (C열 헤더에 이미 있으므로 D~J에 회사명)
         safe_val(ws, 2, col, c.get("보험사", ""))
-        # Row 3: 상품명
         safe_val(ws, 3, col, c.get("상품명", ""))
-        # Row 4: 가입년,월
         safe_val(ws, 4, col, c.get("가입시기", ""))
-        # Row 5: 납입기간 (보장기간)
         납입기간 = c.get("_납입기간", "")
         coverage_period = c.get("보장나이", "")
         if 납입기간 and coverage_period:
@@ -177,13 +157,11 @@ def _fill_header(ws, slice_data):
             safe_val(ws, 5, col, 납입기간)
         else:
             safe_val(ws, 5, col, coverage_period or None)
-        # Row 6: 총납입개월 (남은 개월)
         paid_m = c.get("_납입개월", 0)
         total_m = c.get("_총납입개월", 0)
         if total_m:
             remain = total_m - paid_m
             safe_val(ws, 6, col, f"{paid_m}/{total_m}\n(남은 {remain}개월)")
-        # Row 7: 월보험료
         safe_val(ws, 7, col, c.get("월보험료", 0))
 
 
@@ -205,11 +183,8 @@ def _fill_proposal(ws, proposal):
     riders = proposal.get("특약목록", [])
     주계약 = riders[0] if riders else {}
 
-    # Row 2: 헤더 (병합 전 값)
     safe_val(ws, 2, PROP_COL, "신상품 제안")
-    # Row 3: 상품명 (L3:L4 병합 예정)
     safe_val(ws, 3, PROP_COL, proposal.get("상품명", "제안 상품"))
-    # Row 5: 납입기간 (보장기간) (L5:L6 병합 예정)
     납입 = 주계약.get("납입기간", "")
     보장 = 주계약.get("보험기간", "")
     if 납입 and 보장:
@@ -218,12 +193,10 @@ def _fill_proposal(ws, proposal):
         safe_val(ws, 5, PROP_COL, 납입)
     else:
         safe_val(ws, 5, PROP_COL, 보장)
-    # Row 7: 월보험료
     total_prem = proposal.get("보험료합계", 0)
     if total_prem:
         safe_val(ws, 7, PROP_COL, total_prem)
 
-    # 보장금액 매핑
     row_amounts = map_riders_to_rows(riders)
     for row_num, amount in row_amounts.items():
         if row_num in DATA_ROWS:
@@ -234,14 +207,12 @@ def _format_proposal_cols(ws):
     """K열 서식을 L, M열에 복사 + 셀 병합"""
     from openpyxl.utils import get_column_letter
 
-    l_ltr = get_column_letter(PROP_COL)    # L
-    m_ltr = get_column_letter(TOTAL_COL)   # M
+    l_ltr = get_column_letter(PROP_COL)
+    m_ltr = get_column_letter(TOTAL_COL)
 
-    # 열 너비 설정
     ws.column_dimensions[l_ltr].width = 18
     ws.column_dimensions[m_ltr].width = 18
 
-    # K열 서식을 L, M 열에 복사 (Row 1 ~ 86)
     for r in range(1, 87):
         src = ws.cell(row=r, column=SUM_COL)
         if src.__class__.__name__ == "MergedCell":
@@ -256,7 +227,6 @@ def _format_proposal_cols(ws):
             dst.number_format = src.number_format
             dst.alignment = copy(src.alignment)
 
-    # 병합 전에 Row 2~6 서식을 먼저 적용
     src2 = ws.cell(row=2, column=SUM_COL)
     _thin = Border(
         left=Side(style="thin"), right=Side(style="thin"),
@@ -276,37 +246,28 @@ def _format_proposal_cols(ws):
                 for attr, val in _hdr_style.items():
                     setattr(cell, attr, copy(val) if attr != "number_format" else val)
 
-    # ── 셀 병합 ──
-    # L3:L4 — 상품명
     ws.merge_cells(f"{l_ltr}3:{l_ltr}4")
-    # L5:L6 — 납입기간(보장기간)
     ws.merge_cells(f"{l_ltr}5:{l_ltr}6")
-    # M2:M6 — "전체합계"
     ws.merge_cells(f"{m_ltr}2:{m_ltr}6")
 
 
 def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
     from openpyxl.utils import get_column_letter
-    start_ltr = get_column_letter(_DATA_START)   # D
-    end_ltr = get_column_letter(_DATA_END)        # J
-    k_ltr = get_column_letter(SUM_COL)            # K
-    l_ltr = get_column_letter(PROP_COL)           # L
+    start_ltr = get_column_letter(_DATA_START)
+    end_ltr = get_column_letter(_DATA_END)
+    k_ltr = get_column_letter(SUM_COL)
+    l_ltr = get_column_letter(PROP_COL)
 
-    # 데이터 행 합계 (K열)
     for row_num in DATA_ROWS:
         safe_val(ws, row_num, SUM_COL, f"=SUM({start_ltr}{row_num}:{end_ltr}{row_num})")
-
-    # Row 7 월보험료 합계 (K열)
     safe_val(ws, 7, SUM_COL, f"=SUM({start_ltr}7:{end_ltr}7)")
 
-    # 전체합계 M열 (K + L)
     if has_proposal:
         safe_val(ws, 2, TOTAL_COL, "전체합계")
         for row_num in DATA_ROWS:
             safe_val(ws, row_num, TOTAL_COL, f"={k_ltr}{row_num}+{l_ltr}{row_num}")
         safe_val(ws, 7, TOTAL_COL, f"={k_ltr}7+{l_ltr}7")
 
-    # Row 80 기납입보험료 (was 75)
     for ct in contracts:
         col = COL_IDX.get(ct["열"], 4)
         paid_amt = ct.get("_paid", 0)
@@ -318,7 +279,6 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             safe_val(ws, 80, col, paid_amt)
     safe_val(ws, 80, SUM_COL, f"=SUM({start_ltr}80:{end_ltr}80)")
 
-    # Row 81 납입할보험료 (was 76)
     for ct in contracts:
         col = COL_IDX.get(ct["열"], 4)
         topay_amt = ct.get("_topay", 0)
@@ -332,7 +292,6 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             safe_val(ws, 81, col, topay_amt)
     safe_val(ws, 81, SUM_COL, f"=SUM({start_ltr}81:{end_ltr}81)")
 
-    # Row 82 총납입보험료 = 기납입 + 납입할 (was 77)
     for c_ltr in COL_LTRS:
         col = COL_IDX[c_ltr]
         col_l = get_column_letter(col)
@@ -340,7 +299,6 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
     safe_val(ws, 82, SUM_COL, f"=SUM({start_ltr}82:{end_ltr}82)")
 
     if has_proposal:
-        # L열 납입할보험료 — 월보험료 × 납입개월
         from services.proposal_parser import _parse_납입개월
         if proposal:
             riders = proposal.get("특약목록", [])
@@ -355,423 +313,6 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
         safe_val(ws, 80, TOTAL_COL, f"={k_ltr}80+{l_ltr}80")
         safe_val(ws, 81, TOTAL_COL, f"={k_ltr}81+{l_ltr}81")
         safe_val(ws, 82, TOTAL_COL, f"={k_ltr}82+{l_ltr}82")
-
-
-def _fill_renewal(ws, contracts):
-    """Row 85 갱신 구분, Row 86 보험료 변화 예고 (was 80/81)"""
-    for i, ct in enumerate(contracts):
-        col = COL_IDX.get(ct["열"], 4)
-        name = ct.get("상품명", "")
-        company = ct.get("보험사", "")
-        prem = ct.get("월보험료", 0)
-        total_m = ct.get("_총납입개월", 0)
-        paid_m = ct.get("_납입개월", 0)
-
-        # 갱신형 판별 (상품명 + 보험사 유형)
-        is_renewal = "갱신" in name
-        is_short = total_m and total_m <= 12
-        # 손해보험 종합/건강보험 → 특약 갱신형 가능성 (부분 갱신형)
-        is_sonhae = any(k in company for k in ["화재", "손해", "해상"])
-        is_comprehensive = any(k in name for k in [
-            "건강", "종합", "케어", "플러스", "훼밀리", "간편",
-            "The", "NEW", "희망", "자녀", "Good",
-        ])
-
-        if is_renewal:
-            renewal = "갱신형 ⚠️"
-        elif is_short:
-            renewal = "단기계약\n갱신없음"
-        elif is_sonhae and is_comprehensive:
-            renewal = "부분 갱신형 ⚠️"
-        else:
-            renewal = "비갱신형 ✅"
-        safe_val(ws, 85, col, renewal)
-
-        # 보험료 변화 예고
-        if prem == 0:
-            notice = "납입완료"
-        elif is_renewal:
-            notice = "갱신 시\n보험료 변동 예상 ⚠️"
-        elif is_short:
-            notice = "만기 소멸 예정"
-        elif is_sonhae and is_comprehensive:
-            notice = "특약 갱신 시\n일부 변동 가능 ⚠️"
-        else:
-            remain = total_m - paid_m if total_m else 0
-            if remain <= 0:
-                notice = "납입완료 예정"
-            elif remain <= 24:
-                notice = f"약 {remain}개월 후\n납입완료 예정"
-            else:
-                notice = "변동 없음"
-        safe_val(ws, 86, col, notice)
-
-
-def _fill_renewal_all(ws, all_contracts):
-    """전체 계약에 대해 갱신/보험료변화 행을 7개씩 그룹으로 채움.
-
-    7개 이하: 기존 Row 85-86 사용
-    8개 이상: Row 86 뒤에 그룹당 2행 삽입
-    """
-    import math
-    n_groups = math.ceil(len(all_contracts) / 7)
-
-    # 추가 그룹용 행 삽입 (2행씩) — 삽입 전 하단 병합 해제
-    if n_groups > 1:
-        extra_rows = (n_groups - 1) * 2
-        # Row 87 이후 병합 해제 (insert_rows가 병합을 제대로 밀지 못함)
-        to_remove = [str(mg) for mg in ws.merged_cells.ranges if mg.min_row >= 87]
-        for r in to_remove:
-            ws.merged_cells.ranges = [m for m in ws.merged_cells.ranges if str(m) != r]
-            from openpyxl.utils.cell import range_boundaries
-            mc, mr, xc, xr = range_boundaries(r)
-            for row in range(mr, xr + 1):
-                for col in range(mc, xc + 1):
-                    if (row, col) in ws._cells and ws._cells[(row, col)].__class__.__name__ == "MergedCell":
-                        del ws._cells[(row, col)]
-
-        ws.insert_rows(87, extra_rows)
-
-        # 삽입된 빈 행(87 ~ 86+extra_rows)에 Row 85-86 서식 복사 (fill/border/font)
-        for i in range(extra_rows):
-            r_new = 87 + i
-            r_src = 85 + (i % 2)  # 85(갱신) ↔ 86(보험료변화) 순환
-            _copy_row_style(ws, r_src, r_new, cols=range(1, _MAX_COL_PROP + 1))
-            src_h = ws.row_dimensions[r_src].height if ws.row_dimensions.get(r_src) else None
-            if src_h:
-                ws.row_dimensions[r_new].height = src_h
-
-        # 하단 병합 재생성 (밀린 위치)
-        review_title_row = 88 + extra_rows  # 리뷰 타이틀
-        review_hdr_row = review_title_row + 1
-        ws.merge_cells(f"A{review_title_row}:K{review_title_row}")
-        ws.merge_cells(f"A{review_hdr_row}:B{review_hdr_row}")
-        ws.merge_cells(f"E{review_hdr_row}:H{review_hdr_row}")
-        ws.merge_cells(f"I{review_hdr_row}:K{review_hdr_row}")
-
-        # 리뷰 타이틀/헤더 값 복원
-        safe_val(ws, review_title_row, 1, "📋  현재 유지중인 보험 리뷰")
-        safe_val(ws, review_hdr_row, 1, "보험사 / 상품명")
-        safe_val(ws, review_hdr_row, 3, "가입일 / 만기")
-        ws.row_dimensions[review_title_row].height = 28
-        ws.row_dimensions[review_hdr_row].height = 20
-
-    for g in range(n_groups):
-        chunk = all_contracts[g * 7:(g + 1) * 7]
-        renewal_row = 85 + g * 2
-        notice_row = 86 + g * 2
-
-        for i, ct in enumerate(chunk):
-            col = COL_IDX.get(COL_LTRS[i], 4)
-            name = ct.get("상품명", "")
-            company = ct.get("보험사", "")
-            prem = ct.get("월보험료", 0)
-            total_m = ct.get("_총납입개월", 0)
-            paid_m = ct.get("_납입개월", 0)
-
-            is_renewal = "갱신" in name
-            is_short = total_m and total_m <= 12
-            is_sonhae = any(k in company for k in ["화재", "손해", "해상"])
-            is_comprehensive = any(k in name for k in [
-                "건강", "종합", "케어", "플러스", "훼밀리", "간편",
-                "The", "NEW", "희망", "자녀", "Good",
-            ])
-
-            if is_renewal:
-                renewal = "갱신형 ⚠️"
-            elif is_short:
-                renewal = "단기계약\n갱신없음"
-            elif is_sonhae and is_comprehensive:
-                renewal = "부분 갱신형 ⚠️"
-            else:
-                renewal = "비갱신형 ✅"
-            safe_val(ws, renewal_row, col, renewal)
-
-            if prem == 0:
-                notice = "납입완료"
-            elif is_renewal:
-                notice = "갱신 시\n보험료 변동 예상 ⚠️"
-            elif is_short:
-                notice = "만기 소멸 예정"
-            elif is_sonhae and is_comprehensive:
-                notice = "특약 갱신 시\n일부 변동 가능 ⚠️"
-            else:
-                remain = total_m - paid_m if total_m else 0
-                if remain <= 0:
-                    notice = "납입완료 예정"
-                elif remain <= 24:
-                    notice = f"약 {remain}개월 후\n납입완료 예정"
-                else:
-                    notice = "변동 없음"
-            safe_val(ws, notice_row, col, notice)
-
-        # 행 서식
-        for row in (renewal_row, notice_row):
-            for c in range(_DATA_START, _DATA_END + 1):
-                cell = ws.cell(row=row, column=c)
-                if cell.__class__.__name__ != "MergedCell":
-                    cell.font = Font(name=_FONT_NAME, size=8, bold=True)
-                    cell.alignment = Alignment(
-                        horizontal="center", vertical="center", wrap_text=True,
-                    )
-            ws.row_dimensions[row].height = 26 if row % 2 == 0 else 20
-
-    return (n_groups - 1) * 2  # 삽입한 행 수
-
-
-def _fill_review_all(ws, all_contracts, all_coverage_raw):
-    """전체 계약에 대해 리뷰 행을 채움 (7행 초과 시 동적 확장).
-
-    중요: insert_rows 후 데이터 행(review_start ~ review_start+n-1) 별로
-    A:B(보험사/상품명), E:H(체크사항), I:K(특이사항) 병합을 재생성해야 함.
-    A열은 hidden이므로 병합이 없으면 값이 사라진 것처럼 보임.
-    """
-    import math
-    n_groups = math.ceil(len(all_contracts) / 7)
-    extra_renewal = (n_groups - 1) * 2 if n_groups > 1 else 0
-
-    # 리뷰 시작 위치 = 기존 _REVIEW_START + 갱신 추가 행
-    review_start = _REVIEW_START + extra_renewal
-    n_contracts = len(all_contracts)
-    extra_review = max(0, n_contracts - _REVIEW_COUNT)
-
-    # 리뷰 행 부족 시 삽입
-    if extra_review > 0:
-        # 삽입 전 기존 리뷰 행 병합 해제
-        to_remove = [str(mg) for mg in ws.merged_cells.ranges if mg.min_row >= review_start]
-        for r in to_remove:
-            ws.merged_cells.ranges = [m for m in ws.merged_cells.ranges if str(m) != r]
-            from openpyxl.utils.cell import range_boundaries
-            mc, mr, xc, xr = range_boundaries(r)
-            for row in range(mr, xr + 1):
-                for col_n in range(mc, xc + 1):
-                    if (row, col_n) in ws._cells and ws._cells[(row, col_n)].__class__.__name__ == "MergedCell":
-                        del ws._cells[(row, col_n)]
-
-        ws.insert_rows(review_start + _REVIEW_COUNT, extra_review)
-
-        # 삽입된 빈 리뷰 행에 기존 템플릿 리뷰 5행(review_start~review_start+4) 서식 복사
-        # (템플릿엔 5가지 파스텔 색상 — EBF3FB/FFF8E7/F5F0FA/F0FAFA/F5F5F0 — 순환)
-        for i in range(extra_review):
-            r_new = review_start + _REVIEW_COUNT + i
-            r_src = review_start + ((_REVIEW_COUNT + i) % 5)  # 5색 순환
-            _copy_row_style(ws, r_src, r_new, cols=range(1, _MAX_COL_PROP + 1))
-            ws.row_dimensions[r_new].height = 70
-
-    # 헤더 행 병합 재생성 (타이틀 + 컬럼 헤더)
-    title_row = review_start - 2  # "📋 현재 유지중인 보험 리뷰"
-    header_row = review_start - 1  # "보험사/상품명 | 가입일/만기 | 월보험료 | ..."
-    _safe_merge(ws, f"A{title_row}:K{title_row}")
-    _safe_merge(ws, f"A{header_row}:B{header_row}")
-    _safe_merge(ws, f"E{header_row}:H{header_row}")
-    _safe_merge(ws, f"I{header_row}:K{header_row}")
-    # 헤더 타이틀/라벨 값 복원
-    safe_val(ws, title_row, 1, "📋  현재 유지중인 보험 리뷰")
-    safe_val(ws, header_row, 1, "보험사 / 상품명")
-    safe_val(ws, header_row, 3, "가입일 / 만기")
-    safe_val(ws, header_row, 4, "월 보험료")
-    safe_val(ws, header_row, 5, "주요 체크사항")
-    safe_val(ws, header_row, 9, "특이사항 (면책기간, 보장범위 등)")
-
-    # 데이터 행 병합 재생성 (A:B, E:H, I:K) — 값 쓰기 전에 먼저 병합
-    for i in range(n_contracts):
-        r = review_start + i
-        _safe_merge(ws, f"A{r}:B{r}")
-        _safe_merge(ws, f"E{r}:H{r}")
-        _safe_merge(ws, f"I{r}:K{r}")
-
-    for i, c in enumerate(all_contracts):
-        r = review_start + i
-
-        safe_val(ws, r, 1, _short_name(c))
-        period = c.get("보장나이", "")
-        start = c.get("가입시기", "")
-        safe_val(ws, r, 3, f"{start}\n({period})" if start else period)
-        prem = c.get("월보험료", 0)
-        safe_val(ws, r, 4, f"{prem:,.0f}원" if prem else "납입완료")
-
-        cov_data = {}
-        if c["_idx"] in all_coverage_raw:
-            cov_data = {str(k): v for k, v in all_coverage_raw[c["_idx"]].items()}
-        safe_val(ws, r, 5, _build_review(c, coverage_data=cov_data))
-
-        # 행 서식
-        for col_n in range(1, _MAX_COL + 1):
-            cell = ws.cell(row=r, column=col_n)
-            if cell.__class__.__name__ != "MergedCell":
-                cell.font = Font(name=_FONT_NAME, size=8, bold=True)
-                cell.alignment = Alignment(
-                    horizontal="left", vertical="center", wrap_text=True,
-                )
-        ws.row_dimensions[r].height = 70
-
-
-def _safe_merge(ws, range_str: str):
-    """이미 존재하는 병합이면 무시, 없으면 생성."""
-    existing = {str(m) for m in ws.merged_cells.ranges}
-    if range_str not in existing:
-        try:
-            ws.merge_cells(range_str)
-        except Exception:
-            pass
-
-
-def _copy_row_style(ws, src_row: int, dst_row: int, cols):
-    """src_row의 셀 서식(fill, border, font, alignment, number_format)을 dst_row로 복사.
-    insert_rows 로 생긴 빈 행은 기본 서식이라 템플릿 색상/테두리가 사라지는 것을 보완.
-    """
-    for c in cols:
-        src = ws.cell(row=src_row, column=c)
-        dst = ws.cell(row=dst_row, column=c)
-        if dst.__class__.__name__ == "MergedCell":
-            continue
-        if src.__class__.__name__ == "MergedCell":
-            continue
-        dst.fill = copy(src.fill)
-        dst.border = copy(src.border)
-        dst.font = copy(src.font)
-        dst.alignment = copy(src.alignment)
-        dst.number_format = src.number_format
-
-
-def _short_name(contract):
-    name = contract.get("상품명", "")
-    company = contract.get("보험사", "")
-    for prefix in ["무배당 ", "(무배당)", "무배당", "無", "삼성 "]:
-        name = name.replace(prefix, "")
-    name = name.replace("()", "").strip()
-    if "\n" in name:
-        name = name.split("\n")[0]
-    for full, short in [("삼성생명보험", "삼성생명"), ("한화생명보험", "한화생명"),
-                        ("새마을금고중앙회", "새마을금고"), ("현대해상화재보험", "현대해상")]:
-        company = company.replace(full, short)
-    return f"{company}\n{name}"
-
-
-def _fill_review(ws, contracts, coverage_map=None):
-    for i, c in enumerate(contracts):
-        r = _REVIEW_START + i
-        col_ltr = c.get("열", "")
-        cov = (coverage_map or {}).get(col_ltr, {})
-        # A:B 보험사/상품명
-        safe_val(ws, r, 1, _short_name(c))
-        # C 가입일/만기
-        period = c.get("보장나이", "")
-        start = c.get("가입시기", "")
-        safe_val(ws, r, 3, f"{start}\n({period})" if start else period)
-        # D 월보험료
-        prem = c.get("월보험료", 0)
-        safe_val(ws, r, 4, f"{prem:,.0f}원" if prem else "납입완료")
-        # E:H 주요 체크사항
-        safe_val(ws, r, 5, _build_review(c, coverage_data=cov))
-
-
-def _build_review(contract, coverage_data=None):
-    name = contract.get("상품명", "")
-    company = contract.get("보험사", "")
-    combined = name + company
-    period = contract.get("보장나이", "")
-    premium = contract.get("월보험료", 0)
-    checks = []
-
-    if any(k in combined for k in ["단체", "단기"]):
-        checks.append("단체/단기계약 — 퇴직·탈퇴 시 자동 소멸")
-    elif any(k in combined for k in ["실손", "의료비"]):
-        start_date = contract.get("가입시기", "")
-        gen = _detect_silbi_gen(name, company, start_date)
-        checks.append(f"실손의료비 {gen} (갱신형)")
-    elif any(k in combined for k in ["종신"]) and any(k in combined for k in ["변액", "유니버셜"]):
-        checks.append("변액유니버셜종신 — 수익률·적립금 확인 필요")
-    elif any(k in combined for k in ["종신"]):
-        checks.append("종신보험 — 비갱신형")
-    elif any(k in combined for k in ["운전자", "자동차"]):
-        checks.append("운전자보험 — 교통상해/벌금/변호사비 보장")
-    elif any(k in combined for k in ["CI"]):
-        checks.append("CI보험 — 중대질병 진단 시 보험금 지급")
-    elif any(k in combined for k in ["치아"]):
-        checks.append(f"치아보험 ({period})")
-    elif any(k in combined for k in ["건강", "상해", "종합"]):
-        checks.append(f"건강/상해 보장 ({period})")
-    elif any(k in combined for k in ["암"]):
-        checks.append(f"암보험 ({period})")
-    elif any(k in combined for k in ["저축", "연금", "적립"]):
-        checks.append(f"저축/연금 ({period})")
-    else:
-        checks.append(f"보장기간: {period}")
-
-    if premium == 0:
-        checks.append("납입완료")
-
-    # 보장 내역 요약 (주요 항목 금액)
-    if coverage_data:
-        highlights = _coverage_highlights(coverage_data)
-        if highlights:
-            checks.append(highlights)
-
-    return " / ".join(checks)
-
-
-def _detect_silbi_gen(name: str, company: str, start_date: str = "") -> str:
-    """실손의료비 세대 판별 (키워드 → 가입시기 순)"""
-    import re
-    combined = name + company
-
-    # 키워드 기반 (가장 정확)
-    if any(k in combined for k in ["착한", "비급여특약"]):
-        return "4세대"
-    if any(k in combined for k in ["4세대", "신실손"]):
-        return "4세대"
-    if any(k in combined for k in ["표준화", "3세대"]):
-        return "3세대"
-    if any(k in combined for k in ["단독", "2세대"]):
-        return "2세대"
-    if any(k in combined for k in ["1세대"]):
-        return "1세대"
-    if any(k in combined for k in ["5세대"]):
-        return "5세대"
-
-    # 상품명에 연도가 있으면 (2000~2030 범위만 인식)
-    m = re.search(r"(20[0-2]\d)", name)
-    if m:
-        year = int(m.group(1))
-        if year >= 2026:
-            return "5세대"
-        if year >= 2017:
-            return "4세대"
-
-    # 가입시기 기반 (금감원 기준)
-    # 1세대: ~2009.09 / 2세대: 2009.10~2012.12 / 3세대: 2013.01~2017.03 / 4세대: 2017.04~ / 5세대: 2026.05~
-    if start_date:
-        m = re.match(r"(\d{4})-?(\d{2})?", start_date)
-        if m:
-            y = int(m.group(1))
-            mo = int(m.group(2) or "1")
-            ym = y * 100 + mo
-            if ym >= 202605:
-                return "5세대"
-            if ym >= 201704:
-                return "4세대"
-            if ym >= 201301:
-                return "3세대"
-            if ym >= 200910:
-                return "2세대"
-            return "1세대"
-
-    return "(세대 확인 필요)"
-
-
-def _coverage_highlights(cov: dict) -> str:
-    """주요 보장 항목 요약 (금액이 있는 것만)"""
-    labels = {
-        "9": "사망", "17": "일반암", "44": "심근경색",
-        "39": "뇌혈관", "76": "실비",
-    }
-    parts = []
-    for row_str, label in labels.items():
-        amt = cov.get(row_str, 0)
-        if amt:
-            parts.append(f"{label} {amt:,}")
-    return " / ".join(parts) if parts else ""
 
 
 def _final_format(ws, has_proposal=False):
@@ -789,7 +330,6 @@ def _final_format(ws, has_proposal=False):
                 italic=old.italic if old.italic else False,
                 color=old.color,
             )
-        # Row 3, 5, 6: 상품명/납입기간/개월 — 가운데 정렬 + 줄바꿈
         if r in (3, 5, 6):
             for c in range(_DATA_START, _DATA_END + 1):
                 cell = ws.cell(row=r, column=c)
@@ -797,7 +337,6 @@ def _final_format(ws, has_proposal=False):
                     cell.alignment = Alignment(
                         horizontal="center", vertical="center", wrap_text=True,
                     )
-    # L열(제안) 상품명도 줄바꿈
     if has_proposal:
         for r in (3, 5, 6):
             cell = ws.cell(row=r, column=PROP_COL)
@@ -805,12 +344,10 @@ def _final_format(ws, has_proposal=False):
                 cell.alignment = Alignment(
                     horizontal="center", vertical="center", wrap_text=True,
                 )
-    # 행 높이 설정 — A3 인쇄 1페이지 맞춤 (갱신 구분까지 포함)
-    ws.row_dimensions[5].height = 30    # 납입기간 (2줄)
-    ws.row_dimensions[6].height = 30    # 납입개월 (2줄)
-    ws.row_dimensions[8].height = 10    # 빈 구분행
-    ws.row_dimensions[83].height = 5    # 빈 구분행
-    # 리뷰 행 서식
+    ws.row_dimensions[5].height = 30
+    ws.row_dimensions[6].height = 30
+    ws.row_dimensions[8].height = 10
+    ws.row_dimensions[83].height = 5
     for r in range(_REVIEW_START, _REVIEW_START + _REVIEW_COUNT):
         for c in range(1, max_c + 1):
             cell = ws.cell(row=r, column=c)
@@ -818,16 +355,11 @@ def _final_format(ws, has_proposal=False):
                 cell.alignment = Alignment(
                     horizontal="left", vertical="center", wrap_text=True,
                 )
-    # 여백
     ws.page_margins.top = 0.3
     ws.page_margins.bottom = 0.2
-    # 인쇄 설정 — "한 페이지에 모든 열 맞추기" + 수동 페이지 나누기
-    # fitToWidth=1: 가로를 1페이지에 맞춤 (열 축소)
-    # fitToHeight=0: 세로는 제한 없음 (페이지 나누기로 분리)
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
-    ws.page_setup.scale = None  # fitToPage 모드에서는 scale 자동
-    from openpyxl.worksheet.pagebreak import Break
+    ws.page_setup.scale = None
     ws.row_breaks.brk = []
-    ws.row_breaks.append(Break(id=83))  # 1p: ~82(총납입보험료), 2p: 84~(갱신+리뷰)
+    ws.row_breaks.append(Break(id=83))

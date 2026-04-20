@@ -128,13 +128,17 @@ def _render_age_product(contracts: list, clients_map: dict):
         return
 
     age_product: dict = {}
+    age_product_premium: dict = {}
     for c in contracts:
         client = clients_map.get(c.get("client_id"), {})
         age = client.get("age_group") or "미지정"
         product = c.get("product_name") or "미지정"
+        key = (age, product)
         if age not in age_product:
             age_product[age] = {}
+            age_product_premium[age] = {}
         age_product[age][product] = age_product[age].get(product, 0) + 1
+        age_product_premium[age][product] = age_product_premium[age].get(product, 0) + c.get("monthly_premium", 0)
 
     age_order = ["10대", "20대", "30대", "40대", "50대", "60대 이상", "미지정"]
     sorted_ages = [a for a in age_order if a in age_product]
@@ -146,11 +150,7 @@ def _render_age_product(contracts: list, clients_map: dict):
         st.markdown(f"**{age}** ({total}건)")
         for prod in sorted(products, key=lambda k: -products[k]):
             cnt = products[prod]
-            premium_sum = sum(
-                c.get("monthly_premium", 0) for c in contracts
-                if (c.get("product_name") or "미지정") == prod
-                and (clients_map.get(c.get("client_id"), {}).get("age_group") or "미지정") == age
-            )
+            premium_sum = age_product_premium[age].get(prod, 0)
             st.caption(f"  · {prod}: {cnt}건 (월 평균 {premium_sum // max(cnt, 1):,}원)")
 
 

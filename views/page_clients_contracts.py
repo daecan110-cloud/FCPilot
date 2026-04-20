@@ -1,13 +1,8 @@
 """기계약자 계약 정보 관리 — S/VIP 등급 전용"""
 import streamlit as st
 from auth import get_current_user_id
+from config import INSURANCE_CATEGORIES as _CATEGORIES, INSURANCE_CAT_ICON as _CAT_ICON
 from utils.helpers import safe_error
-
-_CATEGORIES = ["종신보험", "건강보험", "연금보험", "저축보험", "변액보험", "기타"]
-_CAT_ICON = {
-    "종신보험": "🔵", "건강보험": "🟢", "연금보험": "🟡",
-    "저축보험": "🟠", "변액보험": "🟣", "기타": "⚪",
-}
 
 
 def render_contracts(sb, client_id: str):

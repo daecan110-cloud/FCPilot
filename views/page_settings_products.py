@@ -3,13 +3,8 @@ import pandas as pd
 import streamlit as st
 from auth import get_current_user_id
 from utils.helpers import safe_error
+from config import INSURANCE_CATEGORIES as _CATEGORIES, INSURANCE_CAT_ICON as _CAT_ICON
 from utils.supabase_client import get_supabase_client
-
-_CATEGORIES = ["종신보험", "건강보험", "연금보험", "저축보험", "변액보험", "기타"]
-_CAT_ICON = {
-    "종신보험": "🔵", "건강보험": "🟢", "연금보험": "🟡",
-    "저축보험": "🟠", "변액보험": "🟣", "기타": "⚪",
-}
 
 
 def get_active_products(sb, fc_id: str) -> list[dict]:

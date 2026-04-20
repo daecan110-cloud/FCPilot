@@ -1,15 +1,15 @@
 """홈 — 리마인드 추가/수정/완료 폼 + 최근 활동 + 지난 카드"""
 from datetime import date
+
 import streamlit as st
 
 from auth import get_current_user_id
+from config import TOUCH_OPTIONS as _TOUCH_OPTIONS
 from services.fp_reminder_service import (
     update_reminder, purposes, create_reminder, RESULT_OPTIONS, RESULT_MAP,
 )
 from utils.helpers import safe_error
 from utils.supabase_client import get_supabase_client
-
-_TOUCH_OPTIONS = ["콜", "방문", "문자", "이메일", "기타"]
 
 
 def _search_client(sb, fc_id, search, key_prefix="home_remind"):
@@ -104,7 +104,7 @@ def render_edit_form(r: dict, edit_key: str):
                 st.session_state.pop(edit_key, None)
                 st.rerun()
             else:
-                st.error(f"저장 실패: {res}")
+                st.error("저장에 실패했습니다. 다시 시도해주세요.")
         if c2.form_submit_button("취소", use_container_width=True):
             st.session_state.pop(edit_key, None)
             st.rerun()

@@ -5,9 +5,8 @@ from utils.supabase_client import get_supabase_client
 from utils.map_utils import STATUS_LABELS
 from utils.kakao_map import pioneer_map_html
 from services.geocoding import geocode, search_keyword
+from config import CATEGORY_OPTIONS
 from utils.helpers import safe_error
-
-CATEGORY_OPTIONS = ["음식점", "카페", "미용실/뷰티", "학원/교육", "병원/약국", "편의점/마트", "의류/패션", "사무실/오피스", "기타"]
 
 
 def render():

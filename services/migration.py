@@ -79,7 +79,7 @@ def migrate_clients_csv(csv_bytes: bytes) -> dict:
         except Exception as e:
             err_msg = str(e)
             if any(k in err_msg.lower() for k in ["duplicate", "null value", "violates"]):
-                errors.append(f"행 {i}: {err_msg[:80]}")
+                errors.append(f"행 {i}: 데이터 형식을 확인해주세요.")
             else:
                 errors.append(f"행 {i}: 저장 실패 — 관리자에게 문의하세요.")
 

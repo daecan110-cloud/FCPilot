@@ -5,9 +5,8 @@ from auth import get_current_user_id
 from utils.supabase_client import get_supabase_client
 from utils.map_utils import STATUS_LABELS
 from services.geocoding import geocode
+from config import CATEGORY_OPTIONS
 from utils.helpers import safe_error
-
-CATEGORY_OPTIONS = ["음식점", "카페", "미용실/뷰티", "학원/교육", "병원/약국", "편의점/마트", "의류/패션", "사무실/오피스", "기타"]
 
 
 def render_followup():

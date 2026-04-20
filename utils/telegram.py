@@ -77,28 +77,12 @@ def send_message(text: str) -> bool:
     return _send(text, bot="dev")
 
 
-def notify_sprint_complete(sprint: str, summary: str):
-    _send(f"✅ *{sprint} 완료*\n\n{summary}", bot="dev")
-
-
-def notify_action_needed(message: str):
-    _send(f"🔧 *확인 필요*\n\n{message}\n\n⏳ 대기 중...", bot="dev")
-
-
-def notify_warning(message: str):
-    _send(f"⚠️ *알림*\n\n{message}", bot="dev")
-
-
 def report_status(status_text: str):
     _send(f"📊 *현재 상태*\n\n{status_text}", bot="dev")
 
 
 def ack_instruction(text: str):
     _send(f"📩 *지시 수신*\n\n\"{text}\"\n\n🔄 처리 중...", bot="dev")
-
-
-def report_result(instruction: str, result: str):
-    _send(f"✅ *처리 완료*\n\n📩 {instruction}\n\n{result}", bot="dev")
 
 
 # ── 사용자 알림 (FCPilot 봇) ─────────────────────────────

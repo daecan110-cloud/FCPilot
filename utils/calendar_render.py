@@ -4,6 +4,7 @@ from datetime import date
 
 import streamlit as st
 
+from utils.helpers import esc
 from utils.supabase_client import get_supabase_client
 
 
@@ -145,7 +146,7 @@ def render_monthly_calendar(fc_id: str):
                 name = client.get("name", "")
                 status_icon = {"pending": "🟡", "completed": "✅",
                                "cancelled": "❌"}.get(r.get("status", ""), "")
-                memo_part = f" | {r['memo'][:20]}" if r.get("memo") else ""
-                st.markdown(f"{status_icon} **{name}** — {r.get('purpose', '')}{memo_part}")
+                memo_part = f" | {esc(r['memo'][:20])}" if r.get("memo") else ""
+                st.markdown(f"{status_icon} **{esc(name)}** — {esc(r.get('purpose', ''))}{memo_part}")
         else:
             st.caption("일정 없음")

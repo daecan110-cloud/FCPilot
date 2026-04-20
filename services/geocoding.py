@@ -75,5 +75,5 @@ def search_keyword(query: str, size: int = 5) -> list[dict]:
         data = res.json()
         return data.get("documents", [])
     except Exception as e:
-        st.warning(f"검색 API: {e}")
+        st.warning("주소 검색에 실패했습니다. 다시 시도해주세요.")
         return []

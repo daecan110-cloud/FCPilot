@@ -1,5 +1,8 @@
 """고객 상세 — 기본 정보 + 탭 (상담이력/리마인드/보장분석)"""
+import logging
+
 import streamlit as st
+
 from auth import get_current_user_id
 from services.crypto import decrypt_phone
 from utils.helpers import safe_error
@@ -110,6 +113,9 @@ def _render_analysis_history(sb, fc_id: str, client_name: str):
             st.caption(f"분석일: {created}")
             if r.get("excel_path"):
                 try:
+                    from utils.security import validate_storage_path
+                    if not validate_storage_path(r["excel_path"], fc_id):
+                        continue
                     from utils.db_admin import get_admin_client
                     excel_bytes = get_admin_client().storage.from_("analysis-excel").download(r["excel_path"])
                     st.download_button(
@@ -143,14 +149,14 @@ def _render_client_delete_confirm(sb, client_id: str, fc_id: str):
             }).execute()
         except Exception as rpc_err:
             # RPC 미등록/권한실패/참조테이블 미생성 → 직접 순차 delete로 폴백
-            print(f"[delete_client RPC 실패, 직접 삭제] {rpc_err}")
+            logging.warning("delete_client RPC 실패, 직접 삭제로 폴백")
             for tbl in ("fp_reminders", "client_contracts", "contact_logs"):
                 _safe_table_delete(sb, tbl, "client_id", client_id, fc_id)
             # 마지막으로 clients 본체 삭제
             try:
                 sb.table("clients").delete().eq("id", client_id).eq("fc_id", fc_id).execute()
             except Exception as e:
-                print(f"[clients 삭제 오류] {e}")
+                logging.error("clients 삭제 오류: %s", type(e).__name__)
                 st.error(safe_error("삭제", e))
                 return
         st.session_state.pop(confirm_key, None)
@@ -168,10 +174,10 @@ def _safe_table_delete(sb, table: str, key_col: str, key_val: str, fc_id: str):
     except Exception as e:
         err_str = str(e)
         if "PGRST205" in err_str or "Could not find the table" in err_str:
-            print(f"[{table} 미생성 — 건너뜀]")
+            logging.info("%s 미생성 — 건너뜀", table)
         else:
             # 다른 에러는 경고만 찍고 계속 (부분 삭제 허용)
-            print(f"[{table} 삭제 실패 — 계속 진행] {e}")
+            logging.warning("%s 삭제 실패 — 계속 진행: %s", table, type(e).__name__)
 
 
 

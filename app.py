@@ -220,9 +220,10 @@ def main():
         )
         user = st.session_state.get("user")
         if user:
+            from utils.helpers import esc
             st.markdown(
                 f'<div style="text-align:center; padding-bottom:8px;">'
-                f'<span style="font-size:12px; color:#94a3b8 !important;">{__import__("html").escape(str(user.email))}</span>'
+                f'<span style="font-size:12px; color:#94a3b8 !important;">{esc(str(user.email))}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -286,8 +287,9 @@ def _get_sales_mode() -> str:
             mode = res.data[0].get("mode", "both")
             st.session_state.cached_sales_mode = mode
             return mode
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.warning(f"sales_mode 조회 실패: {type(e).__name__}")
     return "both"
 
 

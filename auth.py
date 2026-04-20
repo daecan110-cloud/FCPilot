@@ -113,9 +113,10 @@ def get_user_status() -> str:
             return status
         st.session_state.cached_user_status = "pending"
         return "pending"
-    except Exception:
-        pass
-    return "approved"
+    except Exception as e:
+        import logging
+        logging.warning("user_status 조회 실패 (fail-closed): %s", type(e).__name__)
+    return "pending"
 
 
 def is_admin() -> bool:
@@ -146,7 +147,7 @@ def show_login_page():
     st.title("🛡️ FCPilot")
     st.caption("보험 FC 업무 통합 플랫폼")
 
-    tab_login, tab_signup = st.tabs(["로그인", "회원가입"])
+    tab_login, tab_signup, tab_reset = st.tabs(["로그인", "회원가입", "비밀번호 찾기"])
 
     with tab_login:
         with st.form("login_form"):
@@ -158,6 +159,9 @@ def show_login_page():
                     st.error("이메일과 비밀번호를 입력해주세요.")
                     return
                 _do_login(email, password)
+
+    with tab_reset:
+        _render_password_reset()
 
     with tab_signup:
         with st.form("signup_form"):
@@ -182,12 +186,21 @@ def show_login_page():
 # ── 로그인 / 로그아웃 처리 ────────────────────────────────
 
 def _do_login(email: str, password: str):
+    from utils.security import check_login_throttle, record_login_attempt, clear_login_attempts
+
+    # brute force 차단
+    throttle_msg = check_login_throttle(email)
+    if throttle_msg:
+        st.error(throttle_msg)
+        return
+
     try:
         sb = get_supabase_client()
         res = sb.auth.sign_in_with_password({"email": email, "password": password})
         st.session_state.user = res.user
         st.session_state.session = res.session
         st.session_state.last_activity = time.time()
+        clear_login_attempts(email)
 
         if res.session:
             st.session_state._pending_cookies = {
@@ -202,6 +215,7 @@ def _do_login(email: str, password: str):
 
         st.rerun()
     except Exception as e:
+        record_login_attempt(email)
         err = str(e)
         if "Invalid login" in err or "invalid_credentials" in err:
             st.error("이메일 또는 비밀번호가 올바르지 않습니다.")
@@ -269,6 +283,25 @@ def _do_signup(email: str, password: str, display_name: str):
         else:
             from utils.helpers import safe_error
             st.error(safe_error("회원가입", Exception(msg)))
+
+
+def _render_password_reset():
+    """비밀번호 재설정 이메일 발송 UI"""
+    st.caption("가입한 이메일 주소를 입력하면 비밀번호 재설정 링크를 보내드립니다.")
+    with st.form("reset_form"):
+        reset_email = st.text_input("가입 이메일")
+        submitted = st.form_submit_button("재설정 링크 발송", use_container_width=True)
+        if submitted:
+            if not reset_email or "@" not in reset_email:
+                st.error("올바른 이메일 주소를 입력해주세요.")
+                return
+            try:
+                sb = get_supabase_client()
+                sb.auth.reset_password_email(reset_email.strip())
+                st.success("비밀번호 재설정 이메일을 발송했습니다. 메일함을 확인해주세요.")
+            except Exception:
+                # 이메일 존재 여부를 노출하지 않기 위해 항상 같은 메시지
+                st.success("해당 이메일이 등록되어 있다면 재설정 링크가 발송됩니다.")
 
 
 def logout():
