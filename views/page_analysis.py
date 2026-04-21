@@ -86,6 +86,11 @@ def render():
         st.session_state.pdf_bytes = pdf_bytes
         st.session_state.pop("yakwan_results", None)
         st.session_state.pop("yakwan_selected_idx", None)
+        # 계약 선택 초기화 (전체 선택)
+        all_c = data.get("_all_contracts", data.get("계약", []))
+        st.session_state.selected_contract_idxs = [c["_idx"] for c in all_c]
+        for c in all_c:
+            st.session_state[f"ct_sel_{c['_idx']}"] = True
 
         _save_to_db(data, silent=True)
 
@@ -109,23 +114,30 @@ def render():
                 for w in warnings:
                     st.warning(w)
 
-        # 리뷰 통합 토글 — 엑셀 2개 이상일 때만 표시
+        # 리뷰 통합 토글 — 선택된 계약이 8개 초과일 때만 표시
+        selected = st.session_state.get("selected_contract_idxs", [])
         all_contracts = data.get("_all_contracts", data.get("계약", []))
-        if len(all_contracts) > 7:
-            # key 초기값 설정 (최초 1회)
+        sel_contracts = [c for c in all_contracts if c["_idx"] in selected] if selected else all_contracts
+        if len(sel_contracts) > 8:
             if "review_last_toggle" not in st.session_state:
                 st.session_state.review_last_toggle = False
 
             def _on_review_toggle():
                 rl = st.session_state.review_last_toggle
-                from services.analysis_engine import regenerate_excel
-                proposal_d = st.session_state.get("proposal_data")
                 d = st.session_state.get("analysis_data", {})
+                _sel = st.session_state.get("selected_contract_idxs", [])
+                _all = d.get("_all_contracts", d.get("계약", []))
+                _filtered = [c for c in _all if c["_idx"] in _sel] if _sel else _all
+                _cov = d.get("_coverage_raw", {})
+                _fcov = {k: v for k, v in _cov.items() if k in _sel} if _sel else _cov
+                fd = {"고객명": d.get("고객명", "고객"), "성별": d.get("성별", ""),
+                      "나이": d.get("나이", 0), "_all_contracts": _filtered, "_coverage_raw": _fcov}
+                from services.analysis_engine import regenerate_excel
                 try:
                     st.session_state.excel_files = regenerate_excel(
-                        d, proposal=proposal_d, review_last=rl,
+                        fd, proposal=st.session_state.get("proposal_data"), review_last=rl,
                     )
-                except Exception as e:
+                except Exception:
                     pass
 
             st.toggle(
@@ -165,15 +177,95 @@ def _show_result(data: dict):
     st.divider()
     contracts = data.get("_all_contracts", data.get("계약", []))
     if contracts:
-        with st.expander(f"계약 목록 ({len(contracts)}건)", expanded=True):
+        _render_contract_selector(data, contracts)
+
+
+def _render_contract_selector(data: dict, contracts: list):
+    """계약 선택/해제 UI + 엑셀 재생성"""
+    # 초기값: 전체 선택
+    if "selected_contract_idxs" not in st.session_state:
+        st.session_state.selected_contract_idxs = [
+            c["_idx"] for c in contracts
+        ]
+
+    with st.expander(f"계약 목록 ({len(contracts)}건) — 분석에 포함할 계약을 선택하세요", expanded=True):
+        # 체크박스 key 초기값 설정 (최초 1회)
+        for c in contracts:
+            k = f"ct_sel_{c['_idx']}"
+            if k not in st.session_state:
+                st.session_state[k] = True
+
+        sel_all, desel_all = st.columns(2)
+        if sel_all.button("전체 선택", use_container_width=True, key="sel_all"):
             for c in contracts:
-                prem = c.get("월보험료", 0)
-                st.markdown(
-                    f"- **{c.get('보험사', '')}** | "
-                    f"{c.get('상품명', '')[:30]} | "
-                    f"월 {prem:,}원 | "
-                    f"{c.get('보장나이', '')}"
-                )
+                st.session_state[f"ct_sel_{c['_idx']}"] = True
+            st.rerun()
+        if desel_all.button("전체 해제", use_container_width=True, key="desel_all"):
+            for c in contracts:
+                st.session_state[f"ct_sel_{c['_idx']}"] = False
+            st.rerun()
+
+        for c in contracts:
+            idx = c["_idx"]
+            prem = c.get("월보험료", 0)
+            label = (
+                f"**{c.get('보험사', '')}** | "
+                f"{c.get('상품명', '')[:30]} | "
+                f"월 {prem:,}원 | "
+                f"{c.get('보장나이', '')}"
+            )
+            st.checkbox(label, key=f"ct_sel_{idx}")
+
+    # 체크박스 상태에서 선택 목록 동기화
+    selected = [c["_idx"] for c in contracts if st.session_state.get(f"ct_sel_{c['_idx']}", True)]
+    st.session_state.selected_contract_idxs = selected
+
+    selected = st.session_state.selected_contract_idxs
+    total = len(contracts)
+    n_sel = len(selected)
+
+    if n_sel == 0:
+        st.warning("최소 1개 이상의 계약을 선택해주세요.")
+        return
+
+    if n_sel < total:
+        st.info(f"{total}건 중 {n_sel}건 선택됨")
+        if st.button("선택된 계약으로 엑셀 재생성", type="primary",
+                     use_container_width=True, key="regen_selected"):
+            _regenerate_with_selection(data, contracts, selected)
+
+    # 전체 선택 상태에서 분석 직후 → 별도 재생성 불필요
+
+
+def _regenerate_with_selection(data: dict, contracts: list, selected_idxs: list):
+    """선택된 계약만으로 엑셀 재생성"""
+    from services.analysis_engine import regenerate_excel
+
+    filtered = [c for c in contracts if c["_idx"] in selected_idxs]
+    coverage_raw = data.get("_coverage_raw", {})
+    filtered_cov = {k: v for k, v in coverage_raw.items() if k in selected_idxs}
+
+    # 필터된 데이터로 임시 data dict 생성
+    filtered_data = {
+        "고객명": data.get("고객명", "고객"),
+        "성별": data.get("성별", ""),
+        "나이": data.get("나이", 0),
+        "_all_contracts": filtered,
+        "_coverage_raw": filtered_cov,
+    }
+
+    proposal = st.session_state.get("proposal_data")
+    review_last = st.session_state.get("review_last_toggle", False)
+
+    try:
+        excel_files = regenerate_excel(
+            filtered_data, proposal=proposal, review_last=review_last,
+        )
+        st.session_state.excel_files = excel_files
+        st.success(f"{len(filtered)}건 계약으로 엑셀이 재생성되었습니다.")
+        st.rerun()
+    except Exception as e:
+        st.error(safe_error("엑셀 재생성", e))
 
 
 def _show_proposal(proposal: dict):

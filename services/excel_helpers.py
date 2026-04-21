@@ -13,13 +13,26 @@ def safe_val(ws, row, col, value):
 
 
 def safe_merge(ws, range_str: str):
-    """이미 존재하는 병합이면 무시, 없으면 생성."""
+    """병합 생성. 겹치는 기존 병합이 있으면 해제 후 재생성."""
+    from openpyxl.utils.cell import range_boundaries
     existing = {str(m) for m in ws.merged_cells.ranges}
-    if range_str not in existing:
+    if range_str in existing:
+        return
+    # 겹치는 기존 병합 해제
+    mc, mr, xc, xr = range_boundaries(range_str)
+    to_remove = []
+    for m in ws.merged_cells.ranges:
+        if m.min_row <= xr and m.max_row >= mr and m.min_col <= xc and m.max_col >= mc:
+            to_remove.append(str(m))
+    for r in to_remove:
         try:
-            ws.merge_cells(range_str)
+            ws.unmerge_cells(r)
         except Exception:
             pass
+    try:
+        ws.merge_cells(range_str)
+    except Exception:
+        pass
 
 
 def copy_row_style(ws, src_row: int, dst_row: int, cols):

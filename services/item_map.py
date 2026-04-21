@@ -1,4 +1,4 @@
-"""보장분석 항목명 → 템플릿 행 번호 매핑 (v12 양식 2026-04 — 뇌졸중/뇌경색 교체, 재해수술 추가, 복합재가 추가)"""
+"""보장분석 항목명 → 템플릿 행 번호 매핑 (v13 양식 2026-04 — 8상품 D~K, 합계 L열)"""
 
 INSURER_KEYWORDS = [
     # 생명보험사
@@ -16,14 +16,14 @@ INSURER_KEYWORDS = [
     "새마을금고", "금고중앙회", "수협", "신협", "공제",
 ]
 
-# ── v12 양식: 7상품 D~J, 합계 K(col 11) ──
-COL_IDX = {"D": 4, "E": 5, "F": 6, "G": 7, "H": 8, "I": 9, "J": 10}
-COL_LTRS = ["D", "E", "F", "G", "H", "I", "J"]
-SUM_COL = 11   # K열 (기존 합계)
-PROP_COL = 12  # L열 (신상품 제안)
-TOTAL_COL = 13 # M열 (전체합계 = K + L)
+# ── v13 양식: 8상품 D~K, 합계 L(col 12) ──
+COL_IDX = {"D": 4, "E": 5, "F": 6, "G": 7, "H": 8, "I": 9, "J": 10, "K": 11}
+COL_LTRS = ["D", "E", "F", "G", "H", "I", "J", "K"]
+SUM_COL = 12   # L열 (기존 합계)
+PROP_COL = 13  # M열 (신상품 제안)
+TOTAL_COL = 14 # N열 (전체합계 = L + M)
 
-# 데이터 행 범위 (v12 양식 — 재해수술+복합재가 추가, 이전 대비 +2)
+# 데이터 행 범위 (v13 양식 — 8상품 D~K, 합계 L열)
 DATA_ROWS = (
     list(range(9, 17))       # 사망(9~12) + 후유장해(13~16)
     + list(range(17, 35))    # 암진단(17~20) + 암치료(21~29) + 암주요(30~34)
@@ -192,9 +192,33 @@ SURGERY_TYPE_MAP = {
 
 _STRIP_PATTERNS = ["매년 반복지급(종신)", "매년반복지급(종신)", "매년 반복지급", "(종신)", "(1년)", "(매년)"]
 
+# 항목명에서 제거할 접두/접미 패턴 (특약명 노이즈)
+_PREFIX_NOISE = [
+    "통합간편", "유병자형", "갱신형", "무배당",
+    "20년갱신", "10년갱신", "5년갱신",
+]
+_SUFFIX_NOISE = [
+    "간편가입", "355고지", "무해약환급금형", "연만기",
+    "3.10.5간편가입", "간편가입Ⅵ",
+]
+
+
+def _normalize_item(name: str) -> str:
+    """항목명 정규화: 공백/특수문자 제거 + 접두접미 노이즈 제거"""
+    import re as _re
+    # 특수문자/공백/괄호 제거
+    s = _re.sub(r"[\s·\-\(\)\[\]（）「」,]", "", name)
+    # 접두 노이즈 제거
+    for p in _PREFIX_NOISE:
+        s = s.replace(p, "")
+    # 접미 노이즈 제거
+    for p in _SUFFIX_NOISE:
+        s = s.replace(p, "")
+    return s
+
 
 def find_row_for_item(item_name: str):
-    """항목명 → 템플릿 행 번호 (긴 키 우선 매칭)"""
+    """항목명 → 템플릿 행 번호 (긴 키 우선 매칭, 정규화 후 재매칭)"""
     item_name = item_name.strip()
     if not item_name:
         return None
@@ -204,6 +228,7 @@ def find_row_for_item(item_name: str):
     if item_name in ITEM_ROW_MAP:
         return ITEM_ROW_MAP[item_name]
 
+    # 1차: 원본 문자열로 substring 매칭
     best_row = None
     best_len = 0
     for key, row in ITEM_ROW_MAP.items():
@@ -213,6 +238,17 @@ def find_row_for_item(item_name: str):
             if len(key) > best_len:
                 best_row = row
                 best_len = len(key)
+
+    # 2차: 양쪽 정규화 후 재매칭 (PDF 특약명의 공백/특수문자/퍼센트 범위 처리)
+    item_clean = _normalize_item(item_name)
+    for key, row in ITEM_ROW_MAP.items():
+        if row is None:
+            continue
+        key_clean = _normalize_item(key)
+        if key_clean in item_clean or item_clean in key_clean:
+            if len(key_clean) > best_len:
+                best_row = row
+                best_len = len(key_clean)
 
     if best_row is not None:
         return best_row

@@ -1,4 +1,4 @@
-"""보장분석 엑셀 생성기 — v10 양식 7상품 (2026-04)"""
+"""보장분석 엑셀 생성기 — v13 양식 8상품 (2026-04)"""
 import io
 import os
 import shutil
@@ -18,11 +18,11 @@ from services.excel_review import (
 _TMPL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 TEMPLATE = os.path.join(_TMPL_DIR, "master_template.xlsx")
 
-# v10: D~J(col 4~10), K=합계(col 11), L=제안(col 12), M=전체합계(col 13)
+# v13: D~K(col 4~11), L=합계(col 12), M=제안(col 13), N=전체합계(col 14)
 _DATA_START = 4
-_DATA_END = 10
-_MAX_COL = 11
-_MAX_COL_PROP = 13
+_DATA_END = 11
+_MAX_COL = 12
+_MAX_COL_PROP = 14
 _REVIEW_START = 92
 _REVIEW_COUNT = 7
 
@@ -35,7 +35,7 @@ def generate_analysis_excel(
     coverage_raw = data.get("_coverage_raw", {})
     customer = data.get("고객명", "고객")
 
-    chunks = [all_contracts[i:i + 7] for i in range(0, len(all_contracts), 7)]
+    chunks = [all_contracts[i:i + 8] for i in range(0, len(all_contracts), 8)]
     total_pages = len(chunks)
     results: list[tuple[str, bytes]] = []
 
@@ -122,17 +122,17 @@ def _clear_values(ws, has_proposal=False):
     ranges = [
         (1, 1, 1, max_c),
         (3, _DATA_START, 7, _DATA_END),
-        (9, _DATA_START, 74, _DATA_END),
-        (9, SUM_COL, 74, SUM_COL),
+        (9, _DATA_START, 81, _DATA_END),
+        (9, SUM_COL, 81, SUM_COL),
         (82, _DATA_START, 84, max_c),
         (_REVIEW_START, 1, _REVIEW_START + _REVIEW_COUNT - 1, max_c),
     ]
     if has_proposal:
         ranges += [
             (2, PROP_COL, 7, PROP_COL),
-            (9, PROP_COL, 74, PROP_COL),
+            (9, PROP_COL, 81, PROP_COL),
             (2, TOTAL_COL, 7, TOTAL_COL),
-            (9, TOTAL_COL, 74, TOTAL_COL),
+            (9, TOTAL_COL, 81, TOTAL_COL),
         ]
     clear_values(ws, ranges)
 
@@ -204,7 +204,7 @@ def _fill_proposal(ws, proposal):
 
 
 def _format_proposal_cols(ws):
-    """K열 서식을 L, M열에 복사 + 셀 병합"""
+    """L열(합계) 서식을 M, N열에 복사 + 셀 병합"""
     from openpyxl.utils import get_column_letter
 
     l_ltr = get_column_letter(PROP_COL)
@@ -277,7 +277,7 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             paid_amt = int(prem * paid_m) if prem and paid_m else 0
         if paid_amt:
             safe_val(ws, 82, col, paid_amt)
-    safe_val(ws, 82, SUM_COL, f"=SUM({start_ltr}80:{end_ltr}80)")
+    safe_val(ws, 82, SUM_COL, f"=SUM({start_ltr}82:{end_ltr}82)")
 
     for ct in contracts:
         col = COL_IDX.get(ct["열"], 4)
@@ -290,13 +290,13 @@ def _fill_sums(ws, contracts, has_proposal=False, proposal=None):
             topay_amt = int(prem * remain) if prem and remain > 0 else 0
         if topay_amt:
             safe_val(ws, 83, col, topay_amt)
-    safe_val(ws, 83, SUM_COL, f"=SUM({start_ltr}81:{end_ltr}81)")
+    safe_val(ws, 83, SUM_COL, f"=SUM({start_ltr}83:{end_ltr}83)")
 
     for c_ltr in COL_LTRS:
         col = COL_IDX[c_ltr]
         col_l = get_column_letter(col)
         safe_val(ws, 84, col, f"={col_l}82+{col_l}83")
-    safe_val(ws, 84, SUM_COL, f"=SUM({start_ltr}82:{end_ltr}82)")
+    safe_val(ws, 84, SUM_COL, f"=SUM({start_ltr}84:{end_ltr}84)")
 
     if has_proposal:
         from services.proposal_parser import _parse_납입개월

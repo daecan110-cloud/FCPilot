@@ -176,10 +176,13 @@ def _apply_detail_item(name: str, amount_str: str, contract_idx: int,
     if row_num is None:
         return
 
-    # Page 6에서 이미 확인된 항목(값이 0이어도) → 덮어쓰지 않음
+    # Page 6에서 확인됐고 실제 값이 있는 항목 → 덮어쓰지 않음
+    # (값이 0인 항목은 detail page에서 보완 허용)
     # (row_override 는 특약 분배 용도라서 contract_seen 검사 생략 — 특약 상세가 우선)
     if row_override is None and row_num in contract_seen:
-        return
+        key_check = str(row_num)
+        if coverage_raw.get(contract_idx, {}).get(key_check, 0) > 0:
+            return
 
     amount_won = parse_amount(amount_str)
     if amount_won <= 0:
