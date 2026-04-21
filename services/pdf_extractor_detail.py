@@ -258,16 +258,22 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
     for key, expected in summary_items.items():
         actual = extracted_sums.get(key, 0)
         if actual == 0 and expected > 0:
-            # 누락 항목 → 페이지 4~5 데이터로 자동 보충
             _fill_missing(coverage_raw, key, expected)
             if expected > 100:
                 row_num = int(key)
                 name = _row_to_name(row_num)
-                warnings.append(f"자동보충: {name}(행{row_num}) — 진단 합계 {expected}만원")
+                warnings.append(
+                    f"⚠️ {name} 누락 → {expected}만원 자동보충됨. "
+                    f"엑셀에서 {name} 값이 맞는지 확인해주세요."
+                )
         elif actual > 0 and expected > 0 and abs(actual - expected) / max(actual, expected) > 0.3:
             name = _row_to_name(int(key))
+            diff = actual - expected
+            direction = "많음" if diff > 0 else "적음"
             warnings.append(
-                f"불일치: {name} — 진단 {expected}만원 vs 추출 {actual}만원"
+                f"⚠️ {name}: 진단표 {expected}만원, 추출 {actual}만원 "
+                f"({abs(diff)}만원 {direction}). "
+                f"엑셀에서 {name} 합계가 {actual}만원인지 PDF와 대조해주세요."
             )
 
     return warnings

@@ -25,12 +25,13 @@ from services.item_map import DATA_ROWS
 
 # ── PDF 경로 ──
 _DL = os.path.expanduser("~/Downloads")
+_PDFS = os.path.join(ROOT, "tests", "pdfs")
 PDF_FILES = {
-    "김세종": os.path.join(_DL, "김세종.pdf"),
-    "전성언": os.path.join(_DL, "전성언.pdf"),
-    "김은주": os.path.join(_DL, "김은주.pdf"),
-    "김규연": os.path.join(_DL, "김규연.pdf"),
-    "jin yexiang": os.path.join(_DL, "jin yexiang.pdf"),
+    "김세종": os.path.join(_PDFS, "김세종.pdf"),
+    "전성언": os.path.join(_PDFS, "전성언.pdf"),
+    "김은주": os.path.join(_PDFS, "김은주.pdf"),
+    "김규연": os.path.join(_PDFS, "김규연.pdf"),
+    "jin yexiang": os.path.join(_PDFS, "jin.pdf"),
 }
 
 # ── 기대값 ──
