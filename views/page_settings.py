@@ -58,6 +58,21 @@ def render():
                     for e in result["errors"]:
                         st.caption(e)
 
+    with st.expander("🔤 보장분석 폰트 다운로드"):
+        st.caption("보장분석표 엑셀에 사용되는 폰트입니다. 설치하면 엑셀이 정상적으로 표시됩니다.")
+        import os
+        font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "fonts", "KoPubWorldDotumBold.ttf")
+        if os.path.exists(font_path):
+            with open(font_path, "rb") as f:
+                st.download_button(
+                    "KoPubWorld돋움체 Bold 다운로드",
+                    data=f.read(),
+                    file_name="KoPubWorldDotumBold.ttf",
+                    mime="font/ttf",
+                    use_container_width=True,
+                )
+            st.info("다운로드 후 파일을 더블클릭하여 '설치' 버튼을 누르면 됩니다.")
+
     if is_admin():
         st.markdown("---")
         from views.page_settings_admin import render_admin_section
