@@ -296,13 +296,26 @@ def _save_to_db(data: dict, silent: bool = False):
         sb = get_supabase_client()
         fc_id = get_current_user_id()
         contracts = data.get("_all_contracts", [])
+        score = data.get("보장점수", 0)
         res = sb.table("analysis_records").insert({
             "fc_id": fc_id,
             "client_name": data.get("고객명", ""),
             "contract_count": len(contracts),
-            "result_summary": {"성별": data.get("성별", ""), "나이": data.get("나이", 0)},
+            "result_summary": {
+                "성별": data.get("성별", ""),
+                "나이": data.get("나이", 0),
+                "보장점수": score,
+            },
         }).execute()
         record_id = res.data[0]["id"] if res.data else None
+
+        # 고객 테이블에 보장점수 반영
+        if score > 0:
+            client_name = data.get("고객명", "")
+            if client_name:
+                sb.table("clients").update({"coverage_score": score}).eq(
+                    "fc_id", fc_id
+                ).eq("name", client_name).execute()
 
         if record_id:
             excel_files = st.session_state.get("excel_files", [])

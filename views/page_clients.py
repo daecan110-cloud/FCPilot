@@ -170,12 +170,21 @@ def _render_list():
         grade_html = _grade_badge(grade)
         source = c.get("db_source", "")
         age = c.get("age_group") or (f"{c['age']}세" if c.get("age") else "")
+        score = c.get("coverage_score", 0)
+        score_html = ""
+        if score > 0:
+            color = "#22c55e" if score >= 70 else "#f59e0b" if score >= 40 else "#ef4444"
+            score_html = (
+                f' <span style="background:{color};color:#fff;padding:1px 6px;'
+                f'border-radius:8px;font-size:11px;font-weight:600;">'
+                f'{score}점</span>'
+            )
         meta = " · ".join(filter(None, [age, source]))
         with st.container(border=True):
             c_info, c_btn = st.columns([5, 1])
             with c_info:
                 st.markdown(
-                    f'**{esc(c["name"])}** {grade_html} &nbsp;'
+                    f'**{esc(c["name"])}** {grade_html}{score_html} &nbsp;'
                     f'<span style="color:#787774; font-size:13px;">{esc(meta)}</span>',
                     unsafe_allow_html=True,
                 )

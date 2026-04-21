@@ -29,6 +29,7 @@ def extract_from_pdf(pdf_bytes) -> dict:
 def _do_extract(pdf) -> dict:
     result = {
         "고객명": "", "성별": "", "나이": 0,
+        "보장점수": 0,
         "_all_contracts": [], "_coverage_raw": {},
         "계약": [], "보장금액": {},
         "기납입보험료": {}, "납입할보험료": {},
@@ -59,7 +60,7 @@ def _do_extract(pdf) -> dict:
             extra_pages.append(pdf.pages[3])
     all_contracts = _parse_contracts(p3, extra_pages)
 
-    # 성별/나이
+    # 성별/나이/보장점수
     _extract_demographics(result, pdf, p1_text, p3_text)
 
     # 보장금액: Page 6~8 (상품별 보장금액)
@@ -289,6 +290,11 @@ def _extract_demographics(result: dict, pdf, p1_text: str, p3_text: str):
         if m_age:
             result["나이"] = int(m_age.group(2))
             result["성별"] = m_age.group(1)
+
+    # 보장 진단 점수
+    m_score = re.search(r"진단\s*점수는?\s*(\d+)\s*점", p2_text)
+    if m_score:
+        result["보장점수"] = int(m_score.group(1))
 
 
 def _parse_coverages(pdf, all_contracts: list) -> tuple[dict, dict]:
