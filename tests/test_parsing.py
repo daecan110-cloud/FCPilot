@@ -175,11 +175,11 @@ def test_excel_generation(name, data):
         if not title or "보장 분석표" not in title:
             errors.append(f"제목 이상: {title[:30]}")
 
-        # K열 SUM 수식
+        # L열 SUM 수식 (v13: SUM_COL=12)
         for r in DATA_ROWS[:5]:
-            v = ws.cell(row=r, column=11).value
+            v = ws.cell(row=r, column=12).value
             if not v or "=SUM" not in str(v):
-                errors.append(f"K{r} SUM 누락")
+                errors.append(f"L{r} SUM 누락")
                 break
 
         # Row 5 보장기간 (2줄)
@@ -198,25 +198,25 @@ def test_excel_generation(name, data):
         if ws.row_dimensions[6].height and ws.row_dimensions[6].height < 25:
             errors.append(f"Row6 높이 부족: {ws.row_dimensions[6].height}")
 
-        # 갱신형 (Row 80)
+        # 갱신형 (v13: Row 87)
         contracts = data["_all_contracts"][:7]
         for i in range(len(contracts)):
-            v = ws.cell(row=80, column=4 + i).value
+            v = ws.cell(row=87, column=4 + i).value
             if not v:
-                errors.append(f"Row80 갱신형 누락: col{4+i}")
+                errors.append(f"Row87 갱신형 누락: col{4+i}")
                 break
 
-        # 리뷰 (Row 85~)
+        # 리뷰 (v13: Row 92~)
         for i in range(len(contracts)):
-            v = ws.cell(row=85 + i, column=1).value
+            v = ws.cell(row=92 + i, column=1).value
             if not v:
-                errors.append(f"리뷰 Row{85+i} 누락")
+                errors.append(f"리뷰 Row{92+i} 누락")
                 break
 
-        # 기납입 보험료 — 납입완료 보험도 값 있어야
+        # 기납입 보험료 (v13: Row 82)
         for i, ct in enumerate(contracts):
             if ct.get("_paid", 0) > 0:
-                v = ws.cell(row=75, column=4 + i).value
+                v = ws.cell(row=82, column=4 + i).value
                 if not v:
                     errors.append(f"기납입 누락: [{i}] {ct['보험사'][:10]}")
                     break

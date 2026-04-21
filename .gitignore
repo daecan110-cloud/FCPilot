@@ -42,3 +42,4 @@ Thumbs.db
 # Docs (프로젝트 설정 문서 - 코드만 커밋)
 FCPilot_*.md
 CLAUDE 기본설정/
+tests/pdfs/

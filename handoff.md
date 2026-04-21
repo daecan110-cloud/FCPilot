@@ -1,8 +1,8 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 19 완료 (보안 강화 + 코드 품질 전면 점검)** — 영민 테스트 대기 중
-- 마지막 세션: 2026-04-20 (Claude Code)
+- Phase: **Sprint 20 완료 (PDF 파싱 세로 지원 + 오매핑 수정)** — 영민 테스트 대기 중
+- 마지막 세션: 2026-04-21 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
 
@@ -126,10 +126,35 @@
 
 ---
 
+## Sprint 20 — 완료 (2026-04-21)
+
+### PDF 파싱 세로(Portrait) 지원
+- [x] `pdf_extractor.py` 세로 포맷 계약 테이블 파싱 (6열, 2행/계약)
+- [x] `pdf_extractor.py` 세로 포맷 보장금액 테이블 파싱 (4열 item + 4열 data)
+- [x] `pdf_extractor_detail.py` 세로 포맷 상세페이지 탐색 범위 확장
+
+### 파싱 오매핑 수정
+- [x] `item_map.py` 운전자보험 교통상해사망 매핑 제외 (None)
+- [x] `item_map.py` 짧은 키 정리 ("치매", "수술비", "사망" 등 2~3글자 제거)
+- [x] `item_map.py` 운전자/화재보험 전용 특약 무시 항목 추가
+- [x] `item_map.py` 질병수술(최대) 별도 행(row 56) 분리
+- [x] `pdf_extractor_detail.py` 2차 보완 가드 강화 (seen_rows 항목은 0이어도 덮어쓰기 금지)
+- [x] `pdf_extractor_detail.py` verify 함수 카테고리명 필터링 + 페이지간 중복 방지
+
+### 테스트
+- [x] `test_parsing.py` v13 템플릿 행번호 반영 (SUM→L열, 갱신→87, 리뷰→92, 기납입→82)
+- [x] `test_pdf_batch.py` 신규 — tests/pdfs/ 폴더 PDF 일괄 파싱 검증 도구
+
+### Git 설정
+- [x] 프로젝트별 GitHub 계정 분리 (FCPilot/WaveBot→daecan110-cloud, AlphaBot→japanstudy1205-cloud)
+
+---
+
 ## 알려진 이슈
 
 - Gemini 무료 tier: 분당 2회 제한 → 429 시 자동 재시도 대응 완료
 - Streamlit Cloud `st.html()` height 파라미터 미지원 — folium으로 우회
+- PDF 검증 경고 일부 잔존 (진단표 vs 보장금액표 기준 차이) — 추가 PDF 데이터로 개선 예정
 
 ---
 

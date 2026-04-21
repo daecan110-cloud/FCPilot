@@ -21,12 +21,14 @@ def parse_detail_pages(pdf, all_contracts: list, coverage_raw: dict,
     if seen_rows is None:
         seen_rows = {}
     total_pages = len(pdf.pages)
-    if total_pages <= 8:
+    if total_pages <= 6:
         return
 
     matched_indices = set()
 
-    for pg_idx in range(8, min(total_pages, 30)):
+    # 세로 포맷은 상세 페이지가 index 7부터, 가로는 index 8부터 시작
+    # 텍스트 필터("가입상품상세")로 자동 구분하므로 6부터 안전하게 탐색
+    for pg_idx in range(6, min(total_pages, 30)):
         pg = pdf.pages[pg_idx]
         text = pg.extract_text() or ""
 
@@ -176,13 +178,11 @@ def _apply_detail_item(name: str, amount_str: str, contract_idx: int,
     if row_num is None:
         return
 
-    # Page 6에서 확인됐고 실제 값이 있는 항목 → 덮어쓰지 않음
-    # (값이 0인 항목은 detail page에서 보완 허용)
-    # (row_override 는 특약 분배 용도라서 contract_seen 검사 생략 — 특약 상세가 우선)
+    # Coverage table(Page 6~8)에서 확인된 항목은 덮어쓰지 않음 (0이어도)
+    # 0 = "이 계약에 해당 보장 없음"이므로 detail page로 채우면 안 됨
+    # row_override는 특약 분배 용도(특정순환계 등)라서 검사 생략
     if row_override is None and row_num in contract_seen:
-        key_check = str(row_num)
-        if coverage_raw.get(contract_idx, {}).get(key_check, 0) > 0:
-            return
+        return
 
     amount_won = parse_amount(amount_str)
     if amount_won <= 0:
@@ -204,9 +204,12 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
     total_pages = len(pdf.pages)
 
     summary_items = {}
-    seen_keys_per_page = {}
-    for pg_idx in range(3, min(5, total_pages)):
+    seen_keys_global = set()  # 페이지 간 중복 방지 (세로 PDF는 양쪽 페이지에 동일 항목)
+    for pg_idx in range(3, min(6, total_pages)):
         pg = pdf.pages[pg_idx]
+        text = pg.extract_text() or ""
+        if "보장진단" not in text and "분석결과" not in text:
+            continue
         tables = pg.extract_tables()
         page_seen = set()
         for tbl in tables:
@@ -215,15 +218,22 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
             for row in tbl:
                 if not row or len(row) < 2:
                     continue
+                # col 0이 카테고리명이면 col 1을 사용
                 name = (row[0] or "").strip()
+                if name in ("사망보장", "후유장해", "암보장", "뇌,심장 보장",
+                            "뇌, 심장 보장", "말기질환, 치매 보장", "말기질환,치매 보장",
+                            "수술비", "입원비", "치료비, 기타", "치료비,기타",
+                            "의료비", "말기질환,\n 치매 보장", "뇌,\n 심장 보장",
+                            "치료비,\n 기타"):
+                    name = (row[1] or "").strip() if len(row) > 1 else ""
                 if not name:
                     continue
                 row_num = find_row_for_item(name)
                 if row_num is None:
                     continue
                 key = str(row_num)
-                # 같은 페이지에서 동일 항목 중복 집계 방지
-                if key in page_seen:
+                # 동일 항목 중복 집계 방지 (페이지 내 + 페이지 간)
+                if key in page_seen or key in seen_keys_global:
                     continue
                 # "미가입" 항목은 건너뛰기 (필요보장만 있고 실제 가입 안됨)
                 row_text = " ".join(str(c or "") for c in row)
@@ -232,8 +242,9 @@ def verify_coverages(pdf, coverage_raw: dict) -> list[str]:
                 for cell in reversed(row[1:]):
                     val = parse_amount(cell)
                     if val > 0:
-                        summary_items[key] = summary_items.get(key, 0) + val
+                        summary_items[key] = val
                         page_seen.add(key)
+                        seen_keys_global.add(key)
                         break
 
     if not summary_items:
