@@ -32,9 +32,10 @@ def fill_renewal(ws, contracts):
     _sync_renewal_L_fill(ws, [87, 88])
 
 
-def fill_renewal_all(ws, all_contracts):
+def fill_renewal_all(ws, all_contracts, last_data_col: int = _DATA_END):
     """전체 계약 갱신/보험료변화 (8개씩 그룹, 동적 행 확장)"""
     n_groups = math.ceil(len(all_contracts) / 8)
+    check_end, note_start = _review_merge_cols(last_data_col)
 
     if n_groups > 1:
         extra_rows = (n_groups - 1) * 2
@@ -57,30 +58,8 @@ def fill_renewal_all(ws, all_contracts):
 
         review_title_row = 90 + extra_rows
         review_hdr_row = review_title_row + 1
-        ws.merge_cells(f"A{review_title_row}:L{review_title_row}")
-        ws.merge_cells(f"A{review_hdr_row}:B{review_hdr_row}")
-        ws.merge_cells(f"E{review_hdr_row}:I{review_hdr_row}")
-        ws.merge_cells(f"J{review_hdr_row}:L{review_hdr_row}")
-
-        safe_val(ws, review_title_row, 1, "📋  현재 유지중인 보험 리뷰")
-        safe_val(ws, review_hdr_row, 1, "보험사 / 상품명")
-        safe_val(ws, review_hdr_row, 3, "가입일 / 만기")
-        safe_val(ws, review_hdr_row, 4, "월 보험료")
-        safe_val(ws, review_hdr_row, 5, "주요 체크사항")
-        safe_val(ws, review_hdr_row, 10, "특이사항 (면책기간, 보장범위 등)")
-        # 헤더 서식 (파란 배경 + 흰색 글자)
-        _hf = Font(name=_FONT_NAME, size=9, bold=True, color="FFFFFF")
-        _hfl = PatternFill(patternType="solid", fgColor="2E75B6")
-        _ha = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        for col_n in range(1, _MAX_COL + 1):
-            cell = ws.cell(row=review_hdr_row, column=col_n)
-            if cell.__class__.__name__ == "MergedCell":
-                continue
-            cell.font = _hf
-            cell.fill = _hfl
-            cell.alignment = _ha
-        ws.row_dimensions[review_title_row].height = 28
-        ws.row_dimensions[review_hdr_row].height = 20
+        _write_review_header(ws, review_title_row, review_hdr_row,
+                             check_end, note_start)
 
     for g in range(n_groups):
         chunk = all_contracts[g * 8:(g + 1) * 8]
@@ -112,37 +91,42 @@ def fill_renewal_all(ws, all_contracts):
 
 # ── 리뷰 ─────────────────────────────────────────────────
 
-def fill_review(ws, contracts, coverage_map=None):
+def fill_review(ws, contracts, coverage_map=None, last_data_col: int = _DATA_END):
     """슬라이스 계약 리뷰 (병합+서식 직접 적용)"""
     n = len(contracts)
     if n == 0:
         return
     # 교대 fill 패턴 읽기 (병합 해제 전에)
     fills, borders = _read_review_fills(ws)
-    # 기존 병합 해제 + ghost MergedCell 제거
-    _force_unmerge_range(ws, _REVIEW_START, _REVIEW_START + n + 2)
+
+    check_end, note_start = _review_merge_cols(last_data_col)
+
+    # 기존 병합 해제 (헤더 + 데이터 영역)
+    _force_unmerge_range(ws, _REVIEW_START - 2, _REVIEW_START + n + 2)
+    # 헤더 병합 재조정 (템플릿 기본 헤더)
+    _write_review_header(ws, _REVIEW_START - 2, _REVIEW_START - 1,
+                         check_end, note_start)
 
     for i, c in enumerate(contracts):
         r = _REVIEW_START + i
         # fill 먼저 적용 (병합 전에 모든 셀에 배경색)
         _apply_review_style(ws, r, i, fills, borders)
-        # 병합 생성
-        ws.merge_cells(f"A{r}:B{r}")
-        ws.merge_cells(f"E{r}:I{r}")
-        ws.merge_cells(f"J{r}:L{r}")
+        # 병합 생성 (동적 범위)
+        _merge_review_row(ws, r, check_end, note_start)
 
         cov = (coverage_map or {}).get(c.get("열", ""), {})
-        _write_review_row(ws, r, c, cov)
+        _write_review_row(ws, r, c, cov, note_col=note_start)
         ws.row_dimensions[r].height = 70
 
 
-def fill_review_all(ws, all_contracts, all_coverage_raw):
+def fill_review_all(ws, all_contracts, all_coverage_raw, last_data_col: int = _DATA_END):
     """전체 계약 리뷰 (insert_rows 없이 직접 쓰기)"""
     n_groups = math.ceil(len(all_contracts) / 8)
     extra_renewal = (n_groups - 1) * 2 if n_groups > 1 else 0
 
     review_start = _REVIEW_START + extra_renewal
     n_contracts = len(all_contracts)
+    check_end, note_start = _review_merge_cols(last_data_col)
 
     # 리뷰 영역 전체 병합 해제 (기존 병합 완전 제거)
     _force_unmerge_range(ws, review_start - 2, review_start + n_contracts + 5)
@@ -150,28 +134,7 @@ def fill_review_all(ws, all_contracts, all_coverage_raw):
     # 타이틀 + 헤더
     title_row = review_start - 2
     header_row = review_start - 1
-    ws.merge_cells(f"A{title_row}:L{title_row}")
-    safe_val(ws, title_row, 1, "📋  현재 유지중인 보험 리뷰")
-    ws.merge_cells(f"A{header_row}:B{header_row}")
-    ws.merge_cells(f"E{header_row}:I{header_row}")
-    ws.merge_cells(f"J{header_row}:L{header_row}")
-    safe_val(ws, header_row, 1, "보험사 / 상품명")
-    safe_val(ws, header_row, 3, "가입일 / 만기")
-    safe_val(ws, header_row, 4, "월 보험료")
-    safe_val(ws, header_row, 5, "주요 체크사항")
-    safe_val(ws, header_row, 10, "특이사항 (면책기간, 보장범위 등)")
-
-    # 헤더 서식 (파란 배경 + 흰색 글자)
-    _hdr_font = Font(name=_FONT_NAME, size=9, bold=True, color="FFFFFF")
-    _hdr_fill = PatternFill(patternType="solid", fgColor="2E75B6")
-    _hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    for col_n in range(1, _MAX_COL + 1):
-        cell = ws.cell(row=header_row, column=col_n)
-        if cell.__class__.__name__ == "MergedCell":
-            continue
-        cell.font = _hdr_font
-        cell.fill = _hdr_fill
-        cell.alignment = _hdr_align
+    _write_review_header(ws, title_row, header_row, check_end, note_start)
 
     # 교대 fill 패턴 읽기 (review_start 기준, insert_rows 반영)
     fills, borders = _read_review_fills(ws, review_start)
@@ -181,16 +144,14 @@ def fill_review_all(ws, all_contracts, all_coverage_raw):
         r = review_start + i
         # fill 먼저 적용 (병합 전에 모든 셀에 배경색)
         _apply_review_style(ws, r, i, fills, borders)
-        # 병합 생성
-        ws.merge_cells(f"A{r}:B{r}")
-        ws.merge_cells(f"E{r}:I{r}")
-        ws.merge_cells(f"J{r}:L{r}")
+        # 병합 생성 (동적 범위)
+        _merge_review_row(ws, r, check_end, note_start)
 
         # 데이터 쓰기
         cov_data = {}
         if c["_idx"] in all_coverage_raw:
             cov_data = {str(k): v for k, v in all_coverage_raw[c["_idx"]].items()}
-        _write_review_row(ws, r, c, cov_data)
+        _write_review_row(ws, r, c, cov_data, note_col=note_start)
         ws.row_dimensions[r].height = 70
 
 
@@ -237,7 +198,7 @@ def _apply_review_style(ws, r: int, idx: int, fills, borders):
             cell.border = copy(ref_border)
 
 
-def _write_review_row(ws, r: int, c: dict, cov_data: dict):
+def _write_review_row(ws, r: int, c: dict, cov_data: dict, note_col: int = 10):
     """리뷰 행 1줄 쓰기 (fill_review / fill_review_all 공통)"""
     safe_val(ws, r, 1, short_name(c))
     period = c.get("보장나이", "")
@@ -365,6 +326,71 @@ def _sync_renewal_L_fill(ws, rows: list):
         target.border = copy(ref.border)
         target.font = copy(ref.font)
         target.alignment = copy(ref.alignment)
+
+
+# ── 동적 리뷰 레이아웃 ────────────────────────────────────
+
+def _review_merge_cols(last_data_col: int) -> tuple[int, int]:
+    """리뷰 행의 병합 범위 계산.
+    Returns (check_end_col, note_start_col)
+    - 체크사항: E ~ check_end_col
+    - 면책기간: note_start_col ~ L(12)
+
+    핵심: 숨겨진 열(last_data_col+1 ~ K)을 피해서
+    면책기간이 항상 보이는 열에서 시작하도록 함.
+    """
+    if last_data_col >= _DATA_END:
+        # 8상품 (열 숨김 없음) → 기존 레이아웃 유지
+        return 9, 10  # E:I, J:L
+
+    # 열 숨김 있음 → 체크사항은 E~last_data_col, 면책기간은 L열(12)
+    check_end = last_data_col           # 마지막 보이는 데이터 열
+    check_end = max(check_end, 6)       # 최소 F(6) — 체크사항 E~F 2열 확보
+    note_start = _MAX_COL               # L열(12) — 항상 보이는 열
+    return check_end, note_start
+
+
+def _merge_review_row(ws, r: int, check_end: int, note_start: int):
+    """리뷰 데이터 행 병합 생성 (동적 범위)"""
+    from openpyxl.utils import get_column_letter
+    ws.merge_cells(f"A{r}:B{r}")
+    ce = get_column_letter(check_end)
+    ws.merge_cells(f"E{r}:{ce}{r}")
+    ns = get_column_letter(note_start)
+    ws.merge_cells(f"{ns}{r}:L{r}")
+
+
+def _write_review_header(ws, title_row: int, header_row: int,
+                         check_end: int, note_start: int):
+    """리뷰 타이틀 + 헤더 행 생성 (동적 병합 범위)"""
+    from openpyxl.utils import get_column_letter
+    ce = get_column_letter(check_end)
+    ns = get_column_letter(note_start)
+
+    ws.merge_cells(f"A{title_row}:L{title_row}")
+    safe_val(ws, title_row, 1, "📋  현재 유지중인 보험 리뷰")
+    ws.merge_cells(f"A{header_row}:B{header_row}")
+    ws.merge_cells(f"E{header_row}:{ce}{header_row}")
+    ws.merge_cells(f"{ns}{header_row}:L{header_row}")
+
+    safe_val(ws, header_row, 1, "보험사 / 상품명")
+    safe_val(ws, header_row, 3, "가입일 / 만기")
+    safe_val(ws, header_row, 4, "월 보험료")
+    safe_val(ws, header_row, 5, "주요 체크사항")
+    safe_val(ws, header_row, note_start, "특이사항 (면책기간, 보장범위 등)")
+
+    _hdr_font = Font(name=_FONT_NAME, size=9, bold=True, color="FFFFFF")
+    _hdr_fill = PatternFill(patternType="solid", fgColor="2E75B6")
+    _hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for col_n in range(1, _MAX_COL + 1):
+        cell = ws.cell(row=header_row, column=col_n)
+        if cell.__class__.__name__ == "MergedCell":
+            continue
+        cell.font = _hdr_font
+        cell.fill = _hdr_fill
+        cell.alignment = _hdr_align
+    ws.row_dimensions[title_row].height = 28
+    ws.row_dimensions[header_row].height = 20
 
 
 # ── 내부 유틸 ─────────────────────────────────────────────

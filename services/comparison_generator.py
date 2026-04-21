@@ -96,7 +96,7 @@ def generate_comparison_excel(
 
     sel_proposals = [proposals[i] for i in selected_indices if i < len(proposals)]
     n_props = len(sel_proposals)
-    if n_props < 2:
+    if n_props < 1:
         return ("", b"")
 
     # 현재 보장 합계
@@ -104,6 +104,9 @@ def generate_comparison_excel(
     for ci, cov in data.get("_coverage_raw", {}).items():
         for k, v in cov.items():
             current_sums[k] = current_sums.get(k, 0) + v
+
+    # 진단결과 (PDF에서 추출된 데이터)
+    diag_data = data.get("_diag_results", {})
 
     # 각 제안서별 추가 금액 계산
     prop_adds = []
@@ -145,17 +148,17 @@ def generate_comparison_excel(
     center = Alignment(horizontal="center", vertical="center")
     right_a = Alignment(horizontal="right", vertical="center")
     left_a = Alignment(horizontal="left", vertical="center", indent=1)
-    data_font = Font(name="맑은 고딕", size=9)
-    dash_font = Font(name="맑은 고딕", size=9, color="BDC3C7")
-    plus_font = Font(name="맑은 고딕", size=9, color=GREEN_FT, bold=True)
-    bold_font = Font(name="맑은 고딕", size=9, bold=True)
+    data_font = Font(name="KoPubWorld돋움체 Bold", size=9)
+    dash_font = Font(name="KoPubWorld돋움체 Bold", size=9, color="BDC3C7")
+    plus_font = Font(name="KoPubWorld돋움체 Bold", size=9, color=GREEN_FT, bold=True)
+    bold_font = Font(name="KoPubWorld돋움체 Bold", size=9, bold=True)
 
     diag_styles = {
-        "부족": (PatternFill("solid", fgColor=RED_BG), Font(name="맑은 고딕", size=8, bold=True, color=RED_FT)),
-        "미가입": (PatternFill("solid", fgColor=GRAY_BG), Font(name="맑은 고딕", size=8, bold=True, color=GRAY_FT)),
-        "보통": (PatternFill("solid", fgColor=YELLOW_BG), Font(name="맑은 고딕", size=8, bold=True, color=ORANGE_FT)),
-        "충분": (PatternFill("solid", fgColor=GREEN_BG), Font(name="맑은 고딕", size=8, bold=True, color=GREEN_FT)),
-        "—": (PatternFill(), Font(name="맑은 고딕", size=8, color="95A5A6")),
+        "부족": (PatternFill("solid", fgColor=RED_BG), Font(name="KoPubWorld돋움체 Bold", size=8, bold=True, color=RED_FT)),
+        "미가입": (PatternFill("solid", fgColor=GRAY_BG), Font(name="KoPubWorld돋움체 Bold", size=8, bold=True, color=GRAY_FT)),
+        "보통": (PatternFill("solid", fgColor=YELLOW_BG), Font(name="KoPubWorld돋움체 Bold", size=8, bold=True, color=ORANGE_FT)),
+        "충분": (PatternFill("solid", fgColor=GREEN_BG), Font(name="KoPubWorld돋움체 Bold", size=8, bold=True, color=GREEN_FT)),
+        "—": (PatternFill(), Font(name="KoPubWorld돋움체 Bold", size=8, color="95A5A6")),
     }
 
     def _all_border(r, ncols):
@@ -166,7 +169,7 @@ def generate_comparison_excel(
     row = 1
     ws.merge_cells(f"A{row}:{get_column_letter(total_cols)}{row}")
     ws["A1"] = "보장 비교표"
-    ws["A1"].font = Font(name="맑은 고딕", bold=True, size=16, color=NAVY)
+    ws["A1"].font = Font(name="KoPubWorld돋움체 Bold", bold=True, size=16, color=NAVY)
     ws["A1"].alignment = center
     ws.row_dimensions[row].height = 38
 
@@ -207,7 +210,7 @@ def generate_comparison_excel(
 
     for ci, h in enumerate(headers, 1):
         cell = ws.cell(row=row, column=ci, value=h)
-        cell.font = Font(name="맑은 고딕", bold=True, color=WHITE, size=9)
+        cell.font = Font(name="KoPubWorld돋움체 Bold", bold=True, color=WHITE, size=9)
         cell.fill = PatternFill("solid", fgColor=NAVY)
         cell.alignment = center
         cell.border = border
@@ -242,12 +245,10 @@ def generate_comparison_excel(
         stripe = not stripe
         row_fill = PatternFill("solid", fgColor=VERY_LIGHT) if stripe else PatternFill()
 
-        # 진단 결과 판별 (간단)
-        adds_any = any(pa.get(str(row_num), 0) > 0 for pa in prop_adds)
-        if cur == 0 and not adds_any:
-            diag = "—"
-        else:
-            diag = "충분"  # placeholder
+        # 진단 결과: PDF 추출 데이터 우선, 없으면 미가입/— 판별
+        diag = diag_data.get(str(row_num), "")
+        if not diag:
+            diag = "미가입" if cur == 0 else ""
 
         # A: 항목명
         ws.cell(row=row, column=1, value=item_name).font = data_font
@@ -256,8 +257,8 @@ def generate_comparison_excel(
 
         # B: 진단
         dfill, dfont = diag_styles.get(diag, (PatternFill(), data_font))
-        ws.cell(row=row, column=2, value=diag if diag != "충분" else "").font = dfont
-        ws.cell(row=row, column=2).fill = dfill if diag != "충분" else row_fill
+        ws.cell(row=row, column=2, value=diag).font = dfont
+        ws.cell(row=row, column=2).fill = dfill if diag in diag_styles else row_fill
         ws.cell(row=row, column=2).alignment = center
 
         # C: 현재 보장

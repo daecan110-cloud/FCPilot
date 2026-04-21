@@ -102,19 +102,42 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
         _format_proposal_cols(ws)
     _fill_sums(ws, contracts, has_proposal=has_proposal, proposal=proposal)
 
+    # 실제 상품 수 기반 열 숨기기 + 리뷰 병합 범위 계산
+    n_contracts = len(contracts)
+    visible_end = max(n_contracts, 4)  # 최소 4열 유지
+    last_data_col = _DATA_START + visible_end - 1  # 마지막 보이는 데이터 열
+
     if review_contracts is None:
         fill_renewal(ws, contracts)
-        fill_review(ws, contracts, slice_data.get("보장금액", {}))
+        fill_review(ws, contracts, slice_data.get("보장금액", {}),
+                    last_data_col=last_data_col)
     elif len(review_contracts) > 0:
-        fill_renewal_all(ws, review_contracts)
-        fill_review_all(ws, review_contracts, all_coverage_raw or {})
+        fill_renewal_all(ws, review_contracts, last_data_col=last_data_col)
+        fill_review_all(ws, review_contracts, all_coverage_raw or {},
+                        last_data_col=last_data_col)
 
     _final_format(ws, has_proposal=has_proposal)
+    _hide_unused_columns(ws, n_contracts, has_proposal=has_proposal)
 
     buf = io.BytesIO()
     wb.save(buf)
     os.unlink(tmp.name)
     return buf.getvalue()
+
+
+def _hide_unused_columns(ws, n_contracts: int, has_proposal: bool = False):
+    """사용하지 않는 데이터 열 숨기기 (최소 4열 유지)"""
+    from openpyxl.utils import get_column_letter
+    visible = max(n_contracts, 4)  # 최소 4열 (D~G)
+    hidden_any = False
+    for i in range(visible, 8):  # 8열(D~K) 중 미사용 열 숨기기
+        col_idx = _DATA_START + i  # 열 번호 (8=H, 9=I, 10=J, 11=K)
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].hidden = True
+        hidden_any = True
+    # 열 숨김 시 L열(합계+면책기간 겸용) 너비 확대
+    if hidden_any:
+        ws.column_dimensions["L"].width = 25
 
 
 def _clear_values(ws, has_proposal=False):

@@ -64,7 +64,7 @@ def _do_extract(pdf) -> dict:
     _extract_demographics(result, pdf, p1_text, p3_text)
 
     # 보장금액: Page 6~8 (상품별 보장금액)
-    coverage_raw, seen_rows = _parse_coverages(pdf, all_contracts)
+    coverage_raw, seen_rows, diag_results = _parse_coverages(pdf, all_contracts)
 
     # 보완: Page 9~17 (가입상품상세) 파싱 — Page 6에서 0인 항목은 덮어쓰지 않음
     from services.pdf_extractor_detail import parse_detail_pages, verify_coverages
@@ -77,6 +77,7 @@ def _do_extract(pdf) -> dict:
     # 결과 조립
     result["_all_contracts"] = all_contracts
     result["_coverage_raw"] = coverage_raw
+    result["_diag_results"] = diag_results
     result["계약"] = all_contracts[:7]
 
     for c in all_contracts:
@@ -297,12 +298,14 @@ def _extract_demographics(result: dict, pdf, p1_text: str, p3_text: str):
         result["보장점수"] = int(m_score.group(1))
 
 
-def _parse_coverages(pdf, all_contracts: list) -> tuple[dict, dict]:
-    """Page 6~8에서 보장금액 추출. (coverage_raw, seen_rows) 반환.
+def _parse_coverages(pdf, all_contracts: list) -> tuple[dict, dict, dict]:
+    """Page 6~8에서 보장금액 추출. (coverage_raw, seen_rows, diag_results) 반환.
     seen_rows: {contract_idx: set(row_nums)} — Page 6에서 확인된 항목 (값 0 포함)
+    diag_results: {row_num_str: "부족"/"보통"/"충분"/"미가입"} — 진단결과
     """
     coverage_raw = {}
     seen_rows = {}  # Page 6에서 확인된 행 번호 (0이어도 기록)
+    diag_results = {}  # 진단결과 (행번호 → 진단)
     mapped_indices = set()
     total_pages = len(pdf.pages)
 
@@ -343,6 +346,7 @@ def _parse_coverages(pdf, all_contracts: list) -> tuple[dict, dict]:
             _parse_coverages_horizontal(
                 data_tbl, item_tbl, all_contracts,
                 coverage_raw, seen_rows, mapped_indices,
+                diag_results,
             )
             continue
 
@@ -351,14 +355,18 @@ def _parse_coverages(pdf, all_contracts: list) -> tuple[dict, dict]:
             _parse_coverages_vertical(
                 vert_item_tbl, vert_data_tbl, all_contracts,
                 coverage_raw, seen_rows, mapped_indices,
+                diag_results,
             )
 
-    return coverage_raw, seen_rows
+    return coverage_raw, seen_rows, diag_results
 
 
 def _parse_coverages_horizontal(data_tbl, item_tbl, all_contracts,
-                                coverage_raw, seen_rows, mapped_indices):
-    """가로 포맷: item 7열 + data 9열 (좌/우 쌍 배치)"""
+                                coverage_raw, seen_rows, mapped_indices,
+                                diag_results=None):
+    """가로 포맷: item 7열 + data 9열 (좌/우 쌍 배치)
+    item_tbl 열: [구분, 보장항목L, 내보장금액L, 진단결과L, 보장항목R, 내보장금액R, 진단결과R]
+    """
     page_pos_map = {}
     comp_row = data_tbl[1]
     prod_row = data_tbl[2]
@@ -379,10 +387,23 @@ def _parse_coverages_horizontal(data_tbl, item_tbl, all_contracts,
                 mapped_indices.add(ci)
                 break
 
+    _VALID_DIAG = {"부족", "보통", "충분", "미가입"}
     item_pairs = []
     for row in item_tbl[1:]:
         left = (row[1] or "").strip() if len(row) > 1 else ""
         right = (row[4] or "").strip() if len(row) > 4 else ""
+        # 진단결과 추출 (열3=왼쪽, 열6=오른쪽)
+        if diag_results is not None:
+            ldiag = (row[3] or "").strip() if len(row) > 3 else ""
+            rdiag = (row[6] or "").strip() if len(row) > 6 else ""
+            if left and ldiag in _VALID_DIAG:
+                rn = find_row_for_item(left)
+                if rn:
+                    diag_results[str(rn)] = ldiag
+            if right and rdiag in _VALID_DIAG:
+                rn = find_row_for_item(right)
+                if rn:
+                    diag_results[str(rn)] = rdiag
         item_pairs.append((left, right))
 
     for pair_idx, (left_name, right_name) in enumerate(item_pairs):
@@ -416,7 +437,8 @@ def _parse_coverages_horizontal(data_tbl, item_tbl, all_contracts,
 
 
 def _parse_coverages_vertical(item_tbl, data_tbl, all_contracts,
-                              coverage_raw, seen_rows, mapped_indices):
+                              coverage_raw, seen_rows, mapped_indices,
+                              diag_results=None):
     """세로 포맷: item 4열 + data 4열 (항목이 행별로 나열)
     item_tbl: [구분, 보장항목, 내보장금액, 진단결과] x 46행
     data_tbl: [상품1, 상품2, 상품3, 상품4] x 49행
@@ -444,6 +466,7 @@ def _parse_coverages_vertical(item_tbl, data_tbl, all_contracts,
     if not page_pos_map:
         return
 
+    _VALID_DIAG = {"부족", "보통", "충분", "미가입"}
     for item_idx in range(1, len(item_tbl)):
         item_name = (item_tbl[item_idx][1] or "").strip() if len(item_tbl[item_idx]) > 1 else ""
         if not item_name:
@@ -451,6 +474,11 @@ def _parse_coverages_vertical(item_tbl, data_tbl, all_contracts,
         row_num = find_row_for_item(item_name)
         if row_num is None:
             continue
+        # 진단결과 추출 (열3)
+        if diag_results is not None and len(item_tbl[item_idx]) > 3:
+            vdiag = (item_tbl[item_idx][3] or "").strip()
+            if vdiag in _VALID_DIAG:
+                diag_results[str(row_num)] = vdiag
 
         data_row_idx = item_idx + 3
         if data_row_idx >= len(data_tbl):

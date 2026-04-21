@@ -28,6 +28,7 @@ def render():
     # --- 신규 상품 제안 ---
     use_proposal = st.toggle("신규 상품 제안 포함", value=False)
     proposal_files = None
+    proposal_format = "보장분석표에 포함"
     if use_proposal:
         proposal_files = st.file_uploader(
             "상품제안서 PDF 업로드 (복수 가능)",
@@ -35,6 +36,12 @@ def render():
             accept_multiple_files=True,
             help="보험사 상품설명서(제안서) PDF — 2개 이상 넣으면 비교표 생성",
             key="proposal_pdf",
+        )
+        proposal_format = st.selectbox(
+            "제안서 출력 형식",
+            ["보장분석표에 포함", "별도 비교표 파일"],
+            help="'보장분석표에 포함': 기존 엑셀 M/N열에 추가 | '별도 비교표 파일': 독립 비교표 엑셀 생성",
+            key="proposal_format",
         )
 
     if uploaded_file is None:
@@ -83,18 +90,35 @@ def render():
             st.session_state.pop("proposal_data", None)
             st.session_state.pop("proposal_list", None)
 
-        # 고객명/제안 옵션 → 엑셀 재생성
-        needs_regen = client_name or (proposal_data and proposal_data.get("특약목록"))
+        # 제안서 출력 형식에 따라 분기
+        # "보장분석표에 포함" → 기존 엑셀 M/N열에 제안 추가
+        # "별도 비교표 파일" → 제안 데이터를 별도 비교표로만 생성 (분석표에는 미포함)
+        use_integrated = (proposal_format == "보장분석표에 포함")
+        integrated_proposal = proposal_data if use_integrated else None
+
+        needs_regen = client_name or (integrated_proposal and integrated_proposal.get("특약목록"))
         if needs_regen:
             try:
                 from services.analysis_engine import regenerate_excel
-                excel_files = regenerate_excel(data, proposal=proposal_data)
+                excel_files = regenerate_excel(data, proposal=integrated_proposal)
             except Exception as e:
                 st.warning(safe_error("엑셀 재생성", e))
+
+        # "별도 비교표 파일" + 제안서 있음 → 비교표 자동 생성
+        if not use_integrated and proposal_list:
+            from services.comparison_generator import generate_comparison_excel
+            try:
+                fname, fbytes = generate_comparison_excel(
+                    data, proposal_list, list(range(len(proposal_list))))
+                if fbytes:
+                    st.session_state.comparison_file = (fname, fbytes)
+            except Exception as e:
+                st.warning(safe_error("비교표 생성", e))
 
         st.session_state.analysis_data = data
         st.session_state.excel_files = excel_files
         st.session_state.pdf_bytes = pdf_bytes
+        st.session_state.proposal_format_used = proposal_format
         st.session_state.pop("yakwan_results", None)
         st.session_state.pop("yakwan_selected_idx", None)
         # 계약 선택 초기화 (전체 선택)
@@ -144,9 +168,11 @@ def render():
                 fd = {"고객명": d.get("고객명", "고객"), "성별": d.get("성별", ""),
                       "나이": d.get("나이", 0), "_all_contracts": _filtered, "_coverage_raw": _fcov}
                 from services.analysis_engine import regenerate_excel
+                _fmt = st.session_state.get("proposal_format_used", "보장분석표에 포함")
+                _prop = st.session_state.get("proposal_data") if _fmt == "보장분석표에 포함" else None
                 try:
                     st.session_state.excel_files = regenerate_excel(
-                        fd, proposal=st.session_state.get("proposal_data"), review_last=rl,
+                        fd, proposal=_prop, review_last=rl,
                     )
                 except Exception:
                     pass
@@ -169,11 +195,30 @@ def render():
                 key=f"dl_{idx}_{filename}",
             )
 
-        # 복수 제안서 비교표 (2개 이상일 때만)
+        # 비교표 다운로드 영역
         prop_list = st.session_state.get("proposal_list", [])
+        fmt_used = st.session_state.get("proposal_format_used", "보장분석표에 포함")
+
+        # "별도 비교표 파일" 선택 시 → 자동 생성된 비교표 바로 표시
+        if fmt_used == "별도 비교표 파일" and prop_list:
+            comp = st.session_state.get("comparison_file")
+            if comp:
+                st.divider()
+                st.markdown("**보장 비교표**")
+                fname, fbytes = comp
+                st.download_button(
+                    label=f"다운로드: {fname}",
+                    data=fbytes,
+                    file_name=fname,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="dl_comparison",
+                )
+
+        # 2개 이상 제안서 → 선택 후 비교표 재생성 가능
         if len(prop_list) >= 2:
             st.divider()
-            st.markdown("**보장 비교표**")
+            st.markdown("**제안서 비교표 (선택 재생성)**")
             options = [f"{chr(65+i)}안: {p.get('상품명', f'제안{i+1}')[:20]}" for i, p in enumerate(prop_list)]
             selected_props = st.multiselect(
                 "비교할 제안서 선택",
@@ -181,29 +226,19 @@ def render():
                 default=options,
                 key="comparison_select",
             )
-            if len(selected_props) >= 2:
+            min_sel = 1 if fmt_used == "별도 비교표 파일" else 2
+            if len(selected_props) >= min_sel:
                 sel_indices = [options.index(s) for s in selected_props]
-                if st.button("비교표 생성", use_container_width=True, type="secondary"):
+                if st.button("비교표 재생성", use_container_width=True, type="secondary"):
                     from services.comparison_generator import generate_comparison_excel
                     try:
                         fname, fbytes = generate_comparison_excel(
                             data, prop_list, sel_indices)
                         if fbytes:
                             st.session_state.comparison_file = (fname, fbytes)
+                            st.rerun()
                     except Exception as e:
                         st.error(safe_error("비교표 생성", e))
-
-                comp = st.session_state.get("comparison_file")
-                if comp:
-                    fname, fbytes = comp
-                    st.download_button(
-                        label=f"다운로드: {fname}",
-                        data=fbytes,
-                        file_name=fname,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True,
-                        key="dl_comparison",
-                    )
 
     with tabs[1]:
         from views.page_analysis_yakwan import render_yakwan_section
@@ -301,7 +336,8 @@ def _regenerate_with_selection(data: dict, contracts: list, selected_idxs: list)
         "_coverage_raw": filtered_cov,
     }
 
-    proposal = st.session_state.get("proposal_data")
+    fmt_used = st.session_state.get("proposal_format_used", "보장분석표에 포함")
+    proposal = st.session_state.get("proposal_data") if fmt_used == "보장분석표에 포함" else None
     review_last = st.session_state.get("review_last_toggle", False)
 
     try:
