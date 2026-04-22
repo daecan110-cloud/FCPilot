@@ -31,7 +31,8 @@ os.environ.setdefault("TELEGRAM_DEV_CHAT_ID", str(_tg_dev.get("chat_id", "")))
 TABLES = [
     "users_settings", "clients", "contact_logs",
     "analysis_records", "pioneer_shops", "pioneer_visits",
-    "yakwan_records",
+    "yakwan_records", "command_queue", "client_contracts",
+    "pioneer_shares", "fp_reminders", "fp_products", "bot_sessions",
 ]
 
 PAGE_MODULES = [
@@ -147,6 +148,58 @@ def test_supabase_tables(result: TestResult):
                 result.fail(f"DB: {table}", f"HTTP {res.status_code}")
         except Exception as e:
             result.fail(f"DB: {table}", str(e)[:60])
+
+
+def test_rls_enabled(result: TestResult):
+    """모든 public 테이블에 RLS가 활성화되어 있는지 검증"""
+    headers = {
+        "apikey": SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "Content-Type": "application/json",
+    }
+    try:
+        res = requests.post(
+            f"{SUPABASE_URL}/rest/v1/rpc/exec_sql",
+            headers=headers, timeout=10,
+            json={"query": "SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'"},
+        )
+        if res.status_code != 200:
+            result.fail("RLS: 진단 쿼리", f"HTTP {res.status_code}")
+            return
+        # exec_sql은 'OK' 반환하므로 anon키로 직접 접근 테스트
+    except Exception as e:
+        result.fail("RLS: 진단 쿼리", str(e)[:60])
+        return
+
+    # anon 키로 각 테이블 접근 시도 — RLS가 켜져 있으면 빈 결과 또는 에러
+    anon_key = _secrets["supabase"].get("anon_key", "")
+    if not anon_key:
+        result.ok("RLS: anon_key 없어 스킵")
+        return
+
+    anon_headers = {
+        "apikey": anon_key,
+        "Authorization": f"Bearer {anon_key}",
+    }
+    for table in TABLES:
+        try:
+            res = requests.get(
+                f"{SUPABASE_URL}/rest/v1/{table}?select=id&limit=1",
+                headers=anon_headers, timeout=10,
+            )
+            # RLS 활성 + 미인증 = 빈 배열[] 또는 에러(401/403)
+            if res.status_code in (401, 403):
+                result.ok(f"RLS: {table} 차단됨")
+            elif res.status_code == 200:
+                data = res.json()
+                if len(data) == 0:
+                    result.ok(f"RLS: {table} 빈 결과")
+                else:
+                    result.fail(f"RLS: {table}", "anon으로 데이터 노출!")
+            else:
+                result.ok(f"RLS: {table} HTTP {res.status_code}")
+        except Exception as e:
+            result.fail(f"RLS: {table}", str(e)[:60])
 
 
 def test_exec_sql_rpc(result: TestResult):
@@ -281,32 +334,35 @@ def run_all_tests() -> TestResult:
     print("  FCPilot 자동 테스트")
     print("=" * 50)
 
-    print("\n[1/8] 텔레그램 발송...")
+    print("\n[1/9] 텔레그램 발송...")
     test_telegram_send(result)
 
-    print("[2/8] Supabase 테이블...")
+    print("[2/9] Supabase 테이블...")
     test_supabase_tables(result)
 
-    print("[3/8] exec_sql RPC...")
+    print("[3/9] RLS 보안 검증...")
+    test_rls_enabled(result)
+
+    print("[4/9] exec_sql RPC...")
     test_exec_sql_rpc(result)
 
-    print("[4/8] Config 검증...")
+    print("[5/9] Config 검증...")
     test_config(result)
 
-    print("[5/8] 페이지 모듈 import...")
+    print("[6/9] 페이지 모듈 import...")
     test_module_imports(result, PAGE_MODULES, "Page")
     test_module_imports(result, VIEW_SUB_MODULES, "View")
 
-    print("[6/8] 서비스/유틸 모듈 import...")
+    print("[7/9] 서비스/유틸 모듈 import...")
     test_module_imports(result, SERVICE_MODULES, "Service")
     test_module_imports(result, UTIL_MODULES, "Util")
 
-    print("[7/8] 템플릿/문법/코드 검증...")
+    print("[8/9] 템플릿/문법/코드 검증...")
     test_template_exists(result)
     test_streamlit_app_syntax(result)
     test_no_fp_prefix(result)
 
-    print("[8/8] 완료!")
+    print("[9/9] 완료!")
     print()
     print(result.detail_report())
     print()

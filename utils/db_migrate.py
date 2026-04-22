@@ -18,6 +18,33 @@ _MIGRATIONS = [
         REVOKE EXECUTE ON FUNCTION exec_sql(text) FROM anon, authenticated;
         GRANT EXECUTE ON FUNCTION exec_sql(text) TO service_role
     """),
+    # RLS 강제 활성화 — 모든 public 테이블에 RLS 보장
+    ("fp_products RLS 활성화",
+     "ALTER TABLE IF EXISTS fp_products ENABLE ROW LEVEL SECURITY"),
+    ("bot_sessions RLS 활성화",
+     "ALTER TABLE IF EXISTS bot_sessions ENABLE ROW LEVEL SECURITY"),
+    ("fp_products RLS 정책", """
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_policies
+                WHERE tablename = 'fp_products' AND policyname = 'fc_own_products'
+            ) THEN
+                CREATE POLICY "fc_own_products" ON fp_products
+                    FOR ALL USING (fc_id = auth.uid())
+                    WITH CHECK (fc_id = auth.uid());
+            END IF;
+        END $$
+    """),
+    # 레거시 테이블 RLS (존재할 경우)
+    ("레거시 fp_ 테이블 RLS",
+     """DO $$ DECLARE t TEXT; BEGIN
+        FOREACH t IN ARRAY ARRAY[
+            'fp_users_settings','fp_clients','fp_contact_logs',
+            'fp_analysis_records','fp_pioneer_shops','fp_pioneer_visits','fp_yakwan_records'
+        ] LOOP
+            EXECUTE format('ALTER TABLE IF EXISTS %I ENABLE ROW LEVEL SECURITY', t);
+        END LOOP;
+     END $$"""),
 ]
 
 
