@@ -30,9 +30,8 @@ def render():
         st.warning("로그인이 필요합니다.")
         return
 
-    check_and_send_daily_reminder()
-
     buckets = get_bucketed(fc_id)
+    check_and_send_daily_reminder(buckets=buckets)
     today, this_week, this_month, no_date = (
         buckets["today"], buckets["this_week"],
         buckets["this_month"], buckets["no_date"],
@@ -141,11 +140,26 @@ def _render_reminder_card(r: dict, bucket: str, products_map: dict = None):
                 use_container_width=True,
                 on_click=_toggle, args=(edit_key,),
             )
+            cancel_key = f"cancel_reminder_{rid}"
             st.button(
                 "삭제", key=f"del_{rid}_{bucket}",
                 use_container_width=True,
-                on_click=cancel_reminder, args=(fc_id, rid),
+                on_click=_toggle, args=(cancel_key,),
             )
+
+        # 삭제 확인
+        cancel_key = f"cancel_reminder_{rid}"
+        if st.session_state.get(cancel_key):
+            c1, c2 = st.columns(2)
+            if c1.button("삭제 확인", key=f"cdel_y_{rid}_{bucket}",
+                         type="primary", use_container_width=True):
+                cancel_reminder(fc_id, rid)
+                st.session_state.pop(cancel_key, None)
+                st.rerun()
+            if c2.button("취소", key=f"cdel_n_{rid}_{bucket}",
+                         use_container_width=True):
+                st.session_state.pop(cancel_key, None)
+                st.rerun()
 
         # 완료 결과 입력 폼
         if st.session_state.get(complete_key):

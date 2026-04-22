@@ -32,10 +32,11 @@ def _mark_sent(fc_id: str, today: str):
         pass
 
 
-def check_and_send_daily_reminder():
+def check_and_send_daily_reminder(buckets: dict | None = None):
     """홈 로드 시 호출 — 당일 미발송이면 텔레그램 알림
 
     session_state + DB 이중 체크로 중복 방지.
+    buckets: 이미 조회한 get_bucketed 결과. None이면 내부에서 조회.
     """
     today = str(date.today())
     if st.session_state.get("remind_sent_date") == today:
@@ -51,8 +52,9 @@ def check_and_send_daily_reminder():
         return
 
     # fp_reminders: 지연 + 오늘 예정
-    from services.fp_reminder_service import get_bucketed
-    buckets = get_bucketed(fc_id)
+    if buckets is None:
+        from services.fp_reminder_service import get_bucketed
+        buckets = get_bucketed(fc_id)
     due_reminders = buckets["today"]
 
     # 개척 팔로업: 기한 초과 매장

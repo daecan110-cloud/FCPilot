@@ -1,8 +1,10 @@
 """상품설계서 PDF에서 주계약·특약 정보 추출 (Claude API)"""
 import json
+
 import pdfplumber
+import streamlit as st
+
 from config import CLAUDE_MODEL, CLAUDE_MAX_TOKENS
-from utils.secrets_loader import load_secrets
 
 _SYSTEM_PROMPT = """보험 상품설계서 PDF 텍스트에서 계약 정보를 추출하세요.
 반드시 아래 JSON 배열 형식으로만 응답하세요. 설명 없이 JSON만 출력하세요.
@@ -64,7 +66,7 @@ def _call_claude(text: str) -> list[dict]:
     """Claude API로 계약 정보 추출"""
     import anthropic
 
-    api_key = load_secrets().get("anthropic", {}).get("api_key", "")
+    api_key = st.secrets["claude"]["api_key"]
     client = anthropic.Anthropic(api_key=api_key)
 
     # 텍스트가 너무 길면 앞부분만

@@ -26,13 +26,25 @@ def get_followup_list(fc_id: str) -> list[dict]:
     followups = []
     today = date.today()
 
+    # 전체 방문 기록을 1회 벌크 조회 → Python에서 매장별 매칭
+    try:
+        all_visits = (sb.table("pioneer_visits")
+                      .select("*")
+                      .eq("fc_id", fc_id)
+                      .order("created_at", desc=True)
+                      .execute().data or [])
+    except Exception:
+        all_visits = []
+
+    # shop_id별 최신 방문 1건만 매핑
+    latest_by_shop: dict = {}
+    for v in all_visits:
+        sid = v.get("shop_id")
+        if sid and sid not in latest_by_shop:
+            latest_by_shop[sid] = v
+
     for shop in shops:
-        # 최근 방문 기록
-        try:
-            visit_res = sb.table("pioneer_visits").select("*").eq("shop_id", shop["id"]).eq("fc_id", fc_id).order("created_at", desc=True).limit(1).execute()
-            last_visit = visit_res.data[0] if visit_res.data else None
-        except Exception:
-            last_visit = None
+        last_visit = latest_by_shop.get(shop["id"])
 
         if not last_visit:
             # 방문 기록 없음 → 첫 방문 필요

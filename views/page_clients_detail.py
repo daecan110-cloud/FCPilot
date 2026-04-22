@@ -68,15 +68,18 @@ def render_detail():
     is_existing_client = grade in ("VIP", "S")
 
     if is_existing_client:
-        tab_contract, tab_contact, tab_remind, tab_analysis = st.tabs(
-            ["📄 계약정보", "📝 상담이력", "🔔 리마인드", "📊 보장분석"])
+        tab_timeline, tab_contract, tab_contact, tab_remind, tab_analysis = st.tabs(
+            ["⏳ 타임라인", "📄 계약정보", "📝 상담이력", "🔔 리마인드", "📊 보장분석"])
         with tab_contract:
             from views.page_clients_contracts import render_contracts
             render_contracts(sb, client_id)
     else:
-        tab_contact, tab_remind, tab_analysis = st.tabs(
-            ["📝 상담이력", "🔔 리마인드", "📊 보장분석"])
+        tab_timeline, tab_contact, tab_remind, tab_analysis = st.tabs(
+            ["⏳ 타임라인", "📝 상담이력", "🔔 리마인드", "📊 보장분석"])
 
+    with tab_timeline:
+        from views.page_clients_timeline import render_timeline
+        render_timeline(sb, client_id, client["name"])
     with tab_contact:
         render_contact_logs(sb, client_id)
         render_new_contact(sb, client_id)
