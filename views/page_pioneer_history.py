@@ -25,16 +25,35 @@ def render_history():
         visited_dates = []
 
     if visited_dates:
+        st.markdown(
+            f"<div style='margin-bottom:4px;'>"
+            f"<span style='font-size:14px; font-weight:600; color:#1a1a2e;'>"
+            f"방문 기록 있는 날 ({len(visited_dates)}일)</span></div>",
+            unsafe_allow_html=True,
+        )
+        # 월별로 그룹화해서 태그 표시
         months: dict = {}
         for d in visited_dates:
             m = d[:7]
-            months.setdefault(m, []).append(d[5:])
-        summary = " | ".join(
-            f"{m}: {', '.join(days)}" for m, days in months.items()
-        )
-        st.caption(f"방문 기록 있는 날  {summary}")
+            months.setdefault(m, []).append(d)
+        for m, days in months.items():
+            tags = ""
+            for d in days:
+                day_num = d[8:10].lstrip("0")
+                tags += (
+                    f"<span style='display:inline-block; margin:2px 3px; "
+                    f"padding:4px 10px; background:#e8eaf6; color:#3949ab; "
+                    f"border-radius:12px; font-size:13px; font-weight:600; "
+                    f"cursor:default;'>{day_num}일</span>"
+                )
+            st.markdown(
+                f"<div style='margin-bottom:6px;'>"
+                f"<span style='font-size:12px; color:#9ca3af; "
+                f"margin-right:6px;'>{m}</span>{tags}</div>",
+                unsafe_allow_html=True,
+            )
     else:
-        st.caption("최근 90일 방문 기록이 없습니다.")
+        st.info("최근 90일 방문 기록이 없습니다.")
 
     target_date = st.date_input("날짜 선택", value=date.today())
 
