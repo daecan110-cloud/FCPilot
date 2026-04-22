@@ -69,7 +69,7 @@ def _render_map():
 
     display_shops = shops + (shared_all if show_shared else [])
 
-    filter_col1, filter_col2 = st.columns(2)
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
     with filter_col1:
         status_filter = st.multiselect(
             "상태 필터",
@@ -80,11 +80,25 @@ def _render_map():
     with filter_col2:
         all_cats = sorted({s.get("category", "기타") for s in display_shops})
         cat_filter = st.multiselect("업종 필터", options=all_cats, default=all_cats)
+    with filter_col3:
+        franchise_opt = st.selectbox(
+            "매장 구분",
+            ["전체", "개인매장만", "프랜차이즈만"],
+        )
 
-    filtered = [
-        s for s in display_shops
-        if s.get("status") in status_filter and s.get("category", "기타") in cat_filter
-    ]
+    filtered = []
+    for s in display_shops:
+        if s.get("status") not in status_filter:
+            continue
+        if s.get("category", "기타") not in cat_filter:
+            continue
+        memo = s.get("memo", "")
+        is_fr = "프랜차이즈:" in memo
+        if franchise_opt == "개인매장만" and is_fr:
+            continue
+        if franchise_opt == "프랜차이즈만" and not is_fr:
+            continue
+        filtered.append(s)
 
     map_col, list_col = st.columns([7, 3])
     with map_col:
@@ -101,8 +115,11 @@ def _render_map():
         for s in filtered[:30]:
             icon = STATUS_ICON.get(s.get("status", ""), "⚪")
             is_shared = s.get("_shared_from")
+            memo = s.get("memo", "")
+            is_fr = "프랜차이즈:" in memo
             with st.container(border=True):
-                label = f"{icon} **{s.get('shop_name', '')}**"
+                fr_tag = " `FC`" if is_fr else ""
+                label = f"{icon} **{s.get('shop_name', '')}**{fr_tag}"
                 if is_shared:
                     label += f"  `{is_shared}`"
                 st.markdown(label)
