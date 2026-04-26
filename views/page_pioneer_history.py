@@ -4,6 +4,7 @@ from datetime import date, timedelta
 import streamlit as st
 
 from auth import get_current_user_id
+from utils.helpers import esc
 from utils.supabase_client import get_supabase_client
 from utils.map_utils import VISIT_RESULT_LABELS
 from utils.kakao_map import route_map_html
@@ -22,6 +23,7 @@ def render_history():
                      .order("visit_date", desc=True).execute().data or [])
         visited_dates = sorted({r["visit_date"] for r in date_rows}, reverse=True)
     except Exception:
+        st.warning("방문 기록을 불러오지 못했습니다.")
         visited_dates = []
 
     if visited_dates:
@@ -44,7 +46,7 @@ def render_history():
                     f"<span style='display:inline-block; margin:2px 3px; "
                     f"padding:4px 10px; background:#e8eaf6; color:#3949ab; "
                     f"border-radius:12px; font-size:13px; font-weight:600; "
-                    f"cursor:default;'>{day_num}일</span>"
+                    f"cursor:default;'>{esc(day_num)}일</span>"
                 )
             st.markdown(
                 f"<div style='margin-bottom:6px;'>"

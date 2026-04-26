@@ -31,6 +31,8 @@ python -c "from utils.telegram import send_message; send_message('메시지')"
 | bot_sessions | 텔레그램 봇 세션 |
 | fp_products | FC 상품 목록 |
 | fp_reminders | 리마인드 |
+| client_contracts | 기계약자 계약 정보 |
+| pioneer_shares | 개척 매장 팀 공유 |
 
 ## DB 작업 규칙
 

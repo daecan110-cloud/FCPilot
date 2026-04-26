@@ -1,5 +1,4 @@
 """상품 관리 섹션 — 설정 탭에서 호출 (이름 + 카테고리만)"""
-import pandas as pd
 import streamlit as st
 from auth import get_current_user_id
 from utils.helpers import safe_error
@@ -7,10 +6,11 @@ from config import INSURANCE_CATEGORIES as _CATEGORIES, INSURANCE_CAT_ICON as _C
 from utils.supabase_client import get_supabase_client
 
 
-def get_active_products(sb, fc_id: str) -> list[dict]:
-    """활성 상품 목록 반환 — 다른 탭에서도 호출 가능"""
+@st.cache_data(ttl=120, show_spinner=False)
+def get_active_products(_sb, fc_id: str) -> list[dict]:
+    """활성 상품 목록 반환 — 다른 탭에서도 호출 가능 (2분 캐싱)"""
     try:
-        return (sb.table("fp_products").select("id, name, category")
+        return (_sb.table("fp_products").select("id, name, category")
                 .eq("fc_id", fc_id).eq("is_active", True).order("name")
                 .execute().data or [])
     except Exception:
@@ -18,6 +18,7 @@ def get_active_products(sb, fc_id: str) -> list[dict]:
 
 
 def render_product_section():
+    import pandas as pd
     st.subheader("상품 관리")
     st.caption("셀을 직접 클릭해서 수정 · + 버튼으로 추가 · 행 선택 후 Delete로 삭제")
 
@@ -25,7 +26,7 @@ def render_product_section():
     fc_id = get_current_user_id()
 
     try:
-        rows = sb.table("fp_products").select("*").eq("fc_id", fc_id).order("name").execute().data or []
+        rows = sb.table("fp_products").select("id,name,category,is_active").eq("fc_id", fc_id).order("name").execute().data or []
     except Exception as e:
         st.error(safe_error("조회", e))
         return
@@ -34,7 +35,7 @@ def render_product_section():
     if not rows and not _is_products_initialized(sb, fc_id):
         _copy_admin_products(sb, fc_id)
         try:
-            rows = sb.table("fp_products").select("*").eq("fc_id", fc_id).order("name").execute().data or []
+            rows = sb.table("fp_products").select("id,name,category,is_active").eq("fc_id", fc_id).order("name").execute().data or []
         except Exception:
             pass
 
@@ -109,7 +110,8 @@ def _copy_admin_products(sb, fc_id: str):
         pass
 
 
-def _apply_changes(sb, fc_id: str, original_df: pd.DataFrame, edited_df: pd.DataFrame):
+def _apply_changes(sb, fc_id: str, original_df, edited_df):
+    import pandas as pd
     orig_ids = original_df["_id"].tolist() if "_id" in original_df.columns else []
     orig_len = len(orig_ids)
     edited_len = len(edited_df)
@@ -142,6 +144,7 @@ def _apply_changes(sb, fc_id: str, original_df: pd.DataFrame, edited_df: pd.Data
                     "fc_id": fc_id, "name": name, "category": cat, "is_active": active,
                 }).execute()
 
+        get_active_products.clear()
         st.success("저장되었습니다.")
         st.rerun()
     except Exception as e:

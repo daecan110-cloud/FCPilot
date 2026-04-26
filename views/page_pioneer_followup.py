@@ -15,9 +15,10 @@ def render_followup():
 
     st.subheader("팔로업 현황")
 
+    from views.page_pioneer_map import _load_my_shops, _load_visits
+
     try:
-        shops_res = sb.table("pioneer_shops").select("*").eq("fc_id", fc_id).order("created_at", desc=True).execute()
-        shops = shops_res.data or []
+        shops = _load_my_shops(sb, fc_id)
     except Exception as e:
         st.error(safe_error("매장 조회", e))
         return
@@ -29,9 +30,9 @@ def render_followup():
     _render_delete_all(sb, fc_id, shops)
 
     try:
-        visits_res = sb.table("pioneer_visits").select("*").eq("fc_id", fc_id).order("visit_date", desc=True).execute()
-        all_visits = visits_res.data or []
+        all_visits = _load_visits(sb, fc_id)
     except Exception:
+        st.warning("방문 기록을 불러오지 못했습니다.")
         all_visits = []
 
     from collections import defaultdict
@@ -73,6 +74,8 @@ def render_followup():
                 if st.button("상태 저장", key=f"fu_save_{shop['id']}"):
                     try:
                         sb.table("pioneer_shops").update({"status": new_status}).eq("id", shop["id"]).eq("fc_id", fc_id).execute()
+                        from views.page_pioneer_map import _invalidate_cache
+                        _invalidate_cache()
                         st.success("저장됨")
                         st.rerun()
                     except Exception as e:
@@ -94,6 +97,8 @@ def _render_delete_all(sb, fc_id: str, shops: list):
                 for sid in shop_ids:
                     sb.table("pioneer_visits").delete().eq("shop_id", sid).eq("fc_id", fc_id).execute()
                     sb.table("pioneer_shops").delete().eq("id", sid).eq("fc_id", fc_id).execute()
+                from views.page_pioneer_map import _invalidate_cache
+                _invalidate_cache()
                 st.session_state.pop("delete_all_confirm", None)
                 st.rerun()
             except Exception as e:
@@ -130,6 +135,8 @@ def _render_shop_actions(sb, fc_id: str, shop: dict, visit_count: int):
                         if coords:
                             upd["lat"], upd["lng"] = coords
                     sb.table("pioneer_shops").update(upd).eq("id", shop["id"]).eq("fc_id", fc_id).execute()
+                    from views.page_pioneer_map import _invalidate_cache
+                    _invalidate_cache()
                     st.session_state.pop(edit_key, None)
                     st.rerun()
                 except Exception as e:
@@ -145,6 +152,8 @@ def _render_shop_actions(sb, fc_id: str, shop: dict, visit_count: int):
             try:
                 sb.table("pioneer_visits").delete().eq("shop_id", shop["id"]).eq("fc_id", fc_id).execute()
                 sb.table("pioneer_shops").delete().eq("id", shop["id"]).eq("fc_id", fc_id).execute()
+                from views.page_pioneer_map import _invalidate_cache
+                _invalidate_cache()
                 st.session_state.pop(del_key, None)
                 st.rerun()
             except Exception as e:

@@ -2,6 +2,9 @@
 .streamlit/secrets.toml
 .env
 
+# Scripts (로컬 일회성 스크립트 — API키/경로 하드코딩 포함)
+scripts/
+
 # Data files (고객 개인정보 보호)
 *.csv
 *.xlsx

@@ -71,17 +71,26 @@ def render_team_share():
     owner_ids = [s["owner_id"] for s in shared_to_me]
     owner_names = _get_user_names(sb, owner_ids)
 
+    # 매장 수를 배치 쿼리로 한 번에 조회
+    shop_counts: dict[str, int] = {}
     if shared_to_me:
+        try:
+            rows = (sb.table("pioneer_shops")
+                    .select("fc_id")
+                    .in_("fc_id", list(set(owner_ids)))
+                    .execute().data or [])
+            for row in rows:
+                oid = row["fc_id"]
+                shop_counts[oid] = shop_counts.get(oid, 0) + 1
+        except Exception:
+            pass
+
         for share in shared_to_me:
             oid = share["owner_id"]
             name = owner_names.get(oid, "알 수 없음")
+            cnt = shop_counts.get(oid, "?")
             col1, col2 = st.columns([4, 1])
             with col1:
-                try:
-                    cnt_res = sb.table("pioneer_shops").select("id", count="exact").eq("fc_id", oid).execute()
-                    cnt = cnt_res.count or 0
-                except Exception:
-                    cnt = "?"
                 st.text(f"{name} ({cnt}개 매장)")
             with col2:
                 if st.button("끊기", key=f"unshr_from_{share['id']}", use_container_width=True):

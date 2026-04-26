@@ -8,6 +8,32 @@ _GRADE_ORDER = ["VIP", "S", "A", "B", "C", "D"]
 _GRADE_ICON = {"VIP": "🟣", "S": "🟢", "A": "🔴", "B": "🟠", "C": "🔵", "D": "⚫"}
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_stats_data(_sb, fc_id: str, since: str | None):
+    """통계용 데이터 일괄 조회 (1분 캐싱)"""
+    def _q(table, fields):
+        q = _sb.table(table).select(fields).eq("fc_id", fc_id)
+        return (q.gte("created_at", since) if since else q)
+
+    total_cnt = _sb.table("clients").select("id", count="exact").eq("fc_id", fc_id).execute().count or 0
+    new_clients = _q("clients", "prospect_grade").execute().data or []
+    logs = _q("contact_logs", "touch_method").execute().data or []
+    clients_dist = _sb.table("clients").select("prospect_grade,db_source,age_group,address").eq("fc_id", fc_id).execute().data or []
+    shops = _sb.table("pioneer_shops").select("status").eq("fc_id", fc_id).execute().data or []
+    visits = _q("pioneer_visits", "result").execute().data or []
+    a_cnt = (_sb.table("analysis_records").select("id", count="exact").eq("fc_id", fc_id).gte("created_at", since) if since else _sb.table("analysis_records").select("id", count="exact").eq("fc_id", fc_id)).execute().count or 0
+    y_cnt = (_sb.table("yakwan_records").select("id", count="exact").eq("fc_id", fc_id).gte("created_at", since) if since else _sb.table("yakwan_records").select("id", count="exact").eq("fc_id", fc_id)).execute().count or 0
+    reminders = (_sb.table("fp_reminders").select("status, result, completed_at").eq("fc_id", fc_id).gte("completed_at", since) if since else _sb.table("fp_reminders").select("status, result, completed_at").eq("fc_id", fc_id)).execute().data or []
+    pending_cnt = _sb.table("fp_reminders").select("id", count="exact").eq("fc_id", fc_id).eq("status", "pending").execute().count or 0
+
+    return {
+        "total_cnt": total_cnt, "new_clients": new_clients, "logs": logs,
+        "clients_dist": clients_dist, "shops": shops, "visits": visits,
+        "a_cnt": a_cnt, "y_cnt": y_cnt, "reminders": reminders,
+        "pending_cnt": pending_cnt,
+    }
+
+
 def render():
     st.header("통계 대시보드")
     fc_id = get_current_user_id()
@@ -21,18 +47,29 @@ def render():
     days = {"오늘": 1, "최근 3일": 3, "최근 7일": 7, "최근 30일": 30, "최근 3개월": 90}.get(period)
 
     sb = get_supabase_client()
-    _render_crm(sb, fc_id, since, days, period)
+
+    try:
+        data = _load_stats_data(sb, fc_id, since)
+    except Exception:
+        st.warning("통계 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.")
+        data = {
+            "total_cnt": 0, "new_clients": [], "logs": [],
+            "clients_dist": [], "shops": [], "visits": [],
+            "a_cnt": 0, "y_cnt": 0, "reminders": [], "pending_cnt": 0,
+        }
+
+    _render_crm(data, days, period)
     st.divider()
     from views.page_stats_products import render_product_stats
     render_product_stats(sb, fc_id, since, period)
     st.divider()
-    _render_distribution(sb, fc_id)
+    _render_distribution(data)
     st.divider()
-    _render_pioneer(sb, fc_id, since)
+    _render_pioneer(data)
     st.divider()
-    _render_analysis(sb, fc_id, since)
+    _render_analysis(data)
     st.divider()
-    _render_reminders(sb, fc_id, since)
+    _render_reminders(data)
 
 
 _PERIOD_DAYS = {"오늘": 0, "최근 3일": 3, "최근 7일": 7, "최근 30일": 30, "최근 3개월": 90}
@@ -44,25 +81,11 @@ def _since(period: str) -> str | None:
     return str(date.today() - timedelta(days=_PERIOD_DAYS[period]))
 
 
-def _q(sb, table: str, fields: str, fc_id: str, since: str | None):
-    q = sb.table(table).select(fields).eq("fc_id", fc_id)
-    return (q.gte("created_at", since) if since else q)
-
-
-def _render_crm(sb, fc_id: str, since, days, period: str):
+def _render_crm(data: dict, days, period: str):
     st.subheader("고객 관리")
-    try:
-        total_cnt = sb.table("clients").select("id", count="exact").eq("fc_id", fc_id).execute().count or 0
-    except Exception:
-        total_cnt = 0
-    try:
-        new_clients = _q(sb, "clients", "prospect_grade", fc_id, since).execute().data or []
-    except Exception:
-        new_clients = []
-    try:
-        logs = _q(sb, "contact_logs", "touch_method", fc_id, since).execute().data or []
-    except Exception:
-        logs = []
+    total_cnt = data["total_cnt"]
+    new_clients = data["new_clients"]
+    logs = data["logs"]
 
     total_logs = len(logs)
     if days and days > 1:
@@ -97,16 +120,11 @@ def _render_crm(sb, fc_id: str, since, days, period: str):
         st.caption("터치방식: " + " | ".join(f"{m}: {v}건" for m, v in sorted(methods.items(), key=lambda x: -x[1])))
 
 
-def _render_distribution(sb, fc_id: str):
+def _render_distribution(data: dict):
     st.subheader("고객 분포 (전체)")
     view_by = st.selectbox("보기 기준", ["등급별", "유입경로별", "나이대별", "지역별"],
                            key="stats_dist_by", label_visibility="collapsed")
-    try:
-        clients = (sb.table("clients")
-                   .select("prospect_grade,db_source,age_group,address")
-                   .eq("fc_id", fc_id).execute().data or [])
-    except Exception:
-        clients = []
+    clients = data["clients_dist"]
     if not clients:
         st.caption("해당 기간 고객 데이터가 없습니다.")
         return
@@ -158,16 +176,10 @@ def _dist_cards(dist: dict, keys: list, label_fn):
         col_cnt.caption(f"{cnt}명 ({pct}%)")
 
 
-def _render_pioneer(sb, fc_id: str, since):
+def _render_pioneer(data: dict):
     st.subheader("개척 영업")
-    try:
-        shops = sb.table("pioneer_shops").select("status").eq("fc_id", fc_id).execute().data or []
-    except Exception:
-        shops = []
-    try:
-        visits = _q(sb, "pioneer_visits", "result", fc_id, since).execute().data or []
-    except Exception:
-        visits = []
+    shops = data["shops"]
+    visits = data["visits"]
 
     contracted = sum(1 for s in shops if s.get("status") == "contracted")
     c1, c2, c3, c4 = st.columns(4)
@@ -185,39 +197,23 @@ def _render_pioneer(sb, fc_id: str, since):
         st.caption("매장 현황: " + " | ".join(f"{labels.get(k,k)}: {v}곳" for k, v in statuses.items()))
 
 
-def _render_analysis(sb, fc_id: str, since):
+def _render_analysis(data: dict):
     st.subheader("보장분석")
-    try:
-        aq = sb.table("analysis_records").select("id", count="exact").eq("fc_id", fc_id)
-        a_cnt = (aq.gte("created_at", since) if since else aq).execute().count or 0
-    except Exception:
-        a_cnt = 0
-    try:
-        yq = sb.table("yakwan_records").select("id", count="exact").eq("fc_id", fc_id)
-        y_cnt = (yq.gte("created_at", since) if since else yq).execute().count or 0
-    except Exception:
-        y_cnt = 0
+    a_cnt = data["a_cnt"]
+    y_cnt = data["y_cnt"]
     c1, c2 = st.columns(2)
     c1.metric("보장분석 실행", f"{a_cnt}건")
     c2.metric("약관분석 실행", f"{y_cnt}건")
 
 
-def _render_reminders(sb, fc_id: str, since):
+def _render_reminders(data: dict):
     from services.fp_reminder_service import RESULT_MAP
     st.subheader("리마인드 결과")
-    try:
-        q = sb.table("fp_reminders").select("status, result, completed_at").eq("fc_id", fc_id)
-        rows = (q.gte("completed_at", since) if since else q).execute().data or []
-    except Exception:
-        rows = []
+    rows = data["reminders"]
 
     completed = [r for r in rows if r.get("status") == "completed"]
     cancelled = [r for r in rows if r.get("status") == "cancelled"]
-    pending_q = sb.table("fp_reminders").select("id", count="exact").eq("fc_id", fc_id).eq("status", "pending")
-    try:
-        pending_cnt = pending_q.execute().count or 0
-    except Exception:
-        pending_cnt = 0
+    pending_cnt = data["pending_cnt"]
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("대기 중", f"{pending_cnt}건")

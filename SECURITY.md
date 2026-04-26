@@ -152,22 +152,10 @@ def check_session_timeout():
 - ✅ 파일 업로드 크기 제한 (10MB)
 - ✅ 파일 타입 검증 (PDF/JPG/PNG만 허용)
 
-### 4-3. 로깅 마스킹 함수
-```python
-# utils/helpers.py
-def mask_name(name: str) -> str:
-    """김영민 → 김**"""
-    if not name or len(name) < 2:
-        return "***"
-    return name[0] + "*" * (len(name) - 1)
-
-def mask_phone(phone: str) -> str:
-    """010-1234-5678 → ***-****-5678"""
-    if not phone:
-        return "***"
-    parts = phone.replace("-", "")
-    return f"***-****-{parts[-4:]}"
-```
+### 4-3. 로깅 마스킹
+- 에러 메시지에 고객 이름/전화번호 직접 노출 금지
+- `safe_error()` 함수로 에러 메시지 래핑 (Sprint 19~)
+- `esc()` 함수로 HTML 이스케이프 (XSS 방어)
 
 ---
 

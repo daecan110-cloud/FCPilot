@@ -10,21 +10,18 @@ from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.worksheet.pagebreak import Break
 
 from services.item_map import COL_IDX, COL_LTRS, SUM_COL, PROP_COL, TOTAL_COL, DATA_ROWS
-from services.excel_helpers import safe_val, clear_values, _FONT_NAME
+from services.excel_helpers import (
+    safe_val, clear_values, _FONT_NAME,
+    DATA_START as _DATA_START, DATA_END as _DATA_END,
+    MAX_COL as _MAX_COL, MAX_COL_PROP as _MAX_COL_PROP,
+    REVIEW_START as _REVIEW_START, REVIEW_COUNT as _REVIEW_COUNT,
+)
 from services.excel_review import (
     fill_renewal, fill_renewal_all, fill_review, fill_review_all,
 )
 
 _TMPL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 TEMPLATE = os.path.join(_TMPL_DIR, "master_template.xlsx")
-
-# v13: D~K(col 4~11), L=합계(col 12), M=제안(col 13), N=전체합계(col 14)
-_DATA_START = 4
-_DATA_END = 11
-_MAX_COL = 12
-_MAX_COL_PROP = 14
-_REVIEW_START = 92
-_REVIEW_COUNT = 7
 
 
 def generate_analysis_excel(

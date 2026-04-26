@@ -12,6 +12,17 @@ from utils.helpers import safe_error
 from utils.supabase_client import get_supabase_client
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def _load_recent_logs(_sb, fc_id: str, limit: int) -> list[dict]:
+    """최근 활동 로그 조회 (30초 캐싱)"""
+    try:
+        return (_sb.table("contact_logs").select("*, clients(name)")
+                .eq("fc_id", fc_id).order("created_at", desc=True)
+                .limit(limit).execute().data or [])
+    except Exception:
+        return []
+
+
 def _search_client(sb, fc_id, search, key_prefix="home_remind"):
     if not search.strip():
         return None
@@ -197,12 +208,7 @@ def render_recent_activity(fc_id: str):
         _render_quick_activity(fc_id, sb)
 
     show_count = st.session_state.get("recent_activity_count", 5)
-    try:
-        logs = (sb.table("contact_logs").select("*, clients(name)")
-                .eq("fc_id", fc_id).order("created_at", desc=True)
-                .limit(show_count + 1).execute().data or [])
-    except Exception:
-        logs = []
+    logs = _load_recent_logs(sb, fc_id, show_count + 1)
     if not logs:
         st.info("최근 활동 기록이 없습니다.")
         return

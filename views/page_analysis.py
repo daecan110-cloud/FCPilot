@@ -277,15 +277,19 @@ def _render_contract_selector(data: dict, contracts: list):
             if k not in st.session_state:
                 st.session_state[k] = True
 
-        sel_all, desel_all = st.columns(2)
-        if sel_all.button("전체 선택", use_container_width=True, key="sel_all"):
+        def _select_all():
             for c in contracts:
                 st.session_state[f"ct_sel_{c['_idx']}"] = True
-            st.rerun()
-        if desel_all.button("전체 해제", use_container_width=True, key="desel_all"):
+
+        def _deselect_all():
             for c in contracts:
                 st.session_state[f"ct_sel_{c['_idx']}"] = False
-            st.rerun()
+
+        sel_all, desel_all = st.columns(2)
+        sel_all.button("전체 선택", use_container_width=True, key="sel_all",
+                       on_click=_select_all)
+        desel_all.button("전체 해제", use_container_width=True, key="desel_all",
+                         on_click=_deselect_all)
 
         for c in contracts:
             idx = c["_idx"]

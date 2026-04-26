@@ -29,9 +29,10 @@ def render_product_stats(sb, fc_id: str, since, period: str):
         _render_price_distribution(contracts)
 
 
-def _load_contracts(sb, fc_id: str, since) -> list:
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_contracts(_sb, fc_id: str, since) -> list:
     try:
-        q = sb.table("client_contracts").select("*").eq("fc_id", fc_id)
+        q = _sb.table("client_contracts").select("*").eq("fc_id", fc_id)
         if since:
             q = q.gte("created_at", since)
         return q.execute().data or []
@@ -39,9 +40,10 @@ def _load_contracts(sb, fc_id: str, since) -> list:
         return []
 
 
-def _load_contact_logs_with_products(sb, fc_id: str, since) -> list:
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_contact_logs_with_products(_sb, fc_id: str, since) -> list:
     try:
-        q = sb.table("contact_logs").select("proposed_product_ids, client_id, created_at").eq("fc_id", fc_id)
+        q = _sb.table("contact_logs").select("proposed_product_ids, client_id, created_at").eq("fc_id", fc_id)
         if since:
             q = q.gte("created_at", since)
         rows = q.execute().data or []
@@ -50,10 +52,11 @@ def _load_contact_logs_with_products(sb, fc_id: str, since) -> list:
         return []
 
 
-def _load_clients_map(sb, fc_id: str) -> dict:
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_clients_map(_sb, fc_id: str) -> dict:
     """client_id → {age_group, name} 매핑"""
     try:
-        rows = sb.table("clients").select("id, name, age_group").eq("fc_id", fc_id).execute().data or []
+        rows = _sb.table("clients").select("id, name, age_group").eq("fc_id", fc_id).execute().data or []
         return {r["id"]: r for r in rows}
     except Exception:
         return {}

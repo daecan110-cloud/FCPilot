@@ -142,13 +142,22 @@ def _delete_user(sb, user_id: str):
     st.success("삭제 완료")
 
 
+@st.cache_data(ttl=120, show_spinner=False)
+def _fetch_db_stats(_sb) -> dict[str, int]:
+    tables = ["clients", "contact_logs", "pioneer_shops", "pioneer_visits",
+              "analysis_records", "yakwan_records", "command_queue", "fp_products"]
+    result = {}
+    for t in tables:
+        res = _sb.table(t).select("id", count="exact").execute()
+        result[t] = res.count or 0
+    return result
+
+
 def _render_db_stats(sb):
     with st.expander("DB 통계"):
         try:
-            tables = ["clients", "contact_logs", "pioneer_shops", "pioneer_visits",
-                      "analysis_records", "yakwan_records", "command_queue", "fp_products"]
-            for t in tables:
-                res = sb.table(t).select("id", count="exact").execute()
-                st.text(f"{t}: {res.count}건")
+            stats = _fetch_db_stats(sb)
+            for t, cnt in stats.items():
+                st.text(f"{t}: {cnt}건")
         except Exception as e:
             st.error(safe_error("통계 조회", e))

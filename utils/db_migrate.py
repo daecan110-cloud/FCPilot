@@ -45,6 +45,11 @@ _MIGRATIONS = [
             EXECUTE format('ALTER TABLE IF EXISTS %I ENABLE ROW LEVEL SECURITY', t);
         END LOOP;
      END $$"""),
+    # analysis_records에 client_id FK 추가
+    ("analysis_records.client_id 컬럼",
+     "ALTER TABLE analysis_records ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES clients(id) ON DELETE SET NULL"),
+    ("analysis_records.client_id 인덱스",
+     "CREATE INDEX IF NOT EXISTS idx_analysis_records_client_id ON analysis_records(client_id)"),
 ]
 
 
@@ -99,14 +104,20 @@ def _connect():
         (f"aws-0-ap-northeast-2.pooler.supabase.com", 5432, f"postgres.{ref}"),
     ]
 
-    for h, p, u in options:
+    # 이전 성공 주소를 우선 시도
+    last_ok = st.session_state.get("_db_migrate_ok_idx")
+    if last_ok is not None:
+        options = [options[last_ok]] + [o for i, o in enumerate(options) if i != last_ok]
+
+    for idx, (h, p, u) in enumerate(options):
         try:
             conn = pg8000.connect(
                 host=h, port=p, database="postgres",
-                user=u, password=password, timeout=5,
+                user=u, password=password, timeout=2,
             )
             conn.autocommit = True
             conn.run("SELECT 1")
+            st.session_state._db_migrate_ok_idx = idx
             return conn
         except Exception:
             continue

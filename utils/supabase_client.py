@@ -1,12 +1,15 @@
 """Supabase 클라이언트 초기화"""
+import time
 import streamlit as st
 from supabase import create_client, Client
+
+_SESSION_REFRESH_INTERVAL = 300  # 5분
 
 
 def get_supabase_client() -> Client:
     """세션별 Supabase 클라이언트 — 사용자 JWT 자동 주입.
     클라이언트 객체는 session_state에 보관해 재생성 오버헤드 제거.
-    set_session은 매번 호출해 토큰을 최신 상태로 유지.
+    set_session은 5분 간격으로만 호출해 불필요한 네트워크 왕복 제거.
     """
     if "sb_client" not in st.session_state:
         url = st.secrets["supabase"]["url"]
@@ -15,13 +18,15 @@ def get_supabase_client() -> Client:
     client = st.session_state.sb_client
     session = st.session_state.get("session")
     if session:
-        try:
-            res = client.auth.set_session(session.access_token, session.refresh_token)
-            # 갱신된 세션을 session_state에 반영 (refresh 토큰 재사용 방지)
-            if res and res.session:
-                st.session_state.session = res.session
-        except Exception:
-            # 세션 복구 불가 → 로그아웃 처리
-            st.session_state.pop("session", None)
-            st.session_state.pop("user", None)
+        now = time.time()
+        last_refresh = st.session_state.get("_sb_last_refresh", 0)
+        if now - last_refresh >= _SESSION_REFRESH_INTERVAL:
+            try:
+                res = client.auth.set_session(session.access_token, session.refresh_token)
+                st.session_state._sb_last_refresh = now
+                if res and res.session:
+                    st.session_state.session = res.session
+            except Exception:
+                st.session_state.pop("session", None)
+                st.session_state.pop("user", None)
     return client

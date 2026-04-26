@@ -9,14 +9,10 @@ from services.item_map import COL_IDX, COL_LTRS, DATA_ROWS
 from services.excel_helpers import (
     safe_val, safe_merge, copy_row_style, short_name, classify_renewal,
     _FONT_NAME,
+    DATA_START as _DATA_START, DATA_END as _DATA_END,
+    MAX_COL as _MAX_COL, MAX_COL_PROP as _MAX_COL_PROP,
+    REVIEW_START as _REVIEW_START, REVIEW_COUNT as _REVIEW_COUNT,
 )
-
-_DATA_START = 4
-_DATA_END = 11
-_MAX_COL = 12
-_MAX_COL_PROP = 14
-_REVIEW_START = 92
-_REVIEW_COUNT = 7
 
 
 # ── 갱신 구분 ────────────────────────────────────────────

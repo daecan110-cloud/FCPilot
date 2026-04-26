@@ -87,15 +87,21 @@ def render_detail():
         from views.page_clients_remind import render_reminder_section
         render_reminder_section(sb, fc_id=fc_id, client_id=client_id)
     with tab_analysis:
-        _render_analysis_history(sb, fc_id, client["name"])
+        _render_analysis_history(sb, fc_id, client_id, client["name"])
 
 
-def _render_analysis_history(sb, fc_id: str, client_name: str):
+def _render_analysis_history(sb, fc_id: str, client_id: str, client_name: str):
     st.subheader("보장분석 이력")
     try:
-        records = (sb.table("analysis_records").select("*")
-                   .eq("fc_id", fc_id).ilike("client_name", client_name)
-                   .order("created_at", desc=True).limit(10).execute().data or [])
+        q = sb.table("analysis_records").select("*").eq("fc_id", fc_id)
+        # client_id FK가 있으면 정확 매칭, 없으면 이름 폴백
+        q = q.eq("client_id", client_id)
+        records = q.order("created_at", desc=True).limit(10).execute().data or []
+        if not records:
+            # 마이그레이션 전 데이터 폴백
+            records = (sb.table("analysis_records").select("*")
+                       .eq("fc_id", fc_id).ilike("client_name", client_name)
+                       .order("created_at", desc=True).limit(10).execute().data or [])
     except Exception:
         records = []
     if not records:

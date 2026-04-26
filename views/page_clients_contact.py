@@ -20,6 +20,10 @@ def render_contact_logs(sb, client_id: str):
         st.caption("상담 이력이 없습니다.")
         return
 
+    # 상품 맵을 루프 밖에서 한 번만 조회
+    from views.page_settings_products import get_active_products
+    all_prods = {p["id"]: p["name"] for p in get_active_products(sb, fc_id)}
+
     for i, log in enumerate(logs):
         method = log.get("touch_method", "") or "기타"
         date_str = log.get("created_at", "")[:10]
@@ -27,13 +31,8 @@ def render_contact_logs(sb, client_id: str):
         with st.expander(label, expanded=(i == 0)):
             st.write(log.get("memo", ""))
             if log.get("proposed_product_ids"):
-                try:
-                    from views.page_settings_products import get_active_products
-                    all_prods = {p["id"]: p["name"] for p in get_active_products(sb, fc_id)}
-                    names = [all_prods.get(pid, pid[:8]) for pid in log["proposed_product_ids"]]
-                    st.caption(f"제안 상품: {', '.join(names)}")
-                except Exception:
-                    pass
+                names = [all_prods.get(pid, pid[:8]) for pid in log["proposed_product_ids"]]
+                st.caption(f"제안 상품: {', '.join(names)}")
             if log.get("next_action"):
                 st.caption(f"다음 할 일: {log['next_action']}")
             if log.get("next_date"):

@@ -1,7 +1,7 @@
-"""지도 컴포넌트 — folium + streamlit-folium 기반"""
+"""지도 컴포넌트 — folium + st.components.v1.html (경량 렌더링)"""
 import folium
 import streamlit as st
-from streamlit_folium import st_folium
+import streamlit.components.v1 as components
 
 
 _STATUS_COLORS = {
@@ -67,7 +67,7 @@ def pioneer_map_html(shops: list, height: int = 500, key: str = "pioneer") -> No
         ).add_to(m)
 
     _fit_bounds(m, valid)
-    st_folium(m, height=height, use_container_width=True, returned_objects=[], key=key)
+    components.html(m._repr_html_(), height=height)
 
 
 def route_map_html(visits: list, height: int = 420, key: str = "route") -> None:
@@ -123,7 +123,7 @@ def route_map_html(visits: list, height: int = 420, key: str = "route") -> None:
         ).add_to(m)
 
     _fit_bounds(m, valid)
-    st_folium(m, height=height, use_container_width=True, returned_objects=[], key=key)
+    components.html(m._repr_html_(), height=height)
 
 
 def _fit_bounds(m: folium.Map, items: list) -> None:

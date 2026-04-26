@@ -40,6 +40,20 @@ def _select_date(day_str):
         st.session_state.cal_selected_date = day_str
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_month_reminders(fc_id: str, month_start: str, month_end: str) -> list[dict]:
+    """월간 리마인드 조회 (60초 캐싱)"""
+    try:
+        return (get_supabase_client().table("fp_reminders")
+                .select("reminder_date, status, purpose, memo, clients(name)")
+                .eq("fc_id", fc_id)
+                .gte("reminder_date", month_start)
+                .lte("reminder_date", month_end)
+                .execute().data or [])
+    except Exception:
+        return []
+
+
 def render_monthly_calendar(fc_id: str):
     today = date.today()
 
@@ -64,19 +78,11 @@ def render_monthly_calendar(fc_id: str):
     )
     c4.button("▶", key="cal_next", use_container_width=True, on_click=_nav_next)
 
-    # 해당 월 리마인드 조회
+    # 해당 월 리마인드 조회 (캐싱)
     _, last_day = calendar.monthrange(year, month)
     month_start = f"{year}-{month:02d}-01"
     month_end = f"{year}-{month:02d}-{last_day:02d}"
-    try:
-        rows = (get_supabase_client().table("fp_reminders")
-                .select("reminder_date, status, purpose, memo, clients(name)")
-                .eq("fc_id", fc_id)
-                .gte("reminder_date", month_start)
-                .lte("reminder_date", month_end)
-                .execute().data or [])
-    except Exception:
-        rows = []
+    rows = _load_month_reminders(fc_id, month_start, month_end)
 
     # 날짜별 카운트
     date_map: dict = {}
@@ -137,7 +143,7 @@ def render_monthly_calendar(fc_id: str):
         st.markdown(
             f"<div style='margin-top:8px; padding:10px 14px; background:#f8f9fb; "
             f"border-radius:8px; border:1px solid #eef0f4;'>"
-            f"<b>{selected} 일정</b></div>",
+            f"<b>{esc(selected)} 일정</b></div>",
             unsafe_allow_html=True,
         )
         if day_rows:

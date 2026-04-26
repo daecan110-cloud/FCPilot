@@ -23,14 +23,16 @@ def render_timeline(sb, client_id: str, client_name: str):
         _render_event(ev)
 
 
-def _collect_events(sb, fc_id: str, client_id: str,
+@st.cache_data(ttl=30, show_spinner=False)
+def _collect_events(_sb, fc_id: str, client_id: str,
                     client_name: str) -> list[dict]:
-    """4개 테이블에서 이벤트 수집 → 날짜 역순 정렬"""
+    """4개 테이블에서 이벤트 수집 → 날짜 역순 정렬 (30초 캐싱)"""
     events = []
 
     # 1. 상담이력 (contact_logs)
     try:
-        logs = (sb.table("contact_logs").select("*")
+        logs = (_sb.table("contact_logs")
+                .select("created_at,touch_method,memo,proposed_product_ids,next_action,next_date")
                 .eq("fc_id", fc_id).eq("client_id", client_id)
                 .order("created_at", desc=True)
                 .limit(50).execute().data or [])
@@ -50,7 +52,8 @@ def _collect_events(sb, fc_id: str, client_id: str,
 
     # 2. 리마인드 (fp_reminders)
     try:
-        reminders = (sb.table("fp_reminders").select("*")
+        reminders = (_sb.table("fp_reminders")
+                     .select("created_at,reminder_date,purpose,memo,status,result,result_memo,completed_at")
                      .eq("fc_id", fc_id).eq("client_id", client_id)
                      .order("created_at", desc=True)
                      .limit(50).execute().data or [])
@@ -73,7 +76,8 @@ def _collect_events(sb, fc_id: str, client_id: str,
 
     # 3. 계약정보 (client_contracts)
     try:
-        contracts = (sb.table("client_contracts").select("*")
+        contracts = (_sb.table("client_contracts")
+                     .select("created_at,contract_date,company,product_name,monthly_premium,category,main_coverage,riders")
                      .eq("fc_id", fc_id).eq("client_id", client_id)
                      .order("created_at", desc=True)
                      .limit(50).execute().data or [])
@@ -95,7 +99,8 @@ def _collect_events(sb, fc_id: str, client_id: str,
 
     # 4. 보장분석 (analysis_records)
     try:
-        analyses = (sb.table("analysis_records").select("*")
+        analyses = (_sb.table("analysis_records")
+                    .select("created_at,client_name,contract_count,result_summary,excel_path")
                     .eq("fc_id", fc_id).ilike("client_name", client_name)
                     .order("created_at", desc=True)
                     .limit(20).execute().data or [])

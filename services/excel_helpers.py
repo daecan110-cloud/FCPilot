@@ -5,6 +5,14 @@ from openpyxl.styles import Font, Alignment
 
 _FONT_NAME = "KoPubWorld돋움체 Bold"
 
+# v13 양식 공통 상수 — excel_generator / excel_review 공유
+DATA_START = 4
+DATA_END = 11
+MAX_COL = 12
+MAX_COL_PROP = 14
+REVIEW_START = 92
+REVIEW_COUNT = 7
+
 
 def safe_val(ws, row, col, value):
     cell = ws.cell(row=row, column=col)

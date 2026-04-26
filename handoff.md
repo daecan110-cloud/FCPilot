@@ -1,8 +1,8 @@
 # handoff.md — FCPilot
 
 ## 현재 상태
-- Phase: **Sprint 20 완료 (PDF 파싱 세로 지원 + 오매핑 수정)** — 영민 테스트 대기 중
-- 마지막 세션: 2026-04-21 (Claude Code)
+- Phase: **Sprint 21 완료 (전체 성능 최적화 + 보안/품질 개선)** — 영민 테스트 대기 중
+- 마지막 세션: 2026-04-26 (Claude Code)
 - Supabase: **ghglnszzjuuvrrwpvhhb** (FCPilot 전용)
 - 배포: **fcpilot-kr.streamlit.app** (git push → 자동 반영)
 
@@ -150,15 +150,49 @@
 
 ---
 
+## Sprint 21 — 완료 (2026-04-26)
+
+### 성능 최적화 (10건)
+- [x] `supabase_client.py` set_session 5분 간격 호출 (매 rerun HTTP 왕복 제거)
+- [x] `fp_reminder_service.py` fp_reminders 2쿼리→1쿼리 통합 + @st.cache_data(ttl=30)
+- [x] `db_migrate.py` TCP 타임아웃 5→2초 + 성공 주소 session_state 캐싱
+- [x] `page_stats_products.py` 3개 로드 함수 @st.cache_data(ttl=60)
+- [x] `page_clients_timeline.py` _collect_events 4테이블 @st.cache_data(ttl=30)
+- [x] `calendar_render.py` 월간 리마인드 조회 캐싱 분리
+- [x] `page_pioneer_share.py` shop_counts N+1→.in_() 배치 쿼리
+- [x] `page_pioneer_map.py` _render_map @st.fragment 격리 + 탭 lazy 로딩
+- [x] `page_home_forms.py` 최근 활동 쿼리 캐싱
+- [x] `kakao_map.py` st_folium→components.html 경량 렌더링
+
+### 보안/품질 (6건)
+- [x] scripts/ 3파일 API 키 하드코딩→환경변수 + .gitignore 추가
+- [x] `excel_helpers.py` 상수 6개 통합 (excel_generator↔excel_review 이중정의 제거)
+- [x] 통계/방문기록 silent fail에 st.warning 추가
+- [x] `page_analysis.py` 전체선택/해제 on_click 콜백 전환 (불필요 rerun 제거)
+- [x] 날짜 esc() 미적용 수정 (calendar_render, pioneer_history)
+- [x] Hook에 카카오 API 키 패턴 추가
+
+### DB 마이그레이션
+- [x] `022_analysis_client_id.sql` — analysis_records에 client_id FK + 인덱스 추가
+- [x] `db_migrate.py`에 자동 마이그레이션 등록
+
+### 문서/설정
+- [x] SECURITY.md 삭제된 함수(mask_name/mask_phone) 참조 정리
+- [x] RULES_DETAIL.md DB 테이블 목록 동기화 (client_contracts, pioneer_shares 추가)
+- [x] Memory 시스템 초기화 (MEMORY.md + 5개 메모리 파일)
+
+---
+
 ## 알려진 이슈
 
 - Gemini 무료 tier: 분당 2회 제한 → 429 시 자동 재시도 대응 완료
-- Streamlit Cloud `st.html()` height 파라미터 미지원 — folium으로 우회
 - PDF 검증 경고 일부 잔존 (진단표 vs 보장금액표 기준 차이) — 추가 PDF 데이터로 개선 예정
+- 200줄 초과 파일 15개 — 대형 리팩터링 별도 Sprint 필요
 
 ---
 
 ## 다음 세션 시작 시
 
 1. `git pull origin main`
-2. 실사용 피드백 수집 및 버그 수집
+2. 실사용 피드백 수집 (특히 지도/홈 속도 체감 개선 여부)
+3. analysis_records client_id 마이그레이션 적용 확인

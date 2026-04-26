@@ -3,8 +3,9 @@ import streamlit as st
 import requests
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def geocode(address: str) -> tuple[float, float] | None:
-    """주소 → (lat, lng). Kakao 시도 → 실패 시 Nominatim 폴백."""
+    """주소 → (lat, lng). Kakao 시도 → 실패 시 Nominatim 폴백. (1시간 캐싱)"""
     if not address:
         return None
     return _geocode_kakao(address) or _geocode_nominatim(address)
@@ -43,8 +44,9 @@ def _geocode_nominatim(address: str) -> tuple[float, float] | None:
     return None
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def reverse_geocode(lat: float, lng: float) -> str:
-    """좌표 → 주소 (Kakao Reverse Geocoding)"""
+    """좌표 → 주소 (Kakao Reverse Geocoding, 1시간 캐싱)"""
     try:
         res = requests.get(
             "https://dapi.kakao.com/v2/local/geo/coord2address.json",
@@ -62,8 +64,9 @@ def reverse_geocode(lat: float, lng: float) -> str:
     return ""
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def search_keyword(query: str, size: int = 5) -> list[dict]:
-    """카카오 키워드 검색"""
+    """카카오 키워드 검색 (5분 캐싱)"""
     try:
         key = st.secrets["kakao"]["rest_key"]
         res = requests.get(
