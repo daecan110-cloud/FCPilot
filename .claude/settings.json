@@ -25,6 +25,11 @@
       {
         "matcher": "Edit",
         "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '(item_map|excel_generator|excel_review|excel_helpers)\\.py$'; then echo '⚠️ 보장분석 관련 파일 수정 감지 — 템플릿 검증 실행:' && cd C:/FCPilot && py tests/test_excel_template.py 2>&1 || echo '❌ 템플릿 검증 실패! 수정 내용을 확인하세요.'; fi"
+      },
+      {
+        "matcher": "Edit",
+        "type": "command",
         "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then python -m py_compile \"$filepath\" 2>&1 && echo '구문 검사 통과' || echo '구문 오류 발견!'; fi"
       },
       {
