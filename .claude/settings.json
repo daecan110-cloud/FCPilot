@@ -13,7 +13,7 @@
     "SessionEnd": [
       {
         "type": "command",
-        "command": "cd C:/FCPilot && git add -A && git diff --cached --quiet || git commit -m 'auto: session end save' && git push origin main 2>/dev/null; echo '세션 종료 자동 저장'"
+        "command": "cd C:/FCPilot && git stash 2>/dev/null; echo '세션 종료 — 미커밋 변경사항 stash 보관. push는 /sprint-done으로 실행하세요.'"
       }
     ],
     "PostToolUse": [
@@ -56,6 +56,11 @@
         "matcher": "Edit",
         "type": "command",
         "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE 'views/.*\\.py$'; then grep -nP 'unsafe_allow_html=True' \"$filepath\" | while read -r line; do linenum=$(echo \"$line\" | cut -d: -f1); context=$(sed -n \"$((linenum-3)),$((linenum))p\" \"$filepath\"); if echo \"$context\" | grep -qE '\\{[a-z]' | grep -v 'esc('; then echo \"⚠️ 경고: $filepath:$linenum unsafe_allow_html에 이스케이프 안 된 변수 가능성\"; fi; done || true; fi"
+      },
+      {
+        "matcher": "Edit",
+        "type": "command",
+        "command": "filepath=\"$CLAUDE_TOOL_ARG_FILE_PATH\"; if echo \"$filepath\" | grep -qE '\\.py$'; then lines=$(wc -l < \"$filepath\" 2>/dev/null); if [ \"$lines\" -gt 200 ] 2>/dev/null; then echo \"⚠️ 경고: $filepath ${lines}줄 — CLAUDE.md 200줄 규칙 초과\"; fi; fi"
       },
       {
         "matcher": "Bash",
