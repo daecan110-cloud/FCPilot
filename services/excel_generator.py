@@ -128,15 +128,12 @@ def _hide_unused_columns(ws, n_contracts: int, has_proposal: bool = False):
     """사용하지 않는 데이터 열 숨기기 + 열 너비 균등 분배"""
     from openpyxl.utils import get_column_letter
     visible = n_contracts
-    # 열 너비: D~K 총 너비를 보이는 열 수로 균등 분배
-    total_width = sum(
-        ws.column_dimensions[get_column_letter(_DATA_START + i)].width
-        for i in range(8)
-    )
-    even_width = total_width / max(visible, 4)
+    # 계약 수별 열 너비 (인쇄 비율 수동 튜닝)
+    _WIDTH = {1: 27, 2: 27, 3: 27, 4: 27, 5: 23, 6: 20, 7: 18, 8: 15}
+    col_width = _WIDTH.get(visible, 15)
     for i in range(visible):
         col_letter = get_column_letter(_DATA_START + i)
-        ws.column_dimensions[col_letter].width = even_width
+        ws.column_dimensions[col_letter].width = col_width
     hidden_any = False
     for i in range(visible, 8):  # 미사용 열 숨기기
         col_idx = _DATA_START + i
@@ -177,7 +174,8 @@ def _add_summary_section(ws, n_contracts: int):
     _title_fill = PatternFill(patternType="solid", fgColor="1F3864")
     _title_align = Alignment(horizontal="left", vertical="center")
     _body_font = Font(name=_FONT_NAME, size=10, bold=True)
-    _body_align = Alignment(horizontal="left", vertical="top", wrap_text=True)
+    _body_fill = PatternFill(patternType="solid", fgColor="F2F2F2")
+    _body_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
     # 타이틀 행: 종합리뷰(A~F) / 보완하면 좋은 부분들(G~L)
     title_row = start
@@ -191,17 +189,16 @@ def _add_summary_section(ws, n_contracts: int):
         cell.alignment = _title_align
     ws.row_dimensions[title_row].height = 28
 
-    # 작성 영역: 좌(A~F) / 우(G~L) 분리, 1행
+    # 작성 영역: 먼저 서식 적용 → 병합 (테두리 누락 방지)
     r = title_row + 1
-    safe_merge(ws, f"A{r}:F{r}")
-    safe_merge(ws, f"G{r}:L{r}")
     for c in range(1, _MAX_COL + 1):
         cell = ws.cell(row=r, column=c)
-        if cell.__class__.__name__ == "MergedCell":
-            continue
         cell.border = _thin
         cell.font = _body_font
+        cell.fill = _body_fill
         cell.alignment = _body_align
+    safe_merge(ws, f"A{r}:F{r}")
+    safe_merge(ws, f"G{r}:L{r}")
     ws.row_dimensions[r].height = 100
 
 
