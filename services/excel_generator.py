@@ -151,8 +151,9 @@ def _clear_unused_review_rows(ws, n_contracts: int):
     from openpyxl.styles import PatternFill, Border
     empty_fill = PatternFill(fill_type=None)
     empty_border = Border()
-    for r in range(_REVIEW_START + n_contracts, _REVIEW_START + _REVIEW_COUNT):
-        for c in range(1, _MAX_COL + 1):
+    # 템플릿에 fill이 있는 행 전체 커버 (Row 92~99 = 8행)
+    for r in range(_REVIEW_START + n_contracts, _REVIEW_START + 8):
+        for c in range(1, _MAX_COL_PROP + 1):
             cell = ws.cell(row=r, column=c)
             if cell.__class__.__name__ == "MergedCell":
                 continue
