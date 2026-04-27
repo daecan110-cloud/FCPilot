@@ -54,10 +54,12 @@ def _do_extract(pdf) -> dict:
     p3 = pdf.pages[2]
     p3_text = p3.extract_text() or ""
     extra_pages = []
-    if len(pdf.pages) > 3:
-        p4_text = pdf.pages[3].extract_text() or ""
-        if "계약현황" in p4_text or "보유계약" in p4_text:
-            extra_pages.append(pdf.pages[3])
+    for ep_idx in range(3, min(len(pdf.pages), 8)):
+        ep_text = pdf.pages[ep_idx].extract_text() or ""
+        if "계약현황" in ep_text or "보유계약" in ep_text:
+            extra_pages.append(pdf.pages[ep_idx])
+        else:
+            break
     all_contracts = _parse_contracts(p3, extra_pages)
 
     # 성별/나이/보장점수
