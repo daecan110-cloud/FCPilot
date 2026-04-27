@@ -116,6 +116,7 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
     _final_format(ws, has_proposal=has_proposal)
     _hide_unused_columns(ws, n_contracts, has_proposal=has_proposal)
     _clear_unused_review_rows(ws, n_contracts)
+    _add_summary_section(ws, n_contracts)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -160,6 +161,48 @@ def _clear_unused_review_rows(ws, n_contracts: int):
             cell.value = None
             cell.fill = empty_fill
             cell.border = empty_border
+
+
+def _add_summary_section(ws, n_contracts: int):
+    """리뷰 섹션 아래에 '종합리뷰 / 보완하면 좋은 부분들' 영역 추가"""
+    from openpyxl.styles import PatternFill, Border, Side
+    from services.excel_helpers import safe_merge
+
+    start = _REVIEW_START + n_contracts
+    _thin = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+    _title_font = Font(name=_FONT_NAME, size=11, bold=True, color="FFFFFF")
+    _title_fill = PatternFill(patternType="solid", fgColor="1F3864")
+    _title_align = Alignment(horizontal="left", vertical="center")
+    _body_font = Font(name=_FONT_NAME, size=10, bold=True)
+    _body_align = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
+    # 타이틀 행: 종합리뷰(A~F) / 보완하면 좋은 부분들(G~L)
+    title_row = start
+    safe_merge(ws, f"A{title_row}:F{title_row}")
+    safe_merge(ws, f"G{title_row}:L{title_row}")
+    for col, title in [(1, "📝  종합리뷰"), (7, "💡  보완하면 좋은 부분들")]:
+        cell = ws.cell(row=title_row, column=col)
+        cell.value = title
+        cell.font = _title_font
+        cell.fill = _title_fill
+        cell.alignment = _title_align
+    ws.row_dimensions[title_row].height = 28
+
+    # 작성 영역: 좌(A~F) / 우(G~L) 분리, 1행
+    r = title_row + 1
+    safe_merge(ws, f"A{r}:F{r}")
+    safe_merge(ws, f"G{r}:L{r}")
+    for c in range(1, _MAX_COL + 1):
+        cell = ws.cell(row=r, column=c)
+        if cell.__class__.__name__ == "MergedCell":
+            continue
+        cell.border = _thin
+        cell.font = _body_font
+        cell.alignment = _body_align
+    ws.row_dimensions[r].height = 100
 
 
 def _clear_values(ws, has_proposal=False):
