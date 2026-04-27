@@ -215,9 +215,15 @@ def build_review(contract, coverage_data=None):
     premium = contract.get("월보험료", 0)
     checks = []
 
+    # 실손 판단: 상품명 키워드 또는 보장 데이터(Row 78~81)
+    has_silbi = (
+        any(k in combined for k in ["실손", "의료비"])
+        or (coverage_data and any(coverage_data.get(str(r), 0) for r in range(78, 82)))
+    )
+
     if any(k in combined for k in ["단체", "단기"]):
         checks.append("단체/단기계약 — 퇴직·탈퇴 시 자동 소멸")
-    elif any(k in combined for k in ["실손", "의료비"]):
+    elif has_silbi:
         start_date = contract.get("가입시기", "")
         gen = _detect_silbi_gen(name, company, start_date)
         checks.append(f"실손의료비 {gen} (갱신형)")
@@ -273,20 +279,22 @@ def _detect_silbi_gen(name: str, company: str, start_date: str = "") -> str:
         year = int(m.group(1))
         if year >= 2026:
             return "5세대"
-        if year >= 2017:
+        if year >= 2021:
             return "4세대"
+        if year >= 2017:
+            return "3세대"
 
     if start_date:
-        m = re.match(r"(\d{4})-?(\d{2})?", start_date)
+        m = re.match(r"(\d{4})[-.]?(\d{2})?", start_date)
         if m:
             y = int(m.group(1))
             mo = int(m.group(2) or "1")
             ym = y * 100 + mo
             if ym >= 202605:
                 return "5세대"
-            if ym >= 201704:
+            if ym >= 202107:
                 return "4세대"
-            if ym >= 201301:
+            if ym >= 201704:
                 return "3세대"
             if ym >= 200910:
                 return "2세대"
