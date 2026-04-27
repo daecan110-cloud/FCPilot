@@ -11,7 +11,7 @@ from openpyxl.worksheet.pagebreak import Break
 
 from services.item_map import COL_IDX, COL_LTRS, SUM_COL, PROP_COL, TOTAL_COL, DATA_ROWS
 from services.excel_helpers import (
-    safe_val, clear_values, _FONT_NAME,
+    safe_val, clear_values, _FONT_NAME, classify_product_type,
     DATA_START as _DATA_START, DATA_END as _DATA_END,
     MAX_COL as _MAX_COL, MAX_COL_PROP as _MAX_COL_PROP,
     REVIEW_START as _REVIEW_START, REVIEW_COUNT as _REVIEW_COUNT,
@@ -115,6 +115,7 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
 
     _final_format(ws, has_proposal=has_proposal)
     _hide_unused_columns(ws, n_contracts, has_proposal=has_proposal)
+    _clear_unused_review_rows(ws, n_contracts)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -123,18 +124,41 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
 
 
 def _hide_unused_columns(ws, n_contracts: int, has_proposal: bool = False):
-    """사용하지 않는 데이터 열 숨기기 (최소 4열 유지)"""
+    """사용하지 않는 데이터 열 숨기기 + 열 너비 균등 분배"""
     from openpyxl.utils import get_column_letter
-    visible = max(n_contracts, 4)  # 최소 4열 (D~G)
+    visible = n_contracts
+    # 열 너비: D~K 총 너비를 보이는 열 수로 균등 분배
+    total_width = sum(
+        ws.column_dimensions[get_column_letter(_DATA_START + i)].width
+        for i in range(8)
+    )
+    even_width = total_width / max(visible, 4)
+    for i in range(visible):
+        col_letter = get_column_letter(_DATA_START + i)
+        ws.column_dimensions[col_letter].width = even_width
     hidden_any = False
-    for i in range(visible, 8):  # 8열(D~K) 중 미사용 열 숨기기
-        col_idx = _DATA_START + i  # 열 번호 (8=H, 9=I, 10=J, 11=K)
+    for i in range(visible, 8):  # 미사용 열 숨기기
+        col_idx = _DATA_START + i
         col_letter = get_column_letter(col_idx)
         ws.column_dimensions[col_letter].hidden = True
         hidden_any = True
-    # 열 숨김 시 L열(합계+면책기간 겸용) 너비 확대
     if hidden_any:
         ws.column_dimensions["L"].width = 25
+
+
+def _clear_unused_review_rows(ws, n_contracts: int):
+    """리뷰 섹션에서 계약 수 초과 행의 서식(fill/border) 제거"""
+    from openpyxl.styles import PatternFill, Border
+    empty_fill = PatternFill(fill_type=None)
+    empty_border = Border()
+    for r in range(_REVIEW_START + n_contracts, _REVIEW_START + _REVIEW_COUNT):
+        for c in range(1, _MAX_COL + 1):
+            cell = ws.cell(row=r, column=c)
+            if cell.__class__.__name__ == "MergedCell":
+                continue
+            cell.value = None
+            cell.fill = empty_fill
+            cell.border = empty_border
 
 
 def _clear_values(ws, has_proposal=False):
@@ -164,17 +188,22 @@ def _fill_header(ws, slice_data):
     gender_full = "남자" if gender == "남" else "여자"
     safe_val(ws, 1, 1, f"{customer}님 ({gender_full}, {age}세) · 보장 분석표")
 
+    safe_val(ws, 4, 3, "상품성격")
+    safe_val(ws, 5, 3, "가입시기 / 납입기간\n(보장기간)")
     for c in slice_data.get("계약", []):
         col = COL_IDX.get(c["열"], 4)
         safe_val(ws, 2, col, c.get("보험사", ""))
         safe_val(ws, 3, col, c.get("상품명", ""))
-        safe_val(ws, 4, col, c.get("가입시기", ""))
+        safe_val(ws, 4, col, classify_product_type(c))
+        가입시기 = c.get("가입시기", "")
         납입기간 = c.get("_납입기간", "")
         coverage_period = c.get("보장나이", "")
-        if 납입기간 and coverage_period:
-            safe_val(ws, 5, col, f"{납입기간}\n({coverage_period})")
-        elif 납입기간:
-            safe_val(ws, 5, col, 납입기간)
+        parts = [p for p in [가입시기, 납입기간] if p]
+        line1 = " / ".join(parts)
+        if line1 and coverage_period:
+            safe_val(ws, 5, col, f"{line1}\n({coverage_period})")
+        elif line1:
+            safe_val(ws, 5, col, line1)
         else:
             safe_val(ws, 5, col, coverage_period or None)
         paid_m = c.get("_납입개월", 0)

@@ -9,6 +9,7 @@ from services.pdf_extractor import parse_amount
 # 키: 이름에 포함되어야 할 서브스트링 / 값: 순차 분배할 행 리스트
 _EXPAND_GROUPS = [
     ("특정순환계", [49, 50, 51, 52, 53]),
+    ("심뇌혈관", [49, 50, 51, 52, 53]),  # 심뇌혈관질환주요치료비 = 특정순환계 동일 행
     ("암주요치", [30, 31, 32, 33]),  # "상급종합병원...암주요치" truncated
 ]
 
@@ -25,6 +26,7 @@ def parse_detail_pages(pdf, all_contracts: list, coverage_raw: dict,
         return
 
     matched_indices = set()
+    prev_contract_idx = None
 
     # 세로 포맷은 상세 페이지가 index 7부터, 가로는 index 8부터 시작
     # 텍스트 필터("가입상품상세")로 자동 구분하므로 6부터 안전하게 탐색
@@ -33,12 +35,19 @@ def parse_detail_pages(pdf, all_contracts: list, coverage_raw: dict,
         text = pg.extract_text() or ""
 
         if "가입상품상세" not in text and "상세 보장" not in text:
+            prev_contract_idx = None
             continue
 
         contract_idx = _match_detail_to_contract(text, all_contracts, matched_indices)
         if contract_idx is None:
-            continue
-        matched_indices.add(contract_idx)
+            # 연속 페이지: 보험사/상품명 없으면 이전 계약의 계속
+            if prev_contract_idx is not None:
+                contract_idx = prev_contract_idx
+            else:
+                continue
+        else:
+            matched_indices.add(contract_idx)
+        prev_contract_idx = contract_idx
 
         if contract_idx not in coverage_raw:
             coverage_raw[contract_idx] = {}

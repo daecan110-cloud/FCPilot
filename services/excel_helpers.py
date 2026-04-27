@@ -69,6 +69,40 @@ def clear_values(ws, ranges: list):
                     cell.value = None
 
 
+def classify_product_type(contract: dict) -> str:
+    """상품명에서 상품 성격 분류 (보험사명은 제외)"""
+    name = contract.get("상품명", "")
+
+    if any(k in name for k in ["실손", "실비", "의료비"]):
+        return "실손보험"
+    if any(k in name for k in ["운전자", "드라이브", "drive", "Drive"]):
+        return "운전자보험"
+    if any(k in name for k in ["치아", "치과", "덴탈"]):
+        return "치아보험"
+    if any(k in name for k in ["종신"]):
+        return "종신보험"
+    if any(k in name for k in ["간병", "간호", "LTC"]):
+        return "간병보험"
+    if any(k in name for k in ["어린이", "자녀", "아이사랑"]):
+        return "어린이보험"
+    if any(k in name for k in ["저축", "연금", "변액"]):
+        return "저축보험"
+    if any(k in name for k in ["화재", "주택"]) and not any(
+        k in name for k in ["건강", "종합", "케어", "플러스", "보장", "암", "치아",
+                            "운전자", "실손", "의료비", "종신", "간병"]
+    ):
+        return "화재보험"
+    if any(k in name for k in ["암", "癌"]) and not any(
+        k in name for k in ["건강", "종합", "케어", "플러스", "보장"]
+    ):
+        return "암보험"
+    if any(k in name for k in ["상해보험"]) and not any(
+        k in name for k in ["건강", "종합"]
+    ):
+        return "상해보험"
+    return "건강보험"
+
+
 def short_name(contract: dict) -> str:
     """보험사·상품명 약칭"""
     name = contract.get("상품명", "")
