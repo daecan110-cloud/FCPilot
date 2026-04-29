@@ -102,7 +102,11 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
 
     # 실제 상품 수 기반 열 숨기기 + 리뷰 병합 범위 계산
     n_contracts = len(contracts)
-    visible_end = max(n_contracts, 4)  # 최소 4열 유지
+    # 통합 모드(전체 계약 9개 이상): 갱신 1그룹의 계약 7,8번이 J,K열에 들어가므로 8열 모두 유지
+    consolidated_multi = (
+        review_contracts is not None and len(review_contracts) > 8
+    )
+    visible_end = max(n_contracts, 8) if consolidated_multi else max(n_contracts, 4)
     last_data_col = _DATA_START + visible_end - 1  # 마지막 보이는 데이터 열
 
     review_count = n_contracts
@@ -122,7 +126,7 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
         review_count = 0
 
     _final_format(ws, has_proposal=has_proposal)
-    _hide_unused_columns(ws, n_contracts, has_proposal=has_proposal)
+    _hide_unused_columns(ws, visible_end, has_proposal=has_proposal)
     _clear_unused_review_rows(ws, review_count, extra_renewal)
     _add_summary_section(ws, review_count, extra_renewal)
 
