@@ -1,7 +1,7 @@
 """FCPilot — 메인 라우터 (로직 넣지 말 것)"""
 import streamlit as st
 from config import PAGE_CONFIG
-from auth import init_auth, is_logged_in, show_login_page, logout, check_session_timeout, get_user_status
+from auth import init_auth, is_logged_in, show_login_page, logout, check_session_timeout, get_user_status, is_admin
 
 st.set_page_config(**PAGE_CONFIG)
 
@@ -150,7 +150,7 @@ st.markdown("""
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
 
-    /* Streamlit Cloud "앱 관리" / Deploy / Share 버튼만 숨김 (stToolbar 자체는 유지 — 사이드바 토글 보존) */
+    /* Streamlit Cloud "앱 관리"(stStatusWidget) / Deploy / Share 등 기본 숨김 — admin은 main()에서 다시 노출 */
     [data-testid="stStatusWidget"],
     [data-testid="stDeployButton"],
     .stDeployButton,
@@ -210,6 +210,17 @@ def main():
         return
 
     check_session_timeout()
+
+    # admin 전용: Streamlit Cloud "앱 관리"(stStatusWidget) 버튼 노출 (리부트 가능)
+    if is_admin():
+        st.markdown(
+            "<style>"
+            "[data-testid='stStatusWidget'] {"
+            "display: block !important; visibility: visible !important;"
+            "}"
+            "</style>",
+            unsafe_allow_html=True,
+        )
 
     with st.sidebar:
         st.markdown(

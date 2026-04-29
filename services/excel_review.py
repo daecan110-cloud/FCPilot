@@ -371,6 +371,13 @@ def _write_review_header(ws, title_row: int, header_row: int,
     ce = get_column_letter(check_end)
     ns = get_column_letter(note_start)
 
+    # 헤더/타이틀 행에 남아있는 셀 값 초기화 (병합 변경 시 잔여값 중복 방지)
+    for r in (title_row, header_row):
+        for c in range(1, _MAX_COL + 1):
+            cell = ws.cell(row=r, column=c)
+            if cell.__class__.__name__ != "MergedCell":
+                cell.value = None
+
     ws.merge_cells(f"A{title_row}:L{title_row}")
     safe_val(ws, title_row, 1, "📋  현재 유지중인 보험 리뷰")
     ws.merge_cells(f"A{header_row}:B{header_row}")

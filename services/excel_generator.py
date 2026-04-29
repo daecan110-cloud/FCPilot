@@ -1,5 +1,6 @@
 """보장분석 엑셀 생성기 — v13 양식 8상품 (2026-04)"""
 import io
+import math
 import os
 import shutil
 import tempfile
@@ -104,6 +105,8 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
     visible_end = max(n_contracts, 4)  # 최소 4열 유지
     last_data_col = _DATA_START + visible_end - 1  # 마지막 보이는 데이터 열
 
+    review_count = n_contracts
+    extra_renewal = 0
     if review_contracts is None:
         fill_renewal(ws, contracts)
         fill_review(ws, contracts, slice_data.get("보장금액", {}),
@@ -112,11 +115,16 @@ def _fill_workbook(slice_data, proposal=None, review_contracts=None, all_coverag
         fill_renewal_all(ws, review_contracts, last_data_col=last_data_col)
         fill_review_all(ws, review_contracts, all_coverage_raw or {},
                         last_data_col=last_data_col)
+        review_count = len(review_contracts)
+        if review_count > 8:
+            extra_renewal = (math.ceil(review_count / 8) - 1) * 2
+    else:
+        review_count = 0
 
     _final_format(ws, has_proposal=has_proposal)
     _hide_unused_columns(ws, n_contracts, has_proposal=has_proposal)
-    _clear_unused_review_rows(ws, n_contracts)
-    _add_summary_section(ws, n_contracts)
+    _clear_unused_review_rows(ws, review_count, extra_renewal)
+    _add_summary_section(ws, review_count, extra_renewal)
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -144,13 +152,18 @@ def _hide_unused_columns(ws, n_contracts: int, has_proposal: bool = False):
         ws.column_dimensions["L"].width = 25
 
 
-def _clear_unused_review_rows(ws, n_contracts: int):
-    """리뷰 섹션에서 계약 수 초과 행의 서식(fill/border) 제거"""
+def _clear_unused_review_rows(ws, review_count: int, extra_renewal: int = 0):
+    """리뷰 섹션에서 계약 수 초과 행의 서식(fill/border) 제거.
+    review_count: 실제 리뷰가 들어간 계약 수 (통합 모드는 전체 계약 수)
+    extra_renewal: 갱신 섹션 확장으로 인한 리뷰 시작 행 오프셋"""
     from openpyxl.styles import PatternFill, Border
     empty_fill = PatternFill(fill_type=None)
     empty_border = Border()
-    # 템플릿에 fill이 있는 행 전체 커버 (Row 92~99 = 8행)
-    for r in range(_REVIEW_START + n_contracts, _REVIEW_START + 8):
+    base_start = _REVIEW_START + extra_renewal
+    template_capacity = 8  # 템플릿에 fill이 있는 행 수 (R92~R99)
+    if review_count >= template_capacity:
+        return  # 템플릿 행을 다 채우거나 초과 — 지울 행 없음
+    for r in range(base_start + review_count, base_start + template_capacity):
         for c in range(1, _MAX_COL_PROP + 1):
             cell = ws.cell(row=r, column=c)
             if cell.__class__.__name__ == "MergedCell":
@@ -160,12 +173,14 @@ def _clear_unused_review_rows(ws, n_contracts: int):
             cell.border = empty_border
 
 
-def _add_summary_section(ws, n_contracts: int):
-    """리뷰 섹션 아래에 '종합리뷰 / 보완하면 좋은 부분들' 영역 추가"""
+def _add_summary_section(ws, review_count: int, extra_renewal: int = 0):
+    """리뷰 섹션 아래에 '종합리뷰 / 보완하면 좋은 부분들' 영역 추가.
+    review_count: 실제 리뷰가 들어간 계약 수
+    extra_renewal: 갱신 섹션 확장으로 인한 리뷰 시작 행 오프셋"""
     from openpyxl.styles import PatternFill, Border, Side
     from services.excel_helpers import safe_merge
 
-    start = _REVIEW_START + n_contracts
+    start = _REVIEW_START + extra_renewal + review_count
     _thin = Border(
         left=Side(style="thin"), right=Side(style="thin"),
         top=Side(style="thin"), bottom=Side(style="thin"),
